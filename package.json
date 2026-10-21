@@ -1,0 +1,29 @@
+{
+  "name": "sala-campanha",
+  "description": "",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc",
+    "db:start": "supabase start",
+    "db:reset": "supabase db reset"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.14.0",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@12.14.0",
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
+    "zod": "^4.6.7"
+  },
+  "private": true
+}

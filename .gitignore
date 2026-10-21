@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+
+# Environment files hold local keys; only the example is versioned.
+.env*
+!.env.test.example
+
+# Superpowers scratch (ledgers, briefs, review packages).
+.superpowers/
+
+.DS_Store
