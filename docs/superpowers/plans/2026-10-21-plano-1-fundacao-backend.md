@@ -240,7 +240,7 @@ it('storage rejects upload outside own team prefix', async () => {
   - RPC `delete_provider_key(p_team uuid, p_provider provider) returns void`: só admin; remove o segredo do Vault.
   - RPC `get_provider_key_for_executor(p_team uuid, p_provider provider) returns text`: `execute` concedido só a `service_role`, revogado de `public`, `anon` e `authenticated`. É usado pelo Plano 2.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('admin sets key; members see only last4', async () => {
@@ -259,10 +259,10 @@ it('service role reads plaintext for executor', async () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/provider-keys.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Escrever `0003_provider_keys.sql`** usando `vault.create_secret` e `vault.update_secret`; a leitura usa `vault.decrypted_secrets` só dentro da função de executor. Nenhum `raise notice` com a chave.
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test tests/db/provider-keys.test.ts`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git commit -am "feat(db): team provider keys stored in Vault"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/provider-keys.test.ts`. Expected: FAIL.
+- [x] **Step 3: Escrever `0003_provider_keys.sql`** usando `vault.create_secret` e `vault.update_secret`; a leitura usa `vault.decrypted_secrets` só dentro da função de executor. Nenhum `raise notice` com a chave.
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test tests/db/provider-keys.test.ts`. Expected: PASS.
+- [x] **Step 5: Commit.** `git commit -am "feat(db): team provider keys stored in Vault"`
 
 ---
 
