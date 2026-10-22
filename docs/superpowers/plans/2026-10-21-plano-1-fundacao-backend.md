@@ -118,7 +118,7 @@ Expected: FAIL (`createTestTeam` não existe, ou a tabela `teams` não existe).
 
 O helper lê URL e chaves de `.env.test`, gerado a partir de `supabase status -o env`. Usa `auth.admin.createUser({ email_confirm: true })` e depois `signInWithPassword`. A inserção em `teams` e `team_members` só funciona depois da Task 2: neste passo, o helper só cria os usuários, e a parte de time fica pronta na Task 2.
 
-- [ ] **Step 6: Run test to verify it passes** (depois da Task 2, rodar de novo)
+- [x] **Step 6: Run test to verify it passes** (depois da Task 2, rodar de novo)
 
 Run: `pnpm test tests/db/harness.test.ts`
 Expected: PASS
@@ -153,7 +153,7 @@ git add -A && git commit -m "chore: scaffold workspace, local Supabase and test 
   - `private.can_approve(p_team uuid) returns boolean`: papel em (`admin`,`gestor`)
 - Policies: `select` em `teams` e `team_members` só para membros do time. Sem `insert`, `update` ou `delete` para `authenticated`; a gestão de membros fica para o admin via RPC no Plano 3.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('member sees own team and not another team', async () => {
@@ -171,10 +171,10 @@ it('authenticated cannot insert team_members', async () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/teams.test.ts`. Expected: FAIL (a tabela não existe).
-- [ ] **Step 3: Escrever `0001_teams.sql` e completar `createTestTeam`.** Funções em schema `private`, com `set search_path = ''`.
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test tests/db/teams.test.ts tests/db/harness.test.ts`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git commit -am "feat(db): teams, members and roles with RLS"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/teams.test.ts`. Expected: FAIL (a tabela não existe).
+- [x] **Step 3: Escrever `0001_teams.sql` e completar `createTestTeam`.** Funções em schema `private`, com `set search_path = ''`.
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test tests/db/teams.test.ts tests/db/harness.test.ts`. Expected: PASS.
+- [x] **Step 5: Commit.** `git commit -am "feat(db): teams, members and roles with RLS"`
 
 ---
 
