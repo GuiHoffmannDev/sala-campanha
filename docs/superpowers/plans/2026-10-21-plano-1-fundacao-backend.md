@@ -197,7 +197,7 @@ it('authenticated cannot insert team_members', async () => {
   - `update` de `pieces.status` e `approved_version_id` negado a `authenticated`; esses campos mudam só por RPC (Task 7).
   - Storage: leitura para membros do time do 1º segmento do caminho; escrita para `can_write`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('designer creates campaign and piece; espectador cannot', async () => {
@@ -219,10 +219,10 @@ it('storage rejects upload outside own team prefix', async () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/campaigns.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Escrever `0002_campaigns_pieces.sql`**, com bucket e policies de `storage.objects`.
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test tests/db/campaigns.test.ts`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git commit -am "feat(db): campaigns, pieces, reference assets and storage policies"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/campaigns.test.ts`. Expected: FAIL.
+- [x] **Step 3: Escrever `0002_campaigns_pieces.sql`**, com bucket e policies de `storage.objects`.
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test tests/db/campaigns.test.ts`. Expected: PASS.
+- [x] **Step 5: Commit.** `git commit -am "feat(db): campaigns, pieces, reference assets and storage policies"`
 
 ---
 
