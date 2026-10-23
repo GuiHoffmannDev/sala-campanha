@@ -394,7 +394,7 @@ it('rejects piece from another team', async () => { /* upload_final_version em p
   - `comments(id, version_id, piece_id, team_id, author_id, body text not null, x real null, y real null, parent_id uuid null, resolved boolean default false, created_at)`, com `check ((x is null) = (y is null) and (x is null or (x between 0 and 1 and y between 0 and 1)))`. As coordenadas são relativas à imagem (0–1). Comentário sem coordenadas é comentário simples na versão, que é o corte nº 1 do spec.
   - RLS: `select` para membros; `insert` com `can_write` e `author_id = auth.uid()`; `update` só de `resolved`, por `can_write`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('designer comments on a point of the image', async () => {})
@@ -404,8 +404,8 @@ it('reply keeps thread via parent_id', async () => {})
 it('rejects comment authored as someone else', async () => {})
 ```
 
-- [ ] **Step 2–4:** como nas tasks anteriores. Run: `pnpm db:reset && pnpm test tests/db/comments.test.ts`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git commit -am "feat(db): pinned comments on versions"`
+- [x] **Step 2–4:** como nas tasks anteriores. Run: `pnpm db:reset && pnpm test tests/db/comments.test.ts`. Expected: PASS.
+- [x] **Step 5: Commit.** `git commit -am "feat(db): pinned comments on versions"`
 
 ---
 
