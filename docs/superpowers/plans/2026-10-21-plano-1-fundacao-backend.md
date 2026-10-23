@@ -11,7 +11,7 @@
 **Spec:** `docs/superpowers/specs/2026-10-21-sala-campanha-design.md`
 
 **Planos seguintes (fora deste):**
-- Plano 2: executor do agente (consome `claim_next_message`, chama provedores com `get_provider_key_for_executor`, grava versões).
+- Plano 2: executor do agente (consome `claim_next_message`, chama provedores com `get_provider_key_for_executor`, grava versões com `add_agent_version(..., p_executor)`).
 - Plano 3: app Tauri para macOS (UI, presença, link de compartilhamento).
 
 ## Global Constraints
@@ -81,7 +81,7 @@ sala-campanha/
   - `ROLES = ['admin','gestor','designer','espectador'] as const`, `type Role`
   - `PIECE_STATUSES = ['gerando','base_em_revisao','acabamento','final_em_revisao','aprovada'] as const`, `type PieceStatus`
   - `PROVIDERS = ['openai','anthropic','gemini','fal','krea'] as const`, `type Provider`
-  - `EVENT_KINDS = ['user_message','agent_started','agent_result','agent_error','status_changed','version_added','approval'] as const`, `type EventKind`
+  - `EVENT_KINDS = ['user_message','agent_started','agent_result','agent_error','status_changed','version_added','approval','comment'] as const`, `type EventKind`
   - `DELIVERY_STATUSES = ['queued','claimed','done','failed','not_applicable'] as const`, `type DeliveryStatus`
 - Produces (`tests/helpers/supabase.ts`):
   - `serviceClient(): SupabaseClient` (service role)
@@ -186,16 +186,17 @@ it('authenticated cannot insert team_members', async () => {
 
 **Interfaces:**
 - Produces (SQL):
-  - `campaigns(id, team_id, name, created_by, created_at)`
+  - `campaigns(id, team_id, name, created_by, created_at)`. `created_by`/`uploaded_by` são `null default auth.uid()` com `on delete set null`.
   - `pieces(id, campaign_id, team_id, title, kind text check in ('imagem','texto','imagem_texto'), status piece_status default 'gerando', approved_version_id uuid null, created_by, created_at)`. O `team_id` é denormalizado para RLS.
   - enum `piece_status` com os 5 status
   - `reference_assets(id, campaign_id, team_id, storage_path, original_name, uploaded_by, created_at)`
-  - Bucket privado `team-files`, com caminho obrigatório `<team_id>/...`
+  - Bucket privado `team-files`, com caminho obrigatório `<team_id>/...` (uuid em minúsculas).
+  - `private.file_exists(p_path text) returns boolean`: `security definer`; confere se o objeto existe em `team-files`.
 - Policies:
   - `select` para membros do time.
-  - `insert` em `campaigns`, `pieces` e `reference_assets` quando `private.can_write(team_id)`.
-  - `update` de `pieces.status` e `approved_version_id` negado a `authenticated`; esses campos mudam só por RPC (Task 7).
-  - Storage: leitura para membros do time do 1º segmento do caminho; escrita para `can_write`.
+  - `insert` em `campaigns`, `pieces` e `reference_assets` quando `private.can_write(team_id)`; `reference_assets` exige também `private.file_exists(storage_path)`.
+  - `update` de `pieces.title` para `can_write` (renomear na UI). `update` de `pieces.status` e `approved_version_id` negado a `authenticated`; esses campos mudam só por RPC (Task 7).
+  - Storage: leitura para membros do time do 1º segmento do caminho; upload para `can_write`. Write-once: sem update/move/delete para `authenticated`; limpeza só pelo service role.
 
 - [x] **Step 1: Write the failing tests**
 
@@ -351,16 +352,19 @@ it('release_stale_claims requeues old claims', async () => { /* claim; release('
 
 **Interfaces:**
 - Produces (SQL):
-  - `piece_versions(id, piece_id, team_id, number int, origin text check in ('agente','upload'), phase text check in ('base','final'), image_path text null, caption text null, author_id uuid null, source_event_id bigint null, created_at, unique(piece_id, number), check (image_path is not null or caption is not null))`
-  - RPC `add_agent_version(p_piece uuid, p_image_path text, p_caption text, p_source_event bigint) returns piece_versions`: só `service_role`. Cria a versão `phase='base'` e, se o status é `gerando`, muda para `base_em_revisao`. Grava eventos `version_added` e `status_changed`.
+  - `piece_versions(id, piece_id, team_id, number int, origin text check in ('agente','upload','edicao'), phase text check in ('base','final'), image_path text null, caption text null, author_id uuid null, source_event_id bigint null, created_at, unique(piece_id, number), check (image_path is not null or caption is not null))`
+  - Regra de pacote (em toda versão criada): `imagem` = só `image_path`; `texto` = só `caption`; `imagem_texto` = os dois. A imagem precisa existir no Storage (`private.file_exists`).
+  - RPC `add_agent_version(p_piece uuid, p_image_path text, p_caption text, p_source_event bigint, p_executor text) returns piece_versions`: só `service_role`. Exige que `p_source_event` seja mensagem da peça com `delivery='claimed'` e `claimed_by = p_executor` (evita resultado duplicado depois de `release_stale_claims`). Só em `gerando` ou `base_em_revisao`. Cria a versão `phase='base'` e, se o status é `gerando`, muda para `base_em_revisao`. Grava eventos `version_added` e `status_changed`.
   - RPC `upload_final_version(p_piece uuid, p_image_path text, p_caption text) returns piece_versions`: exige `can_write` e status em (`acabamento`,`final_em_revisao`). Cria a versão `phase='final'`, muda o status para `final_em_revisao` e grava os eventos.
-  - RPC `update_caption(p_version uuid, p_caption text) returns piece_versions`: exige `can_write` e versão ainda não aprovada; cria uma nova versão com a mesma imagem e a nova legenda.
+  - RPC `update_caption(p_version uuid, p_caption text) returns piece_versions`: exige `can_write`; só para versão da fase em revisão (`base_em_revisao` + `base` ou `final_em_revisao` + `final`) que nunca recebeu evento `approval`; peça `imagem` não tem legenda. Cria uma nova versão `origin='edicao'` com a mesma imagem e a nova legenda.
   - RPC `approve_version(p_piece uuid, p_version uuid) returns pieces`: exige `can_approve` na peça; a versão precisa ser dessa peça.
     - `base_em_revisao` + versão `base` → `acabamento`.
     - `final_em_revisao` + versão `final` → `aprovada`.
     - Peça só de texto em `base_em_revisao` → `aprovada` (a fase de acabamento é opcional para texto, conforme o spec).
     - Atualiza `approved_version_id` e grava o evento `approval`.
-  - RPC `step_back(p_piece uuid) returns pieces`: exige `can_write`. Volta um status na ordem de `PIECE_STATUSES` e grava `status_changed` com `{from,to}`. Em `gerando`, falha com `'no previous status'`.
+    - Qualquer versão da fase pode ser aprovada, não só a mais nova (o gestor pode preferir uma anterior).
+  - RPC `step_back(p_piece uuid) returns pieces`: exige `can_write`; sair de `aprovada` exige `can_approve`. Volta um status na ordem de `PIECE_STATUSES` (peça `texto`: `gerando → base_em_revisao → aprovada`) e grava `status_changed` com `{from,to}`. Em `gerando`, falha com `'no previous status'`.
+    - `approved_version_id`: limpo ao voltar para `base_em_revisao`; de `aprovada` para `final_em_revisao`, volta a ser a base aprovada mais recente; nos demais casos, mantido.
 
 - [x] **Step 1: Write the failing tests**
 
@@ -391,7 +395,9 @@ it('rejects piece from another team', async () => { /* upload_final_version em p
 
 **Interfaces:**
 - Produces (SQL):
-  - `comments(id, version_id, piece_id, team_id, author_id, body text not null, x real null, y real null, parent_id uuid null, resolved boolean default false, created_at)`, com `check ((x is null) = (y is null) and (x is null or (x between 0 and 1 and y between 0 and 1)))`. As coordenadas são relativas à imagem (0–1). Comentário sem coordenadas é comentário simples na versão, que é o corte nº 1 do spec.
+  - `comments(id, version_id, piece_id, team_id, author_id, body text not null, x real null, y real null, text_start int null, text_end int null, quote text null, parent_id uuid null, resolved boolean default false, created_at)`. O alvo é um só: ponto na imagem (`x`,`y` entre 0 e 1), trecho da legenda (`[text_start, text_end)` mais o texto citado em `quote`, conferido contra a legenda por trigger) ou nenhum (comentário simples na versão, o corte nº 1 do spec).
+  - Fio de um nível: a resposta aponta para um comentário raiz e não tem alvo próprio.
+  - Cada comentário grava um evento `comment` em `session_events` (`{comment_id, version_id, parent_id}`, não vai ao agente).
   - RLS: `select` para membros; `insert` com `can_write` e `author_id = auth.uid()`; `update` só de `resolved`, por `can_write`.
 
 - [x] **Step 1: Write the failing tests**
@@ -433,6 +439,31 @@ it('member receives new event; other team does not', async () => {
 - [x] **Step 5: Commit.** `git commit -am "feat(db): realtime publication for collaborative tables"`
 
 ---
+
+## Decisões da revisão final (2026-10-23)
+
+A revisão final do plano contra o spec gerou estas regras, já refletidas nas interfaces acima:
+
+| Tema | Decisão |
+|---|---|
+| Comentário em texto | `text_start`, `text_end` e `quote`; o alvo é um ponto, um trecho ou nada |
+| Desfazer aprovação | Só `admin` e `gestor` tiram a peça de `aprovada` (o spec deixa todos voltarem etapa, mas só esses dois aprovam) |
+| `approved_version_id` | Acompanha a aprovação em vigor ao voltar etapa; o histórico completo fica nos eventos `approval` |
+| `update_caption` | Só na fase em revisão, em versão nunca aprovada; `origin='edicao'` |
+| Pacote por tipo | `imagem` = imagem; `texto` = legenda; `imagem_texto` = as duas |
+| Agente fora de fase | `add_agent_version` só em `gerando` ou `base_em_revisao`, com claim ativo do executor |
+| Versão antiga | Pode ser aprovada |
+| Storage | Write-once para membros; o arquivo precisa existir para virar versão ou referência |
+| Fio de respostas | Um nível |
+| `update(title)` em `pieces` | Mantido para renomear na UI |
+| DELETE no Realtime | Não passa por RLS: o service role, ao apagar em cascata, expõe só as chaves primárias a outros assinantes. Aceito: deleção é rara e manual |
+
+## Checklist de deploy
+
+- `log_statement` em `ddl` ou `none` (com `all`/`mod`, a chave de `set_provider_key` vai para o log). O teste `Postgres does not log statement text with keys` cobre o ambiente local.
+- Sem pgaudit (ou equivalente) registrando os parâmetros de `public.set_provider_key`.
+- `log_min_duration_statement` desligado, ou sem registrar parâmetros.
+- As migrations 0002–0008 foram editadas no lugar antes do primeiro deploy. Depois de aplicadas em um banco remoto, toda mudança vira migration nova.
 
 ## Pré-requisitos para o Plano 3 (registrar, não executar aqui)
 

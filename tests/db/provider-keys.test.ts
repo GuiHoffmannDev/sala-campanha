@@ -145,3 +145,9 @@ it('deleting the admin who set a key keeps the key', async () => {
   const { data: plain } = await serviceClient().rpc('get_provider_key_for_executor', { p_team: t.teamId, p_provider: 'openai' })
   expect(plain).toBe(KEY)
 })
+
+it('Postgres does not log statement text with keys', async () => {
+  // `all` or `mod` would write set_provider_key calls, plaintext key included, to the log.
+  const [row] = await dbQuery<{ log_statement: string }>('show log_statement')
+  expect(['none', 'ddl']).toContain(row?.log_statement)
+})
