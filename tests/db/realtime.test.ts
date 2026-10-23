@@ -1,5 +1,5 @@
 import type { RealtimePostgresChangesPayload, SupabaseClient } from '@supabase/supabase-js'
-import { createPieceFixture, serviceClient } from '../helpers/supabase'
+import { createAgentVersion, createPieceFixture, serviceClient } from '../helpers/supabase'
 
 type Change = RealtimePostgresChangesPayload<Record<string, unknown>>
 type Subscription = { table: string; filter?: string }
@@ -89,10 +89,7 @@ it('pieces, versions and comments reach members of the team only', async () => {
   const other = await listen(b.t.members.admin.client, TABLES.map((table) => ({ table })))
 
   // Agent result: new version, status gerando → base_em_revisao, status_changed event.
-  const { data: version, error } = await serviceClient().rpc('add_agent_version', {
-    p_piece: a.pieceId, p_image_path: `${a.t.teamId}/${a.pieceId}/base.png`, p_caption: 'Legenda', p_source_event: null,
-  })
-  expect(error).toBeNull()
+  const version = await createAgentVersion(a)
   const designer = a.t.members.designer
   const comment = await designer.client.from('comments')
     .insert({ version_id: version.id, piece_id: a.pieceId, team_id: a.t.teamId, author_id: designer.userId, body: 'Logo menor' })

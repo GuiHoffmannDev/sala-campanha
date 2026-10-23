@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { createPieceFixture, createTestTeam, serviceClient, type PieceFixture } from '../helpers/supabase'
+import { createAgentVersion, createPieceFixture, createTestTeam, serviceClient, type PieceFixture } from '../helpers/supabase'
 
 type Comment = {
   id: string; version_id: string; piece_id: string; team_id: string; author_id: string | null
@@ -9,11 +9,8 @@ type Comment = {
 /** Piece with one agent version; returns the fixture and the version id. */
 async function withVersion(): Promise<{ f: PieceFixture; versionId: string }> {
   const f = await createPieceFixture()
-  const { data, error } = await serviceClient().rpc('add_agent_version', {
-    p_piece: f.pieceId, p_image_path: `${f.t.teamId}/${f.pieceId}/base.png`, p_caption: 'Legenda', p_source_event: null,
-  })
-  if (error || !data) throw new Error(`add_agent_version failed: ${error?.message}`)
-  return { f, versionId: data.id }
+  const version = await createAgentVersion(f, { caption: 'Legenda' })
+  return { f, versionId: version.id }
 }
 
 function comment(c: SupabaseClient, f: PieceFixture, versionId: string, authorId: string, extra: Record<string, unknown> = {}) {
@@ -80,9 +77,7 @@ it('reply must stay on the same version', async () => {
   const { f, versionId } = await withVersion()
   const d = f.t.members.designer
   const { data: root } = await comment(d.client, f, versionId, d.userId)
-  const { data: v2 } = await serviceClient().rpc('add_agent_version', {
-    p_piece: f.pieceId, p_image_path: `${f.t.teamId}/${f.pieceId}/v2.png`, p_caption: null, p_source_event: null,
-  })
+  const v2 = await createAgentVersion(f)
   const { error } = await comment(d.client, f, v2.id, d.userId, { parent_id: root!.id })
   expect(error?.code).toBe('23503')
 })

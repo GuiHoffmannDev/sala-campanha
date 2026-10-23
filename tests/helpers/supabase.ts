@@ -81,8 +81,10 @@ export async function createTestTeam(name = `Test team ${randomUUID()}`): Promis
 
 export type PieceFixture = { t: TestTeam; campaignId: string; pieceId: string }
 
+export type PieceKind = 'imagem' | 'texto' | 'imagem_texto'
+
 /** Creates a test team with one campaign and one piece, using the service role. */
-export async function createPieceFixture(t?: TestTeam): Promise<PieceFixture> {
+export async function createPieceFixture(t?: TestTeam, kind: PieceKind = 'imagem_texto'): Promise<PieceFixture> {
   const team = t ?? (await createTestTeam())
   const admin = serviceClient()
   const { data: campaign, error: campaignError } = await admin.from('campaigns')
@@ -91,7 +93,7 @@ export async function createPieceFixture(t?: TestTeam): Promise<PieceFixture> {
   if (campaignError || !campaign) throw new Error(`insert campaign failed: ${campaignError?.message}`)
 
   const { data: piece, error: pieceError } = await admin.from('pieces')
-    .insert({ campaign_id: campaign.id, team_id: team.teamId, title: 'Peça de teste', kind: 'imagem_texto', created_by: team.members.admin.userId })
+    .insert({ campaign_id: campaign.id, team_id: team.teamId, title: 'Peça de teste', kind, created_by: team.members.admin.userId })
     .select('id').single()
   if (pieceError || !piece) throw new Error(`insert piece failed: ${pieceError?.message}`)
 
@@ -104,4 +106,45 @@ export async function uploadTeamFile(path: string): Promise<string> {
     .upload(path, new Blob(['png'], { type: 'image/png' }))
   if (error) throw new Error(`upload ${path} failed: ${error.message}`)
   return path
+}
+
+export const TEST_EXECUTOR = 'test-executor'
+
+/**
+ * Posts a message to the agent and marks it claimed by `executor`. Claims the
+ * row directly instead of calling claim_next_message, which takes the oldest
+ * queued message of any piece and could grab another test's message.
+ */
+export async function createClaimedMessage(f: PieceFixture, executor = TEST_EXECUTOR): Promise<number> {
+  const { data: msg, error } = await f.t.members.gestor.client.rpc('post_message', { p_piece: f.pieceId, p_text: 'Gerar versão' })
+  if (error || !msg) throw new Error(`post_message failed: ${error?.message}`)
+  const { error: claimError } = await serviceClient().from('session_events')
+    .update({ delivery: 'claimed', claimed_by: executor, claimed_at: new Date().toISOString() }).eq('id', msg.id)
+  if (claimError) throw new Error(`claim message failed: ${claimError.message}`)
+  return msg.id
+}
+
+export type Version = {
+  id: string; piece_id: string; number: number; origin: string; phase: string
+  image_path: string | null; caption: string | null; author_id: string | null; source_event_id: number | null
+}
+
+/** Uploads a new image under the piece folder and returns its path. */
+export const uploadPieceImage = (f: PieceFixture) => uploadTeamFile(`${f.t.teamId}/${f.pieceId}/${randomUUID()}.png`)
+
+/**
+ * Stores an agent base version the way the executor does: claimed source
+ * message, uploaded image (unless `image` is false), then add_agent_version.
+ */
+export async function createAgentVersion(
+  f: PieceFixture, opts: { caption?: string | null; image?: boolean } = {},
+): Promise<Version> {
+  const caption = opts.caption === undefined ? 'Legenda base' : opts.caption
+  const image = opts.image === false ? null : await uploadPieceImage(f)
+  const source = await createClaimedMessage(f)
+  const { data, error } = await serviceClient().rpc('add_agent_version', {
+    p_piece: f.pieceId, p_image_path: image, p_caption: caption, p_source_event: source, p_executor: TEST_EXECUTOR,
+  })
+  if (error || !data) throw new Error(`add_agent_version failed: ${error?.message}`)
+  return data
 }
