@@ -3,7 +3,7 @@
 
 create type public.event_kind as enum (
   'user_message', 'agent_started', 'agent_result', 'agent_error',
-  'status_changed', 'version_added', 'approval'
+  'status_changed', 'version_added', 'approval', 'comment'
 );
 
 create type public.delivery_status as enum (

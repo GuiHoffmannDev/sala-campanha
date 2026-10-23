@@ -23,6 +23,7 @@ export const EVENT_KINDS = [
   'status_changed',
   'version_added',
   'approval',
+  'comment',
 ] as const
 export const EventKindSchema = z.enum(EVENT_KINDS)
 export type EventKind = z.infer<typeof EventKindSchema>
