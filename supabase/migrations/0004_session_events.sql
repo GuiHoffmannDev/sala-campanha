@@ -59,8 +59,19 @@ set search_path = ''
 as $$
 declare
   v_piece public.pieces;
-  v_mentions uuid[] := coalesce(p_mention_user_ids, '{}');
+  -- Duplicates removed, first-seen order kept, so a person is notified once.
+  v_mentions uuid[] := array(
+    select m.user_id from unnest(coalesce(p_mention_user_ids, '{}')) with ordinality as m (user_id, pos)
+    group by m.user_id order by min(m.pos)
+  );
   v_refs uuid[] := coalesce(p_reference_asset_ids, '{}');
+  -- Text without leading/trailing blanks. `\s` misses Unicode spaces such as
+  -- NBSP and zero-width ones, so they are listed explicitly.
+  v_trimmed text := regexp_replace(
+    p_text,
+    '^[\s   -​    　﻿]+|[\s   -​    　﻿]+$',
+    '', 'g'
+  );
   v_to_agent boolean;
   v_event public.session_events;
 begin
@@ -70,7 +81,7 @@ begin
     raise exception 'piece not found or not writable' using errcode = '42501';
   end if;
 
-  if p_text is null or p_text !~ '\S' then
+  if v_trimmed is null or v_trimmed = '' then
     raise exception 'message text must not be empty' using errcode = '22023';
   end if;
 
@@ -95,7 +106,7 @@ begin
   end if;
 
   -- People-only conversation: starts with `@` and names at least one person.
-  v_to_agent := not (left(ltrim(p_text, E' \t\r\n'), 1) = '@' and cardinality(v_mentions) > 0);
+  v_to_agent := not (left(v_trimmed, 1) = '@' and cardinality(v_mentions) > 0);
 
   insert into public.session_events (piece_id, team_id, author_id, kind, body, to_agent, mention_user_ids, delivery)
   values (

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import pg from 'pg'
 import { ROLES, type Role } from '../../packages/shared/src/domain'
 
 const ENV_FILE = '.env.test'
@@ -12,12 +13,13 @@ function loadEnv() {
   const url = process.env.SUPABASE_URL
   const anonKey = process.env.SUPABASE_ANON_KEY
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !anonKey || !serviceRoleKey) {
+  const dbUrl = process.env.SUPABASE_DB_URL
+  if (!url || !anonKey || !serviceRoleKey || !dbUrl) {
     throw new Error(
-      `Missing SUPABASE_URL, SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY. Create ${ENV_FILE} as described in .env.test.example.`,
+      `Missing SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY or SUPABASE_DB_URL. Create ${ENV_FILE} as described in .env.test.example.`,
     )
   }
-  return { url, anonKey, serviceRoleKey }
+  return { url, anonKey, serviceRoleKey, dbUrl }
 }
 
 const env = loadEnv()
@@ -27,6 +29,17 @@ const clientOptions = { auth: { persistSession: false, autoRefreshToken: false }
 
 export function serviceClient(): SupabaseClient {
   return createClient(env.url, env.serviceRoleKey, clientOptions)
+}
+
+/** Runs SQL as `postgres` on the local DB, for checks PostgREST cannot reach (such as the Vault). */
+export async function dbQuery<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
+  const client = new pg.Client({ connectionString: env.dbUrl })
+  await client.connect()
+  try {
+    return (await client.query(sql, params)).rows as T[]
+  } finally {
+    await client.end()
+  }
 }
 
 export type TestMember = { userId: string; client: SupabaseClient }

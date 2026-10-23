@@ -1,6 +1,16 @@
-import { createTestTeam, serviceClient } from '../helpers/supabase'
+import { createTestTeam, dbQuery, serviceClient } from '../helpers/supabase'
 
 const KEY = 'sk-test-1234567890abcd'
+
+async function secretIdOf(teamId: string, provider: string): Promise<string> {
+  const { data, error } = await serviceClient().from('provider_keys').select('vault_secret_id').eq('team_id', teamId).eq('provider', provider).single()
+  if (error || !data) throw new Error(`provider_keys row not found: ${error?.message}`)
+  return data.vault_secret_id
+}
+
+async function vaultHasSecret(secretId: string): Promise<boolean> {
+  return (await dbQuery('select 1 from vault.secrets where id = $1', [secretId])).length === 1
+}
 
 it('admin sets key; members see only last4', async () => {
   const t = await createTestTeam()
@@ -22,7 +32,7 @@ it('admin of another team cannot set or delete key', async () => {
   const a = await createTestTeam('A'); const b = await createTestTeam('B')
   await a.members.admin.client.rpc('set_provider_key', { p_team: a.teamId, p_provider: 'openai', p_key: KEY })
 
-  const { error: setError } = await b.members.admin.client.rpc('set_provider_key', { p_team: a.teamId, p_provider: 'openai', p_key: 'sk-other-team-key' })
+  const { error: setError } = await b.members.admin.client.rpc('set_provider_key', { p_team: a.teamId, p_provider: 'openai', p_key: 'sk-other-team-key-0000' })
   expect(setError).not.toBeNull()
   const { error: deleteError } = await b.members.admin.client.rpc('delete_provider_key', { p_team: a.teamId, p_provider: 'openai' })
   expect(deleteError).not.toBeNull()
@@ -31,12 +41,12 @@ it('admin of another team cannot set or delete key', async () => {
   expect(data).toBe(KEY)
 })
 
-it('rejects key shorter than 8 characters', async () => {
+it('rejects key shorter than 20 characters', async () => {
   const t = await createTestTeam()
-  const { error } = await t.members.admin.client.rpc('set_provider_key', { p_team: t.teamId, p_provider: 'openai', p_key: 'sk-1234' })
+  const { error } = await t.members.admin.client.rpc('set_provider_key', { p_team: t.teamId, p_provider: 'openai', p_key: 'sk-' + 'x'.repeat(16) })
   expect(error).not.toBeNull()
-  // Positive control: exactly 8 characters is accepted, so the rejection above is about length.
-  expect((await t.members.admin.client.rpc('set_provider_key', { p_team: t.teamId, p_provider: 'openai', p_key: 'sk-12345' })).error).toBeNull()
+  // Positive control: exactly 20 characters is accepted, so the rejection above is about length.
+  expect((await t.members.admin.client.rpc('set_provider_key', { p_team: t.teamId, p_provider: 'openai', p_key: 'sk-' + 'x'.repeat(17) })).error).toBeNull()
 })
 
 it('never returns plaintext to members', async () => {
@@ -51,6 +61,7 @@ it('never returns plaintext to members', async () => {
   expect(all.error).not.toBeNull()
   expect(JSON.stringify(all)).not.toContain(KEY)
   expect((await admin.from('provider_keys').select('vault_secret_id')).error).not.toBeNull()
+  expect((await admin.from('provider_keys').select('updated_by')).error).not.toBeNull()
 
   const visible = await admin.from('provider_keys').select('team_id,provider,last4,updated_at')
   expect(visible.error).toBeNull()
@@ -87,6 +98,7 @@ it('admin deletes key; executor gets nothing', async () => {
   const t = await createTestTeam()
   const admin = t.members.admin.client
   await admin.rpc('set_provider_key', { p_team: t.teamId, p_provider: 'gemini', p_key: KEY })
+  const secretId = await secretIdOf(t.teamId, 'gemini')
 
   expect((await t.members.gestor.client.rpc('delete_provider_key', { p_team: t.teamId, p_provider: 'gemini' })).error).not.toBeNull()
   expect((await admin.rpc('delete_provider_key', { p_team: t.teamId, p_provider: 'gemini' })).error).toBeNull()
@@ -96,4 +108,40 @@ it('admin deletes key; executor gets nothing', async () => {
   const { data: plain, error } = await serviceClient().rpc('get_provider_key_for_executor', { p_team: t.teamId, p_provider: 'gemini' })
   expect(error).toBeNull()
   expect(plain).toBeNull()
+  expect(await vaultHasSecret(secretId)).toBe(false)
+})
+
+it('deleting the team removes its Vault secrets', async () => {
+  const t = await createTestTeam()
+  await t.members.admin.client.rpc('set_provider_key', { p_team: t.teamId, p_provider: 'openai', p_key: KEY })
+  const secretId = await secretIdOf(t.teamId, 'openai')
+  expect(await vaultHasSecret(secretId)).toBe(true)
+
+  expect((await serviceClient().from('teams').delete().eq('id', t.teamId)).error).toBeNull()
+  expect(await vaultHasSecret(secretId)).toBe(false)
+})
+
+it('set_provider_key recreates a secret removed outside the RPCs', async () => {
+  const t = await createTestTeam()
+  const admin = t.members.admin.client
+  await admin.rpc('set_provider_key', { p_team: t.teamId, p_provider: 'anthropic', p_key: KEY })
+  await dbQuery('delete from vault.secrets where id = $1', [await secretIdOf(t.teamId, 'anthropic')])
+
+  const newKey = 'sk-ant-replacement-key-0000'
+  expect((await admin.rpc('set_provider_key', { p_team: t.teamId, p_provider: 'anthropic', p_key: newKey })).error).toBeNull()
+  expect(await vaultHasSecret(await secretIdOf(t.teamId, 'anthropic'))).toBe(true)
+  const { data: plain } = await serviceClient().rpc('get_provider_key_for_executor', { p_team: t.teamId, p_provider: 'anthropic' })
+  expect(plain).toBe(newKey)
+})
+
+it('deleting the admin who set a key keeps the key', async () => {
+  const t = await createTestTeam()
+  await t.members.admin.client.rpc('set_provider_key', { p_team: t.teamId, p_provider: 'openai', p_key: KEY })
+
+  expect((await serviceClient().auth.admin.deleteUser(t.members.admin.userId)).error).toBeNull()
+
+  const { data } = await serviceClient().from('provider_keys').select('updated_by,last4').eq('team_id', t.teamId)
+  expect(data).toEqual([{ updated_by: null, last4: 'abcd' }])
+  const { data: plain } = await serviceClient().rpc('get_provider_key_for_executor', { p_team: t.teamId, p_provider: 'openai' })
+  expect(plain).toBe(KEY)
 })

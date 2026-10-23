@@ -236,7 +236,7 @@ it('storage rejects upload outside own team prefix', async () => {
 - Produces (SQL):
   - enum `provider` com os 5 provedores
   - `provider_keys(team_id, provider, vault_secret_id uuid, last4 text, updated_by, updated_at, pk(team_id, provider))`. RLS: `select` de `team_id, provider, last4, updated_at` para membros. A coluna `vault_secret_id` é revogada de `authenticated` via column privileges.
-  - RPC `set_provider_key(p_team uuid, p_provider provider, p_key text) returns void`: `security definer`. Exige `team_role_of = 'admin'`, rejeita chave com menos de 8 caracteres, cria ou atualiza o segredo em `vault.secrets` e grava `last4`.
+  - RPC `set_provider_key(p_team uuid, p_provider provider, p_key text) returns void`: `security definer`. Exige `team_role_of = 'admin'`, rejeita chave com menos de 20 caracteres, cria ou atualiza o segredo em `vault.secrets` e grava `last4`.
   - RPC `delete_provider_key(p_team uuid, p_provider provider) returns void`: só admin; remove o segredo do Vault.
   - RPC `get_provider_key_for_executor(p_team uuid, p_provider provider) returns text`: `execute` concedido só a `service_role`, revogado de `public`, `anon` e `authenticated`. É usado pelo Plano 2.
 

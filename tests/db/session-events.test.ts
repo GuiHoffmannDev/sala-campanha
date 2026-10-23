@@ -32,6 +32,25 @@ it('message starting with @mention goes to people only', async () => {
   expect(data).toMatchObject({ to_agent: false, delivery: 'not_applicable', mention_user_ids: [f.t.members.gestor.userId] })
 })
 
+it('Unicode spaces before @mention still mean people only', async () => {
+  const f = await createPieceFixture()
+  const { data, error } = await f.t.members.designer.client.rpc('post_message', {
+    p_piece: f.pieceId, p_text: ' ​@Gestor oi', p_mention_user_ids: [f.t.members.gestor.userId],
+  })
+  expect(error).toBeNull()
+  expect(data).toMatchObject({ to_agent: false, delivery: 'not_applicable' })
+})
+
+it('repeated mentions are stored once, in order', async () => {
+  const f = await createPieceFixture()
+  const { gestor, admin } = f.t.members
+  const { data, error } = await f.t.members.designer.client.rpc('post_message', {
+    p_piece: f.pieceId, p_text: '@Gestor @Admin oi', p_mention_user_ids: [gestor.userId, admin.userId, gestor.userId],
+  })
+  expect(error).toBeNull()
+  expect(data.mention_user_ids).toEqual([gestor.userId, admin.userId])
+})
+
 it('@ without mention ids still goes to agent', async () => {
   const f = await createPieceFixture()
   const { data } = await f.t.members.designer.client.rpc('post_message', { p_piece: f.pieceId, p_text: '@algo' })
@@ -48,8 +67,10 @@ it('mention not at the start still goes to agent', async () => {
 
 it('rejects empty text', async () => {
   const f = await createPieceFixture()
-  const { error } = await f.t.members.designer.client.rpc('post_message', { p_piece: f.pieceId, p_text: '   ' })
-  expect(error?.code).toBe('22023')
+  for (const p_text of ['   ', ' ​　']) {
+    const { error } = await f.t.members.designer.client.rpc('post_message', { p_piece: f.pieceId, p_text })
+    expect(error?.code).toBe('22023')
+  }
 })
 
 it('espectador cannot post', async () => {
@@ -84,9 +105,19 @@ it('rejects reference asset from another campaign', async () => {
   expect(error?.code).toBe('22023')
 })
 
+it('rejects reference asset from another team', async () => {
+  const a = await createPieceFixture(); const b = await createPieceFixture()
+  const ref = await createReferenceAsset(b)
+  const { error } = await a.t.members.gestor.client.rpc('post_message', {
+    p_piece: a.pieceId, p_text: 'Use a foto', p_reference_asset_ids: [ref],
+  })
+  expect(error?.code).toBe('22023')
+})
+
 it('members read events; other teams and direct writes do not', async () => {
   const a = await createPieceFixture(); const b = await createPieceFixture()
-  const { data: event } = await a.t.members.gestor.client.rpc('post_message', { p_piece: a.pieceId, p_text: 'oi' })
+  const { data: event, error: postError } = await a.t.members.gestor.client.rpc('post_message', { p_piece: a.pieceId, p_text: 'oi' })
+  expect(postError).toBeNull()
 
   const { data: seen } = await a.t.members.espectador.client.from('session_events').select('id').gt('id', 0)
   expect(seen).toEqual([{ id: event.id }])

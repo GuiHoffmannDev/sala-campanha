@@ -10,14 +10,16 @@ create table public.provider_keys (
   provider public.provider not null,
   vault_secret_id uuid not null,
   last4 text not null,
-  updated_by uuid not null references auth.users (id),
+  -- Null once the author's account is deleted; the key itself stays valid.
+  updated_by uuid references auth.users (id) on delete set null,
   updated_at timestamptz not null default now(),
   primary key (team_id, provider)
 );
 
--- Grants: members read every column except `vault_secret_id`. No client writes.
+-- Grants: members read only the columns in the Task 4 contract; `vault_secret_id`
+-- and `updated_by` stay hidden. No client writes.
 revoke all on public.provider_keys from anon, authenticated;
-grant select (team_id, provider, last4, updated_by, updated_at) on public.provider_keys to authenticated;
+grant select (team_id, provider, last4, updated_at) on public.provider_keys to authenticated;
 grant all on public.provider_keys to service_role;
 
 alter table public.provider_keys enable row level security;
@@ -58,8 +60,10 @@ begin
   if private.team_role_of(p_team) is distinct from 'admin' then
     raise exception 'only team admins can set provider keys' using errcode = '42501';
   end if;
-  if p_key is null or length(p_key) < 8 then
-    raise exception 'provider key must have at least 8 characters' using errcode = '22023';
+  -- Every supported provider issues keys well over 20 characters; a shorter
+  -- minimum would let the 4-character mask reveal a large share of the key.
+  if p_key is null or length(p_key) < 20 then
+    raise exception 'provider key must have at least 20 characters' using errcode = '22023';
   end if;
 
   -- Lock the row so two concurrent saves cannot each create a secret.
@@ -73,9 +77,15 @@ begin
     insert into public.provider_keys (team_id, provider, vault_secret_id, last4, updated_by)
     values (p_team, p_provider, v_secret_id, right(p_key, 4), auth.uid());
   else
-    perform vault.update_secret(v_secret_id, p_key);
+    -- If the secret was removed outside these RPCs, update_secret would be a
+    -- silent no-op; store a fresh secret so the row never points at nothing.
+    if exists (select 1 from vault.secrets s where s.id = v_secret_id) then
+      perform vault.update_secret(v_secret_id, p_key);
+    else
+      v_secret_id := vault.create_secret(p_key);
+    end if;
     update public.provider_keys
-    set last4 = right(p_key, 4), updated_by = auth.uid(), updated_at = now()
+    set vault_secret_id = v_secret_id, last4 = right(p_key, 4), updated_by = auth.uid(), updated_at = now()
     where team_id = p_team and provider = p_provider;
   end if;
 end
