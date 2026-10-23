@@ -282,7 +282,7 @@ it('service role reads plaintext for executor', async () => {
     - `delivery = 'queued'` se `to_agent`, senão `'not_applicable'`.
     - `body = {text, model, reference_asset_ids}`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('plain message goes to agent queue', async () => {
@@ -301,10 +301,10 @@ it('rejects piece from another team', async () => { /* membro de A posta em peç
 it('rejects mention of user from another team', async () => { /* expect error */ })
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/session-events.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Escrever `0004_session_events.sql`.** Adicionar `createPieceFixture()` em `tests/helpers/supabase.ts`, retornando `{ t: TestTeam; campaignId: string; pieceId: string }`.
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test tests/db/session-events.test.ts`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git commit -am "feat(db): session events and agent/people message routing"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/session-events.test.ts`. Expected: FAIL.
+- [x] **Step 3: Escrever `0004_session_events.sql`.** Adicionar `createPieceFixture()` em `tests/helpers/supabase.ts`, retornando `{ t: TestTeam; campaignId: string; pieceId: string }`.
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test tests/db/session-events.test.ts`. Expected: PASS.
+- [x] **Step 5: Commit.** `git commit -am "feat(db): session events and agent/people message routing"`
 
 ---
 

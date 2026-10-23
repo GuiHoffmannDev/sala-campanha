@@ -65,3 +65,22 @@ export async function createTestTeam(name = `Test team ${randomUUID()}`): Promis
 
   return { teamId: team.id, members }
 }
+
+export type PieceFixture = { t: TestTeam; campaignId: string; pieceId: string }
+
+/** Creates a test team with one campaign and one piece, using the service role. */
+export async function createPieceFixture(t?: TestTeam): Promise<PieceFixture> {
+  const team = t ?? (await createTestTeam())
+  const admin = serviceClient()
+  const { data: campaign, error: campaignError } = await admin.from('campaigns')
+    .insert({ team_id: team.teamId, name: 'Campanha de teste', created_by: team.members.admin.userId })
+    .select('id').single()
+  if (campaignError || !campaign) throw new Error(`insert campaign failed: ${campaignError?.message}`)
+
+  const { data: piece, error: pieceError } = await admin.from('pieces')
+    .insert({ campaign_id: campaign.id, team_id: team.teamId, title: 'Peça de teste', kind: 'imagem_texto', created_by: team.members.admin.userId })
+    .select('id').single()
+  if (pieceError || !piece) throw new Error(`insert piece failed: ${pieceError?.message}`)
+
+  return { t: team, campaignId: campaign.id, pieceId: piece.id }
+}
