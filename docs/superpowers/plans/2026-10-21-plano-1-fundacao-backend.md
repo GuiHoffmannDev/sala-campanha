@@ -355,14 +355,14 @@ it('release_stale_claims requeues old claims', async () => { /* claim; release('
   - RPC `add_agent_version(p_piece uuid, p_image_path text, p_caption text, p_source_event bigint) returns piece_versions`: só `service_role`. Cria a versão `phase='base'` e, se o status é `gerando`, muda para `base_em_revisao`. Grava eventos `version_added` e `status_changed`.
   - RPC `upload_final_version(p_piece uuid, p_image_path text, p_caption text) returns piece_versions`: exige `can_write` e status em (`acabamento`,`final_em_revisao`). Cria a versão `phase='final'`, muda o status para `final_em_revisao` e grava os eventos.
   - RPC `update_caption(p_version uuid, p_caption text) returns piece_versions`: exige `can_write` e versão ainda não aprovada; cria uma nova versão com a mesma imagem e a nova legenda.
-  - RPC `approve_version(p_version uuid) returns pieces`: exige `can_approve`.
+  - RPC `approve_version(p_piece uuid, p_version uuid) returns pieces`: exige `can_approve` na peça; a versão precisa ser dessa peça.
     - `base_em_revisao` + versão `base` → `acabamento`.
     - `final_em_revisao` + versão `final` → `aprovada`.
     - Peça só de texto em `base_em_revisao` → `aprovada` (a fase de acabamento é opcional para texto, conforme o spec).
     - Atualiza `approved_version_id` e grava o evento `approval`.
   - RPC `step_back(p_piece uuid) returns pieces`: exige `can_write`. Volta um status na ordem de `PIECE_STATUSES` e grava `status_changed` com `{from,to}`. Em `gerando`, falha com `'no previous status'`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('agent version moves gerando to base_em_revisao', async () => {})
@@ -376,10 +376,10 @@ it('step_back records status_changed event with author', async () => {})
 it('rejects piece from another team', async () => { /* upload_final_version em peça de B: error */ })
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/versions-status.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Escrever `0006_versions_status.sql`.** `number` = max + 1 por peça, dentro da mesma transação, com `for update` na peça.
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test tests/db/versions-status.test.ts`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git commit -am "feat(db): piece versions, status machine and approvals"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/versions-status.test.ts`. Expected: FAIL.
+- [x] **Step 3: Escrever `0006_versions_status.sql`.** `number` = max + 1 por peça, dentro da mesma transação, com `for update` na peça.
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test tests/db/versions-status.test.ts`. Expected: PASS.
+- [x] **Step 5: Commit.** `git commit -am "feat(db): piece versions, status machine and approvals"`
 
 ---
 
