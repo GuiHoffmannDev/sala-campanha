@@ -321,7 +321,7 @@ it('rejects mention of user from another team', async () => { /* expect error */
   - `complete_message(p_event bigint, p_executor text, p_status delivery_status) returns void`: aceita só `done` ou `failed`, e só se `claimed_by = p_executor`.
   - `release_stale_claims(p_older_than interval) returns int`: volta para `queued` as reivindicações abandonadas.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('claim is exclusive under concurrency', async () => {
@@ -336,10 +336,10 @@ it('authenticated cannot claim', async () => { /* rpc como gestor: expect error 
 it('release_stale_claims requeues old claims', async () => { /* claim; release('0 seconds'): retorna 1; delivery 'queued' */ })
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/inbox.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Escrever `0005_inbox.sql`.**
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test tests/db/inbox.test.ts`. Expected: PASS, rodando 3 vezes seguidas sem falha intermitente.
-- [ ] **Step 5: Commit.** `git commit -am "feat(db): inbox with exclusive per-piece claim"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/inbox.test.ts`. Expected: FAIL.
+- [x] **Step 3: Escrever `0005_inbox.sql`.**
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test tests/db/inbox.test.ts`. Expected: PASS, rodando 3 vezes seguidas sem falha intermitente.
+- [x] **Step 5: Commit.** `git commit -am "feat(db): inbox with exclusive per-piece claim"`
 
 ---
 
