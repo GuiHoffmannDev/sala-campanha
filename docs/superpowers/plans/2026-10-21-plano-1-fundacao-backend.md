@@ -418,7 +418,7 @@ it('rejects comment authored as someone else', async () => {})
 **Interfaces:**
 - Produces: as tabelas `session_events`, `pieces`, `piece_versions` e `comments` entram na publicação `supabase_realtime`. A RLS filtra o que cada cliente recebe. O Plano 3 assina `postgres_changes` por `piece_id`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 it('member receives new event; other team does not', async () => {
@@ -427,10 +427,10 @@ it('member receives new event; other team does not', async () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/realtime.test.ts`. Expected: FAIL (timeout sem evento).
-- [ ] **Step 3: Escrever `0008_realtime.sql`.**
-- [ ] **Step 4: Rodar a suíte inteira.** Run: `pnpm db:reset && pnpm test`. Expected: todos PASS.
-- [ ] **Step 5: Commit.** `git commit -am "feat(db): realtime publication for collaborative tables"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/realtime.test.ts`. Expected: FAIL (timeout sem evento).
+- [x] **Step 3: Escrever `0008_realtime.sql`.**
+- [x] **Step 4: Rodar a suíte inteira.** Run: `pnpm db:reset && pnpm test`. Expected: todos PASS.
+- [x] **Step 5: Commit.** `git commit -am "feat(db): realtime publication for collaborative tables"`
 
 ---
 
