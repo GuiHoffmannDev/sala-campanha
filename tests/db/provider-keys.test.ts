@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { createTestTeam, dbQuery, serviceClient } from '../helpers/supabase'
 
 const KEY = 'sk-test-1234567890abcd'
@@ -23,7 +24,7 @@ it('admin sets key; members see only last4', async () => {
 it('gestor cannot set key', async () => {
   const t = await createTestTeam()
   const { error } = await t.members.gestor.client.rpc('set_provider_key', { p_team: t.teamId, p_provider: 'openai', p_key: KEY })
-  expect(error).not.toBeNull()
+  expect(error?.code).toBe('42501')
   const { data } = await t.members.admin.client.from('provider_keys').select('provider')
   expect(data).toEqual([])
 })
@@ -170,7 +171,9 @@ it('a pasted key is trimmed; a key with inner spaces is rejected', async () => {
 it('two concurrent first saves both succeed and leave one secret', async () => {
   const t = await createTestTeam()
   const admin = t.members.admin.client
-  const keys = ['sk-concurrent-key-one-1111', 'sk-concurrent-key-two-2222']
+  // Unique per run: secrets are counted by value across the whole Vault.
+  const run = randomUUID().replaceAll('-', '')
+  const keys = [`sk-one-${run}`, `sk-two-${run}`]
   const results = await Promise.all(keys.map((p_key) => admin.rpc('set_provider_key', { p_team: t.teamId, p_provider: 'fal', p_key })))
   for (const r of results) expect(r.error).toBeNull()
 
@@ -178,4 +181,29 @@ it('two concurrent first saves both succeed and leave one secret', async () => {
   expect(keys).toContain(plain)
   const secrets = await dbQuery('select 1 from vault.decrypted_secrets where decrypted_secret = any($1)', [keys])
   expect(secrets).toHaveLength(1)
+})
+
+it('app calls time out before auto_explain could log their parameters', async () => {
+  // log_parameter_max_length and auto_explain.* need a superuser, so migrations
+  // cannot change them. The guard is that statement_timeout of the app roles
+  // cancels any call (set_provider_key included) before auto_explain logs it.
+  const [{ setting: minDuration } = { setting: '-1' }] = await dbQuery<{ setting: string }>(
+    "select setting from pg_settings where name = 'auto_explain.log_min_duration'",
+  )
+  if (Number(minDuration) < 0) return // auto_explain disabled: nothing is logged.
+
+  const rows = await dbQuery<{ rolname: string; timeout: string | null }>(`
+    select r.rolname,
+           (select split_part(c, '=', 2) from unnest(s.setconfig) c where c like 'statement_timeout=%') as timeout
+    from pg_roles r left join pg_db_role_setting s on s.setrole = r.oid and s.setdatabase = 0
+    where r.rolname in ('authenticator', 'authenticated')`)
+  expect(rows).toHaveLength(2)
+  for (const { rolname, timeout } of rows) {
+    expect(timeout, rolname).not.toBeNull()
+    const [{ ms } = { ms: '0' }] = await dbQuery<{ ms: string }>(
+      "select extract(epoch from $1::interval) * 1000 as ms", [/^\d+$/.test(timeout!) ? `${timeout} ms` : timeout],
+    )
+    expect(Number(ms), rolname).toBeGreaterThan(0)
+    expect(Number(ms), rolname).toBeLessThan(Number(minDuration))
+  }
 })

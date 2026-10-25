@@ -190,11 +190,11 @@ it('authenticated cannot insert team_members', async () => {
   - `pieces(id, campaign_id, team_id, title, kind text check in ('imagem','texto','imagem_texto'), status piece_status default 'gerando', approved_version_id uuid null, created_by, created_at)`. O `team_id` é denormalizado para RLS.
   - enum `piece_status` com os 5 status
   - `reference_assets(id, campaign_id, team_id, storage_path, original_name, uploaded_by, created_at)`
-  - Bucket privado `team-files`, com caminho obrigatório `<team_id>/...` (uuid em minúsculas).
-  - `private.file_exists(p_path text) returns boolean`: `security definer`; confere se o objeto existe em `team-files`.
+  - Bucket privado `team-files`, com caminho obrigatório `<team_id>/...` (uuid em minúsculas), só `image/png`, `image/jpeg` e `image/webp`, até 25 MB.
+  - `private.file_exists(p_team uuid, p_path text) returns boolean`: `security definer`; true só se o caminho está na pasta de `p_team` e o objeto existe. Caminho de outro time responde false, exista ou não (sem oráculo entre times).
 - Policies:
   - `select` para membros do time.
-  - `insert` em `campaigns`, `pieces` e `reference_assets` quando `private.can_write(team_id)`; `reference_assets` exige também `private.file_exists(storage_path)`.
+  - `insert` em `campaigns`, `pieces` e `reference_assets` quando `private.can_write(team_id)`; `reference_assets` exige também `private.file_exists(team_id, storage_path)`.
   - `update` de `pieces.title` para `can_write` (renomear na UI). `update` de `pieces.status` e `approved_version_id` negado a `authenticated`; esses campos mudam só por RPC (Task 7).
   - Storage: leitura para membros do time do 1º segmento do caminho; upload para `can_write`. Write-once: sem update/move/delete para `authenticated`; limpeza só pelo service role.
 
@@ -237,7 +237,7 @@ it('storage rejects upload outside own team prefix', async () => {
 - Produces (SQL):
   - enum `provider` com os 5 provedores
   - `provider_keys(team_id, provider, vault_secret_id uuid, last4 text, updated_by, updated_at, pk(team_id, provider))`. RLS: `select` de `team_id, provider, last4, updated_at` para membros. A coluna `vault_secret_id` é revogada de `authenticated` via column privileges.
-  - RPC `set_provider_key(p_team uuid, p_provider provider, p_key text) returns void`: `security definer`. Exige `team_role_of = 'admin'`, rejeita chave com menos de 20 caracteres, cria ou atualiza o segredo em `vault.secrets` e grava `last4`.
+  - RPC `set_provider_key(p_team uuid, p_provider provider, p_key text) returns void`: `security definer`. Exige `team_role_of = 'admin'`. Apara espaços e quebras de linha nas pontas; rejeita chave com menos de 20 caracteres ou com espaço interno. Cria ou atualiza o segredo em `vault.secrets` e grava `last4`. Dois primeiros cadastros simultâneos não falham (`insert ... on conflict`).
   - RPC `delete_provider_key(p_team uuid, p_provider provider) returns void`: só admin; remove o segredo do Vault.
   - RPC `get_provider_key_for_executor(p_team uuid, p_provider provider) returns text`: `execute` concedido só a `service_role`, revogado de `public`, `anon` e `authenticated`. É usado pelo Plano 2.
 
@@ -357,7 +357,7 @@ it('touch_claim renews every claim of the executor on the piece', async () => {}
 **Interfaces:**
 - Produces (SQL):
   - `piece_versions(id, piece_id, team_id, number int, origin text check in ('agente','upload','edicao'), phase text check in ('base','final'), image_path text null, caption text null, author_id uuid null, source_event_id bigint null, created_at, unique(piece_id, number), check (image_path is not null or caption is not null))`
-  - Regra de pacote (em toda versão criada): `imagem` = só `image_path`; `texto` = só `caption`; `imagem_texto` = os dois. A imagem precisa existir no Storage (`private.file_exists`).
+  - Regra de pacote (em toda versão criada): `imagem` = só `image_path`; `texto` = só `caption`; `imagem_texto` = os dois. A imagem precisa existir na pasta do time no Storage (`private.file_exists(team_id, path)`).
   - RPC `add_agent_version(p_piece uuid, p_image_path text, p_caption text, p_source_event bigint, p_executor text) returns piece_versions`: só `service_role`. Exige que `p_source_event` seja mensagem da peça com `delivery='claimed'` e `claimed_by = p_executor` (evita resultado duplicado depois de `release_stale_claims`). Só em `gerando` ou `base_em_revisao`. Cria a versão `phase='base'` e, se o status é `gerando`, muda para `base_em_revisao`. Grava eventos `version_added` e `status_changed`.
   - RPC `upload_final_version(p_piece uuid, p_image_path text, p_caption text) returns piece_versions`: exige `can_write` e status em (`acabamento`,`final_em_revisao`). Cria a versão `phase='final'`, muda o status para `final_em_revisao` e grava os eventos.
   - RPC `update_caption(p_version uuid, p_caption text) returns piece_versions`: exige `can_write`; só para versão da fase em revisão (`base_em_revisao` + `base` ou `final_em_revisao` + `final`) que nunca recebeu evento `approval`; peça `imagem` não tem legenda. Cria uma nova versão `origin='edicao'` com a mesma imagem e a nova legenda.
@@ -399,7 +399,7 @@ it('rejects piece from another team', async () => { /* upload_final_version em p
 
 **Interfaces:**
 - Produces (SQL):
-  - `comments(id, version_id, piece_id, team_id, author_id, body text not null, x real null, y real null, text_start int null, text_end int null, quote text null, parent_id uuid null, resolved boolean default false, created_at)`. O alvo é um só: ponto na imagem (`x`,`y` entre 0 e 1), trecho da legenda (`[text_start, text_end)` mais o texto citado em `quote`, conferido contra a legenda por trigger) ou nenhum (comentário simples na versão, o corte nº 1 do spec).
+  - `comments(id, version_id, piece_id, team_id, author_id, body text not null, x real null, y real null, text_start int null, text_end int null, quote text null, parent_id uuid null, resolved boolean default false, created_at)`. O alvo é um só: ponto na imagem (`x`,`y` entre 0 e 1), trecho da legenda (`[text_start, text_end)` em code points Unicode, não unidades UTF-16 — no cliente, `Array.from(caption)` — mais o texto citado em `quote`, conferido contra a legenda por trigger) ou nenhum (comentário simples na versão, o corte nº 1 do spec).
   - Fio de um nível: a resposta aponta para um comentário raiz e não tem alvo próprio.
   - Cada comentário grava um evento `comment` em `session_events` (`{comment_id, version_id, parent_id}`, não vai ao agente).
   - RLS: `select` para membros; `insert` com `can_write` e `author_id = auth.uid()`; `update` só de `resolved`, por `can_write`.
@@ -460,11 +460,18 @@ A revisão final do plano contra o spec gerou estas regras, já refletidas nas i
 | Storage | Write-once para membros; o arquivo precisa existir para virar versão ou referência |
 | Fio de respostas | Um nível |
 | `update(title)` em `pieces` | Mantido para renomear na UI |
+| Redirecionamento | `absorb_pending` reivindica as mensagens incorporadas; `touch_claim` renova claims longos |
+| Offsets de trecho | Code points Unicode (`Array.from(caption)` no cliente) |
+| Chave colada | Aparada nas pontas; espaço interno rejeitado |
+| Limites do bucket | PNG, JPEG e WebP, até 25 MB |
 | DELETE no Realtime | Não passa por RLS: o service role, ao apagar em cascata, expõe só as chaves primárias a outros assinantes. Aceito: deleção é rara e manual |
 
 ## Checklist de deploy
 
 - `log_statement` em `ddl` ou `none` (com `all`/`mod`, a chave de `set_provider_key` vai para o log). O teste `Postgres does not log statement text with keys` cobre o ambiente local.
+- `auto_explain.log_min_duration` maior que o `statement_timeout` de `authenticator` e `authenticated` (hoje 10 s contra 8 s), ou `auto_explain` desligado. Com `log_parameter_max_length = -1`, um plano registrado incluiria a chave. Essas configurações exigem superuser e não mudam por migration; o teste `app calls time out before auto_explain could log their parameters` cobre o ambiente local.
+- Desligar o cadastro público no projeto hospedado (Auth: "Allow new users to sign up" desligado). O `enable_signup = false` do `supabase/config.toml` só vale no ambiente local.
+- Os limites do bucket `team-files` vêm da migration 0002; conferir que nenhum ajuste manual no painel os afrouxou.
 - Sem pgaudit (ou equivalente) registrando os parâmetros de `public.set_provider_key`.
 - `log_min_duration_statement` desligado, ou sem registrar parâmetros.
 - As migrations 0002–0008 foram editadas no lugar antes do primeiro deploy. Depois de aplicadas em um banco remoto, toda mudança vira migration nova.

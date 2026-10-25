@@ -11,5 +11,5 @@ it('authenticated cannot insert team_members', async () => {
   const a = await createTestTeam()
   const { error } = await a.members.admin.client.from('team_members')
     .insert({ team_id: a.teamId, user_id: a.members.admin.userId, role: 'admin', display_name: 'x' })
-  expect(error).not.toBeNull()
+  expect(error?.code).toBe('42501')
 })
