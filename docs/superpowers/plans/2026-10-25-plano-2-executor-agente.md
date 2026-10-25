@@ -309,7 +309,7 @@ it('uploadFile then downloadFile round-trips bytes and mime type', async () => {
 - Produces (`openai.ts`): `createOpenAI(fetchFn: typeof fetch): TextProvider`. `POST https://api.openai.com/v1/responses`, header `Authorization: Bearer <key>`, corpo `{ model, instructions: system, input: prompt, max_output_tokens }`. Resultado: `output[]` do tipo `message`, com `content[]` do tipo `output_text`, concatenados. Vazio: `invalid_output`.
 - Produces (`index.ts`): `createProviders(fetchFn: typeof fetch = fetch): Providers`, com `text: { anthropic, openai }` e `image: {}` (as Tasks 5 e 6 completam).
 
-- [ ] **Step 1: Write the failing tests** com um `fetch` falso que grava as chamadas.
+- [x] **Step 1: Write the failing tests** com um `fetch` falso que grava as chamadas.
 
 ```ts
 it('anthropic sends the request shape and joins text blocks', async () => {
@@ -329,10 +329,10 @@ it('redacts the key from provider error details', async () => {
 it('timeout becomes ProviderError timeout', async () => { /* fetch que espera o abort */ })
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/providers-text.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implementar os arquivos.** Conferir no Context7 os formatos atuais de request e response das duas APIs antes de fechar o parse.
-- [ ] **Step 4: Run.** Run: `pnpm test tests/executor/providers-text.test.ts && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git add -A && git commit -m "feat(executor): http helper with redaction and text providers"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/providers-text.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implementar os arquivos.** Conferir no Context7 os formatos atuais de request e response das duas APIs antes de fechar o parse.
+- [x] **Step 4: Run.** Run: `pnpm test tests/executor/providers-text.test.ts && pnpm typecheck`. Expected: PASS.
+- [x] **Step 5: Commit.** `git add -A && git commit -m "feat(executor): http helper with redaction and text providers"`
 
 ---
 
