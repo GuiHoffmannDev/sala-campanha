@@ -59,7 +59,10 @@ it('a claim held by an open transaction is skipped, not waited on', async () => 
   try {
     // Fail instead of hanging if c2 ever waits on c1's lock.
     await c2.query("set lock_timeout = '2s'")
+    // Run as the executor's role, as in production.
+    await c2.query('set role service_role')
     await c1.query('begin')
+    await c1.query('set local role service_role')
     expect(ids(await c1.query("select id from public.claim_next_message('A')"))).toEqual([first])
 
     // c2 still sees `first` as queued but locked: it skips it, does not fall
@@ -217,6 +220,22 @@ it('touch_claim renews every claim of the executor on the piece', async () => {
   const { data, error } = await touch(f.pieceId, 'A')
   expect(error).toBeNull()
   expect(data).toBe(2)
+
+  const released = await serviceClient().rpc('release_stale_claims', { p_older_than: '1 hour' })
+  expect(released).toMatchObject({ error: null, data: 0 })
+  expect([await deliveryOf(first), await deliveryOf(second)]).toEqual(['claimed', 'claimed'])
+})
+
+it('absorb_pending renews the claims the executor already holds', async () => {
+  const f = await createPieceFixture()
+  const first = await post(f, 'primeira')
+  await claim('A')
+  const second = await post(f, 'redirecionamento')
+
+  // Without touch_claim, the original claim would go stale on its own.
+  const old = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+  await serviceClient().from('session_events').update({ claimed_at: old }).eq('id', first)
+  expect((await absorb(f.pieceId, 'A')).error).toBeNull()
 
   const released = await serviceClient().rpc('release_stale_claims', { p_older_than: '1 hour' })
   expect(released).toMatchObject({ error: null, data: 0 })

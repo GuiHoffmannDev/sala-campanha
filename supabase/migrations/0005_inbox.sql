@@ -66,12 +66,21 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  if not exists (
-    select 1 from public.session_events e
-    where e.piece_id = p_piece and e.delivery = 'claimed' and e.claimed_by = p_executor
-  ) then
+  -- Lock the executor's claims: release_stale_claims cannot requeue them
+  -- between this check and the absorb below, so the piece never ends up
+  -- split between two executors.
+  perform 1 from public.session_events e
+  where e.piece_id = p_piece and e.delivery = 'claimed' and e.claimed_by = p_executor
+  for update;
+  if not found then
     raise exception 'executor holds no claim on this piece' using errcode = '42501';
   end if;
+
+  -- Renew the claims it already holds, so all of them age together and a
+  -- stale original message cannot be requeued while its redirections stay claimed.
+  update public.session_events
+  set claimed_at = now()
+  where piece_id = p_piece and delivery = 'claimed' and claimed_by = p_executor;
 
   return query
     with picked as (

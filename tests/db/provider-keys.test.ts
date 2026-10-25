@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { createTestTeam, dbQuery, serviceClient } from '../helpers/supabase'
+import type pg from 'pg'
+import { createTestTeam, dbClient, dbQuery, serviceClient } from '../helpers/supabase'
 
 const KEY = 'sk-test-1234567890abcd'
 
@@ -169,18 +170,48 @@ it('a pasted key is trimmed; a key with inner spaces is rejected', async () => {
 })
 
 it('two concurrent first saves both succeed and leave one secret', async () => {
+  // Forces the race: c1 inserts the row and keeps its transaction open; c2
+  // then blocks on the unique index, and after c1 commits it must take the
+  // on-conflict branch (drop its own secret, replace c1's) without an error.
   const t = await createTestTeam()
-  const admin = t.members.admin.client
-  // Unique per run: secrets are counted by value across the whole Vault.
-  const run = randomUUID().replaceAll('-', '')
-  const keys = [`sk-one-${run}`, `sk-two-${run}`]
-  const results = await Promise.all(keys.map((p_key) => admin.rpc('set_provider_key', { p_team: t.teamId, p_provider: 'fal', p_key })))
-  for (const r of results) expect(r.error).toBeNull()
+  const run = randomUUID().replaceAll('-', '') // secrets are counted by value across the whole Vault
+  const keys = [`sk-one-${run}`, `sk-two-${run}`] as const
+  const claims = JSON.stringify({ sub: t.members.admin.userId, role: 'authenticated' })
+  const asAdmin = async (c: pg.Client) => {
+    await c.query('begin')
+    await c.query('set local role authenticated')
+    await c.query("select set_config('request.jwt.claims', $1, true)", [claims])
+  }
+  const save = (c: pg.Client, key: string) =>
+    c.query("select public.set_provider_key($1, 'fal', $2)", [t.teamId, key])
 
-  const { data: plain } = await serviceClient().rpc('get_provider_key_for_executor', { p_team: t.teamId, p_provider: 'fal' })
-  expect(keys).toContain(plain)
-  const secrets = await dbQuery('select 1 from vault.decrypted_secrets where decrypted_secret = any($1)', [keys])
-  expect(secrets).toHaveLength(1)
+  const c1 = await dbClient()
+  const c2 = await dbClient()
+  try {
+    await asAdmin(c1)
+    await save(c1, keys[0])
+    await asAdmin(c2)
+    const pid = (await c2.query<{ pid: number }>('select pg_backend_pid() as pid')).rows[0]!.pid
+    const second = save(c2, keys[1]).then(() => c2.query('commit'))
+
+    // Wait until c2 is blocked on c1's row before committing c1.
+    for (let i = 0; ; i++) {
+      const [row] = await dbQuery<{ wait: string | null }>('select wait_event_type as wait from pg_stat_activity where pid = $1', [pid])
+      if (row?.wait === 'Lock') break
+      if (i > 100) throw new Error('c2 never blocked on the provider_keys row')
+      await new Promise((r) => setTimeout(r, 20))
+    }
+    await c1.query('commit')
+    await second
+
+    const { data: plain } = await serviceClient().rpc('get_provider_key_for_executor', { p_team: t.teamId, p_provider: 'fal' })
+    expect(plain).toBe(keys[1])
+    const secrets = await dbQuery('select 1 from vault.decrypted_secrets where decrypted_secret = any($1)', [[...keys]])
+    expect(secrets).toHaveLength(1)
+  } finally {
+    await Promise.all([c1, c2].map((c) => c.query('rollback').catch(() => undefined)))
+    await Promise.all([c1.end(), c2.end()])
+  }
 })
 
 it('app calls time out before auto_explain could log their parameters', async () => {
@@ -190,7 +221,11 @@ it('app calls time out before auto_explain could log their parameters', async ()
   const [{ setting: minDuration } = { setting: '-1' }] = await dbQuery<{ setting: string }>(
     "select setting from pg_settings where name = 'auto_explain.log_min_duration'",
   )
-  if (Number(minDuration) < 0) return // auto_explain disabled: nothing is logged.
+  if (Number(minDuration) < 0) {
+    // auto_explain not loaded or disabled: it logs nothing, so there is nothing to guard.
+    expect(minDuration).toBe('-1')
+    return
+  }
 
   const rows = await dbQuery<{ rolname: string; timeout: string | null }>(`
     select r.rolname,

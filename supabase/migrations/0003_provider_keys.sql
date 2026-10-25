@@ -88,6 +88,10 @@ begin
     from public.provider_keys k
     where k.team_id = p_team and k.provider = p_provider
     for update;
+    -- The winner's row was deleted in between: report it instead of saving nothing.
+    if v_secret_id is null then
+      raise exception 'provider key changed concurrently, try again' using errcode = '40001';
+    end if;
   end if;
 
   -- If the secret was removed outside these RPCs, update_secret would be a

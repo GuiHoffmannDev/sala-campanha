@@ -224,7 +224,9 @@ it('a comment adds a comment event visible to its team only', async () => {
 
 it('excerpt offsets count code points, not UTF-16 units', async () => {
   const f = await createPieceFixture()
-  const caption = 'Oferta 🔥 hoje'
+  // Text after 'hoje' keeps the UTF-16 range inside the caption, so the wrong
+  // range fails on the quote, not on the caption length.
+  const caption = 'Oferta 🔥 hoje mesmo'
   const v = await createAgentVersion(f, { caption })
   const d = f.t.members.designer
   const start = Array.from(caption).indexOf('h') // 9; in UTF-16 'hoje' starts at 10
@@ -233,6 +235,8 @@ it('excerpt offsets count code points, not UTF-16 units', async () => {
   expect(error).toBeNull()
   const utf16 = caption.indexOf('hoje')
   expect(utf16).toBe(start + 1)
+  expect(utf16 + 4).toBeLessThanOrEqual(Array.from(caption).length)
   const wrong = await comment(d.client, f, v.id, d.userId, { text_start: utf16, text_end: utf16 + 4, quote: 'hoje' })
   expect(wrong.error?.code).toBe('22023')
+  expect(wrong.error?.message).toContain('excerpt does not match')
 })
