@@ -8,7 +8,7 @@ Guia para executar o projeto tarefa por tarefa. Cada tarefa roda num **terminal 
 |---|---|
 | Design aprovado (o que construir e por quê) | `docs/superpowers/specs/2026-10-21-sala-campanha-design.md` |
 | Plano 1 — Fundação do backend (Supabase) | `docs/superpowers/plans/2026-10-21-plano-1-fundacao-backend.md` |
-| Plano 2 — Executor do agente | ainda não escrito |
+| Plano 2 — Executor do agente | `docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md` |
 | Plano 3 — App Tauri para macOS | ainda não escrito |
 
 O progresso oficial fica nas caixinhas `- [ ]` dentro do plano. Este handoff tem uma lista resumida para você acompanhar.
@@ -162,9 +162,149 @@ cd ~/Documents/sala-campanha && claude "Faça a revisão final de todo o Plano 1
 
 ---
 
+## Plano 2 — Executor do agente
+
+Pré-requisitos: Plano 1 completo e Supabase local rodando (`supabase start`). Os testes usam provedores falsos; nenhuma chave real é necessária, exceto no passo opcional da Tarefa 10.
+
+### Tarefa 1 — Eventos do agente no banco
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md. Execute SOMENTE a Task 1, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 1 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 1 do plano docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md) contra a Task 1, Global Constraints e Review Focus. Foque em add_agent_event: só service_role executa, exige claim do executor, aceita só agent_started/agent_result/agent_error e não vaza entre times. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 2 — Contrato compartilhado do agente
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md. Execute SOMENTE a Task 2, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 2 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 2 do plano docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md) contra a Task 2, Global Constraints e Review Focus. Foque nos IDs de MODEL_CATALOG (conferidos no Context7), nos textos exatos de agentErrorMessage e em ModelChoiceSchema rejeitar chaves e provedores desconhecidos. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 3 — Pacote do executor: configuração, log e banco
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md. Execute SOMENTE a Task 3, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 3 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 3 do plano docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md) contra a Task 3, Global Constraints e Review Focus. Foque em mensagens de erro de configuração sem valores de segredo, no filtro do histórico (sem mensagens na fila nem @Pessoa) e em ClaimLostError para 42501. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 4 — HTTP e adaptadores de texto (Anthropic e OpenAI)
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md. Execute SOMENTE a Task 4, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 4 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 4 do plano docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md) contra a Task 4, Global Constraints e Review Focus. Foque em redação da chave nos erros, em quando há nova tentativa (só 429, 5xx e rede) e no formato atual das duas APIs. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 5 — Adaptador de imagem Gemini
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md. Execute SOMENTE a Task 5, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 5 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 5 do plano docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md) contra a Task 5, Global Constraints e Review Focus. Foque no formato do request com imagens de referência, no parse de inlineData e na recusa do modelo virar erro legível. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 6 — Adaptador de imagem fal (Flux Kontext)
+- [ ] Implementada
+- [ ] Revisada
+
+Esta tarefa é cortável (item 4 da ordem de corte do spec). Se pular, remova a linha `fal` de `MODEL_CATALOG`.
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md. Execute SOMENTE a Task 6, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 6 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 6 do plano docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md) contra a Task 6, Global Constraints e Review Focus. Foque em data URI em vez de URL assinada, no endpoint sem referências e em não mandar a chave ao baixar o resultado. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 7 — Orquestrador (monta o prompt)
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md. Execute SOMENTE a Task 7, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 7 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 7 do plano docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md) contra a Task 7, Global Constraints e Review Focus. Foque no texto exato de ORCHESTRATOR_SYSTEM, em o lote atual não aparecer no histórico e em parsePlan aplicar as regras por tipo de peça. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 8 — Processar uma reivindicação (rodadas e erros)
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md. Execute SOMENTE a Task 8, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando 3 vezes seguidas, checkboxes da Task 8 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 8 do plano docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md) contra a Task 8, Global Constraints e Review Focus. Foque na ordem absorb antes de complete, em nenhum provedor chamado fora de gerando/base_em_revisao, em claim perdido sem versão duplicada e com arquivo removido, e em a chave nunca aparecer em evento ou log. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 9 — Worker, entrypoint e desligamento
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md. Execute SOMENTE a Task 9, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: pnpm db:reset && pnpm test && pnpm typecheck com tudo passando, checkboxes da Task 9 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 9 do plano docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md) contra a Task 9, Global Constraints e Review Focus. Foque em slot que não morre com erro, em desligamento que espera a rodada em andamento e em main sem imprimir segredos. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 10 — Teste ao vivo, Docker e checklist de deploy
+- [ ] Implementada
+- [ ] Revisada
+
+O passo com chaves reais é opcional. Para rodar, coloque as chaves só na linha de comando (`LIVE_ANTHROPIC_KEY=... pnpm test tests/live`), nunca num arquivo commitado.
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md. Execute SOMENTE a Task 10, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 10 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar (revisão final do Plano 2 inteiro):**
+```
+cd ~/Documents/sala-campanha && claude "Faça a revisão final de todo o Plano 2 (docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md) contra o spec docs/superpowers/specs/2026-10-21-sala-campanha-design.md e as interfaces do Plano 1. Confira cobertura de cada task, os 5 itens de Review Focus, e que nenhuma chave de provedor ou service role aparece em log, evento, erro ou imagem Docker. Rode pnpm db:reset && pnpm test && pnpm typecheck. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+---
+
 ## Depois do Plano 1
 
-- [ ] **Escrever o Plano 2 (executor do agente).** Num terminal novo:
+- [x] **Escrever o Plano 2 (executor do agente).** Num terminal novo:
   ```
   cd ~/Documents/sala-campanha && claude "Use superpowers:writing-plans. Escreva o Plano 2 (executor do agente) a partir do spec docs/superpowers/specs/2026-10-21-sala-campanha-design.md, usando as interfaces já construídas no Plano 1 (docs/superpowers/plans/2026-10-21-plano-1-fundacao-backend.md). Salve em docs/superpowers/plans/ e atualize HANDOFF.md com as tarefas do Plano 2 no mesmo formato."
   ```
