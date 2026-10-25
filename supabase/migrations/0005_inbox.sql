@@ -1,5 +1,15 @@
 -- Agent inbox: executors claim queued user messages, one at a time per piece.
 -- Only the service role (the executor, Plan 2) may call these functions.
+--
+-- Executor flow for one piece:
+--   1. claim_next_message: takes the piece's oldest queued message.
+--   2. absorb_pending (during the generation): takes the messages queued since
+--      then, so redirections are folded into the running work and no other
+--      executor answers them again.
+--   3. touch_claim (periodically): keeps long generations from being
+--      requeued by release_stale_claims.
+--   4. complete_message for every claimed message. The piece accepts a new
+--      claim only once none of its messages is claimed.
 
 -- Inbox scans touch only open messages.
 create index session_events_open_idx on public.session_events (piece_id, id)
@@ -47,17 +57,60 @@ begin
 end
 $$;
 
--- Queued messages of one piece, in conversation order. The executor reads them
--- to fold redirections into a running generation.
-create function public.pending_for_piece(p_piece uuid)
+-- Claims every queued message of a piece for an executor that already holds
+-- a claim on it, and returns them in conversation order. Used to fold
+-- redirections into a running generation without another executor taking them.
+create function public.absorb_pending(p_piece uuid, p_executor text)
 returns setof public.session_events
-language sql
-stable
+language plpgsql
 set search_path = ''
 as $$
-  select * from public.session_events
-  where piece_id = p_piece and delivery = 'queued'
-  order by id
+begin
+  if not exists (
+    select 1 from public.session_events e
+    where e.piece_id = p_piece and e.delivery = 'claimed' and e.claimed_by = p_executor
+  ) then
+    raise exception 'executor holds no claim on this piece' using errcode = '42501';
+  end if;
+
+  return query
+    with picked as (
+      select e.id from public.session_events e
+      where e.piece_id = p_piece and e.delivery = 'queued'
+      order by e.id
+      for update
+    )
+    , absorbed as (
+      update public.session_events e
+      set delivery = 'claimed', claimed_by = p_executor, claimed_at = now()
+      from picked
+      where e.id = picked.id
+      returning e.*
+    )
+    select * from absorbed order by id;
+end
+$$;
+
+-- Renews every claim an executor holds on a piece, so a long generation is not
+-- requeued by release_stale_claims. Returns how many claims were renewed.
+create function public.touch_claim(p_piece uuid, p_executor text)
+returns int
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_count int;
+begin
+  update public.session_events
+  set claimed_at = now()
+  where piece_id = p_piece and delivery = 'claimed' and claimed_by = p_executor;
+
+  get diagnostics v_count = row_count;
+  if v_count = 0 then
+    raise exception 'executor holds no claim on this piece' using errcode = '42501';
+  end if;
+  return v_count;
+end
 $$;
 
 -- Closes a claimed message as `done` or `failed`; only its claimer may do it.
@@ -105,10 +158,12 @@ end
 $$;
 
 revoke all on function public.claim_next_message(text) from public, anon, authenticated;
-revoke all on function public.pending_for_piece(uuid) from public, anon, authenticated;
+revoke all on function public.absorb_pending(uuid, text) from public, anon, authenticated;
 revoke all on function public.complete_message(bigint, text, public.delivery_status) from public, anon, authenticated;
 revoke all on function public.release_stale_claims(interval) from public, anon, authenticated;
+revoke all on function public.touch_claim(uuid, text) from public, anon, authenticated;
 grant execute on function public.claim_next_message(text) to service_role;
-grant execute on function public.pending_for_piece(uuid) to service_role;
+grant execute on function public.absorb_pending(uuid, text) to service_role;
 grant execute on function public.complete_message(bigint, text, public.delivery_status) to service_role;
 grant execute on function public.release_stale_claims(interval) to service_role;
+grant execute on function public.touch_claim(uuid, text) to service_role;

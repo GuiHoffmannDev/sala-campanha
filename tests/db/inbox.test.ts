@@ -112,7 +112,8 @@ it('authenticated cannot claim', async () => {
   const { gestor } = f.t.members
   const calls = await Promise.all([
     gestor.client.rpc('claim_next_message', { p_executor: 'x' }),
-    gestor.client.rpc('pending_for_piece', { p_piece: f.pieceId }),
+    gestor.client.rpc('absorb_pending', { p_piece: f.pieceId, p_executor: 'x' }),
+    gestor.client.rpc('touch_claim', { p_piece: f.pieceId, p_executor: 'x' }),
     gestor.client.rpc('complete_message', { p_event: 1, p_executor: 'x', p_status: 'done' }),
     gestor.client.rpc('release_stale_claims', { p_older_than: '0 seconds' }),
   ])
@@ -120,19 +121,83 @@ it('authenticated cannot claim', async () => {
   expect(await claim('A')).toHaveLength(1)
 })
 
-it('pending_for_piece lists queued messages of the piece in order', async () => {
+const absorb = (pieceId: string, executor: string) =>
+  serviceClient().rpc('absorb_pending', { p_piece: pieceId, p_executor: executor })
+const touch = (pieceId: string, executor: string) =>
+  serviceClient().rpc('touch_claim', { p_piece: pieceId, p_executor: executor })
+const complete = (id: number, executor: string) =>
+  serviceClient().rpc('complete_message', { p_event: id, p_executor: executor, p_status: 'done' })
+
+it('absorb_pending claims the queued messages of the piece, in order', async () => {
   const f = await createPieceFixture()
   const other = await createPieceFixture(f.t)
   const first = await post(f, 'primeira')
   const second = await post(f, 'segunda')
   const third = await post(f, 'terceira')
-  await post(other, 'outra peça')
-  await claim('A') // claims `first` (oldest overall)
+  const otherPiece = await post(other, 'outra peça')
+  expect((await claim('A')).map((e) => e.id)).toEqual([first])
 
-  const { data, error } = await serviceClient().rpc('pending_for_piece', { p_piece: f.pieceId })
+  const { data, error } = await absorb(f.pieceId, 'A')
   expect(error).toBeNull()
-  expect((data as { id: number }[]).map((e) => e.id)).toEqual([second, third])
-  expect(first).toBeLessThan(second)
+  expect((data as { id: number; claimed_by: string }[]).map((e) => [e.id, e.claimed_by])).toEqual([[second, 'A'], [third, 'A']])
+
+  // Another executor gets the other piece, never the absorbed messages.
+  expect((await claim('B')).map((e) => e.id)).toEqual([otherPiece])
+  expect(await claim('C')).toEqual([])
+  expect(await deliveryOf(otherPiece)).toBe('claimed')
+})
+
+it('absorb_pending needs a claim on the piece', async () => {
+  const f = await createPieceFixture()
+  const id = await post(f)
+  const { error } = await absorb(f.pieceId, 'A')
+  expect(error?.code).toBe('42501')
+  expect(await deliveryOf(id)).toBe('queued')
+
+  // A claim of another executor does not count.
+  await claim('B')
+  expect((await absorb(f.pieceId, 'A')).error?.code).toBe('42501')
+})
+
+it('the piece is free again only after every absorbed message is completed', async () => {
+  const f = await createPieceFixture()
+  const first = await post(f, 'primeira')
+  await claim('A')
+  const second = await post(f, 'redirecionamento')
+  await absorb(f.pieceId, 'A')
+  const third = await post(f, 'depois')
+
+  expect((await complete(first, 'A')).error).toBeNull()
+  expect(await claim('B')).toEqual([]) // `second` is still claimed by A
+  expect((await complete(second, 'A')).error).toBeNull()
+  expect((await claim('B')).map((e) => e.id)).toEqual([third])
+})
+
+it('touch_claim renews every claim of the executor on the piece', async () => {
+  const f = await createPieceFixture()
+  const first = await post(f, 'primeira')
+  await claim('A')
+  const second = await post(f, 'redirecionamento')
+  await absorb(f.pieceId, 'A')
+
+  // Age both claims past the stale threshold, then renew them.
+  const old = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+  await serviceClient().from('session_events').update({ claimed_at: old }).in('id', [first, second])
+  const { data, error } = await touch(f.pieceId, 'A')
+  expect(error).toBeNull()
+  expect(data).toBe(2)
+
+  const released = await serviceClient().rpc('release_stale_claims', { p_older_than: '1 hour' })
+  expect(released).toMatchObject({ error: null, data: 0 })
+  expect([await deliveryOf(first), await deliveryOf(second)]).toEqual(['claimed', 'claimed'])
+})
+
+it('touch_claim needs a claim of the same executor', async () => {
+  const f = await createPieceFixture()
+  await post(f)
+  expect((await touch(f.pieceId, 'A')).error?.code).toBe('42501')
+  await claim('B')
+  expect((await touch(f.pieceId, 'A')).error?.code).toBe('42501')
 })
 
 it('release_stale_claims requeues old claims', async () => {

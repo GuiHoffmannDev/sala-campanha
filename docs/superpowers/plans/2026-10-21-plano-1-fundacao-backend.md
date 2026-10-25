@@ -11,7 +11,7 @@
 **Spec:** `docs/superpowers/specs/2026-10-21-sala-campanha-design.md`
 
 **Planos seguintes (fora deste):**
-- Plano 2: executor do agente (consome `claim_next_message`, chama provedores com `get_provider_key_for_executor`, grava versões com `add_agent_version(..., p_executor)`).
+- Plano 2: executor do agente (consome `claim_next_message`, incorpora redirecionamentos com `absorb_pending`, renova claims com `touch_claim`, chama provedores com `get_provider_key_for_executor`, grava versões com `add_agent_version(..., p_executor)`).
 - Plano 3: app Tauri para macOS (UI, presença, link de compartilhamento).
 
 ## Global Constraints
@@ -318,7 +318,9 @@ it('rejects mention of user from another team', async () => { /* expect error */
 **Interfaces:**
 - Produces (SQL, `execute` só para `service_role`):
   - `claim_next_message(p_executor text) returns setof session_events`: reivindica a mensagem `queued` mais antiga **por peça que não tenha outra `claimed`**. Marca `claimed`, `claimed_by` e `claimed_at` e retorna 0 ou 1 linha. Algoritmo: `select ... where delivery='queued' and not exists (claimed na mesma peça) order by id limit 1 for update skip locked`, depois `update`.
-  - `pending_for_piece(p_piece uuid) returns setof session_events`: mensagens `queued` da peça, em ordem. O executor usa para incorporar redirecionamentos durante a geração (Plano 2).
+  - `absorb_pending(p_piece uuid, p_executor text) returns setof session_events`: exige que o executor já tenha um claim na peça; marca como `claimed` por ele todas as mensagens `queued` da peça e as devolve em ordem. O executor usa para incorporar redirecionamentos durante a geração sem que outro executor responda de novo (Plano 2).
+  - `touch_claim(p_piece uuid, p_executor text) returns int`: renova `claimed_at` de todos os claims do executor na peça, para gerações longas não voltarem à fila; erro se não houver claim.
+  - A peça só aceita novo claim quando nenhuma mensagem dela está `claimed` (inclusive as absorvidas).
   - `complete_message(p_event bigint, p_executor text, p_status delivery_status) returns void`: aceita só `done` ou `failed`, e só se `claimed_by = p_executor`.
   - `release_stale_claims(p_older_than interval) returns int`: volta para `queued` as reivindicações abandonadas.
 
@@ -335,6 +337,8 @@ it('messages of different pieces are claimed in parallel', async () => { /* 2 pe
 it('complete_message rejects other executor', async () => { /* expect error */ })
 it('authenticated cannot claim', async () => { /* rpc como gestor: expect error */ })
 it('release_stale_claims requeues old claims', async () => { /* claim; release('0 seconds'): retorna 1; delivery 'queued' */ })
+it('absorb_pending claims the queued messages of the piece, in order', async () => {})
+it('touch_claim renews every claim of the executor on the piece', async () => {})
 ```
 
 - [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/inbox.test.ts`. Expected: FAIL.
