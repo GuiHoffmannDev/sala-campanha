@@ -117,22 +117,25 @@ create policy team_files_insert_writers on storage.objects
 -- backs a version or reference (including an approved one) cannot change under
 -- it. Cleanup runs with the service role.
 
--- True when the object exists in `team-files`. security definer: tables use it
--- to check paths without depending on the caller's storage policies.
-create function private.file_exists(p_path text)
+-- True when the object exists in `team-files` under `p_team`'s folder.
+-- Checking the folder first means a path in another team's folder is
+-- answered false whether or not the object exists: no cross-team existence
+-- oracle. security definer: callers need not see storage.objects.
+create function private.file_exists(p_team uuid, p_path text)
 returns boolean
 language sql
 stable
 security definer
 set search_path = ''
 as $$
-  select exists (select 1 from storage.objects o where o.bucket_id = 'team-files' and o.name = p_path)
+  select private.path_team(p_path) = p_team
+    and exists (select 1 from storage.objects o where o.bucket_id = 'team-files' and o.name = p_path)
 $$;
 
-revoke all on function private.file_exists(text) from public;
-grant execute on function private.file_exists(text) to authenticated, service_role;
+revoke all on function private.file_exists(uuid, text) from public;
+grant execute on function private.file_exists(uuid, text) to authenticated, service_role;
 
--- A reference row must point at a file already uploaded.
+-- A reference row must point at a file already uploaded to its team's folder.
 create policy reference_assets_insert_writers on public.reference_assets
   for insert to authenticated
-  with check (private.can_write(team_id) and private.file_exists(storage_path));
+  with check (private.can_write(team_id) and coalesce(private.file_exists(team_id, storage_path), false));

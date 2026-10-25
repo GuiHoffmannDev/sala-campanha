@@ -126,6 +126,11 @@ it('reference asset needs an uploaded file', async () => {
   const missing = await designer.from('reference_assets').insert(row(`${f.t.teamId}/nao-existe.png`))
   expect(missing.error?.code).toBe('42501')
 
+  // A file that exists in another team's folder gets the same answer as a missing one.
+  const b = await createTestTeam()
+  const foreign = await designer.from('reference_assets').insert(row(await uploadTeamFile(`${b.teamId}/produto.png`)))
+  expect(foreign.error).toMatchObject({ code: missing.error?.code, message: missing.error?.message })
+
   const path = await uploadTeamFile(`${f.t.teamId}/produto.png`)
   const { data, error } = await designer.from('reference_assets').insert(row(path)).select('uploaded_by').single()
   expect(error).toBeNull()

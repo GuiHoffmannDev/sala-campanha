@@ -78,8 +78,9 @@ begin
   if p_caption is not null and p_caption !~ '\S' then
     raise exception 'caption must not be empty' using errcode = '22023';
   end if;
-  if p_image_path is not null and not private.file_exists(p_image_path) then
-    raise exception 'image file not found' using errcode = '22023';
+  -- Same error for a missing file and a file in another team's folder.
+  if p_image_path is not null and not coalesce(private.file_exists(p_piece.team_id, p_image_path), false) then
+    raise exception 'image file not found in the team folder' using errcode = '22023';
   end if;
 
   insert into public.piece_versions (piece_id, team_id, number, origin, phase, image_path, caption, author_id, source_event_id)

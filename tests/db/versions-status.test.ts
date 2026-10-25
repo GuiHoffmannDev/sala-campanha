@@ -136,22 +136,35 @@ it('add_agent_version is rejected outside gerando and base_em_revisao', async ()
   expect((await pieceOf(texto.pieceId)).status).toBe('aprovada')
 })
 
-it('version must keep its image inside the team folder', async () => {
+it('version image must exist in the team folder', async () => {
   const f = await createPieceFixture()
   const b = await createTestTeam()
-  // The file exists, but in another team's folder.
-  const foreignPath = await uploadTeamFile(`${b.teamId}/base.png`)
-  const { error } = await addAgentVersion(f, { p_image_path: foreignPath, p_source_event: await createClaimedMessage(f) })
-  expect(error?.code).toBe('23514')
-})
-
-it('version image must exist in storage', async () => {
-  const f = await createPieceFixture()
-  const { error } = await addAgentVersion(f, {
+  const missing = await addAgentVersion(f, {
     p_image_path: `${f.t.teamId}/${f.pieceId}/nao-existe.png`, p_source_event: await createClaimedMessage(f),
   })
-  expect(error?.code).toBe('22023')
-  expect(error?.message).toContain('image file not found')
+  expect(missing.error?.code).toBe('22023')
+  expect(missing.error?.message).toContain('image file not found in the team folder')
+
+  // The file exists, but in another team's folder: same error, so nothing is learned about it.
+  const foreignPath = await uploadTeamFile(`${b.teamId}/base.png`)
+  const foreign = await addAgentVersion(f, { p_image_path: foreignPath, p_source_event: await createClaimedMessage(f) })
+  expect(foreign.error).toMatchObject({ code: missing.error?.code, message: missing.error?.message })
+})
+
+it('members cannot learn whether another team has a file', async () => {
+  const f = await createPieceFixture()
+  await inAcabamento(f)
+  const b = await createTestTeam()
+  const existing = await uploadTeamFile(`${b.teamId}/segredo.png`)
+  const upload = (path: string) => f.t.members.designer.client.rpc('upload_final_version', {
+    p_piece: f.pieceId, p_image_path: path, p_caption: 'x',
+  })
+
+  const a = await upload(existing)
+  const c = await upload(`${b.teamId}/nao-existe.png`)
+  expect(a.error?.code).toBe('22023')
+  expect(a.error).toMatchObject({ code: c.error?.code, message: c.error?.message })
+  expect((await pieceOf(f.pieceId)).status).toBe('acabamento')
 })
 
 it('version content must match the piece kind', async () => {
