@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import pg from 'pg'
 import { ROLES, type Role } from '../../packages/shared/src/domain'
+import type { InboxMessage } from '../../packages/executor/src/db.ts'
 
 const ENV_FILE = '.env.test'
 // Local-only password shared by every test user; never used outside the local stack.
@@ -121,13 +122,27 @@ export const TEST_EXECUTOR = 'test-executor'
  * row directly instead of calling claim_next_message, which takes the oldest
  * queued message of any piece and could grab another test's message.
  */
-export async function createClaimedMessage(f: PieceFixture, executor = TEST_EXECUTOR): Promise<number> {
-  const { data: msg, error } = await f.t.members.gestor.client.rpc('post_message', { p_piece: f.pieceId, p_text: 'Gerar versão' })
+export async function createClaimedMessage(
+  f: PieceFixture,
+  executor = TEST_EXECUTOR,
+  opts: { text?: string; model?: unknown; referenceAssetIds?: string[] } = {},
+): Promise<number> {
+  const { data: msg, error } = await f.t.members.gestor.client.rpc('post_message', {
+    p_piece: f.pieceId, p_text: opts.text ?? 'Gerar versão', p_model: opts.model ?? null, p_reference_asset_ids: opts.referenceAssetIds ?? [],
+  })
   if (error || !msg) throw new Error(`post_message failed: ${error?.message}`)
   const { error: claimError } = await serviceClient().from('session_events')
     .update({ delivery: 'claimed', claimed_by: executor, claimed_at: new Date().toISOString() }).eq('id', msg.id)
   if (claimError) throw new Error(`claim message failed: ${claimError.message}`)
   return msg.id
+}
+
+/** Reads one session event in the executor's inbox shape. */
+export async function loadEvent(id: number): Promise<InboxMessage> {
+  const { data, error } = await serviceClient().from('session_events')
+    .select('id, piece_id, team_id, author_id, body').eq('id', id).single()
+  if (error || !data) throw new Error(`load event ${id} failed: ${error?.message}`)
+  return data
 }
 
 export type Version = {

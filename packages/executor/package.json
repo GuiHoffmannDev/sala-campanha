@@ -1,0 +1,11 @@
+{
+  "name": "@sala/executor",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@sala/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.118.0",
+    "zod": "^4.6.7"
+  }
+}

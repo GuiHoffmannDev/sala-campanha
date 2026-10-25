@@ -249,7 +249,7 @@ it('error messages match the fixed copy', () => {
   - `createClaimedMessage(f, executor = TEST_EXECUTOR, opts: { text?: string; model?: unknown; referenceAssetIds?: string[] } = {})`, compatível com as chamadas atuais.
   - `loadEvent(id: number): Promise<InboxMessage>`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 // tests/executor/config.test.ts
@@ -274,11 +274,11 @@ it('loadReferencePaths ignores ids from another campaign', async () => {})
 it('uploadFile then downloadFile round-trips bytes and mime type', async () => {})
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor`. Expected: FAIL (módulos não existem).
-- [ ] **Step 3: Criar `packages/executor/package.json`** (`"name": "@sala/executor"`, `"type": "module"`, `"private": true`, deps `@sala/shared: workspace:*`, `@supabase/supabase-js`, `zod` nas mesmas versões da raiz) e rodar `pnpm install`.
-- [ ] **Step 4: Implementar `config.ts`, `log.ts`, `db.ts` e os helpers.**
-- [ ] **Step 5: Run.** Run: `pnpm test tests/executor && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "feat(executor): config, logger and Supabase access layer"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor`. Expected: FAIL (módulos não existem).
+- [x] **Step 3: Criar `packages/executor/package.json`** (`"name": "@sala/executor"`, `"type": "module"`, `"private": true`, deps `@sala/shared: workspace:*`, `@supabase/supabase-js`, `zod` nas mesmas versões da raiz) e rodar `pnpm install`.
+- [x] **Step 4: Implementar `config.ts`, `log.ts`, `db.ts` e os helpers.**
+- [x] **Step 5: Run.** Run: `pnpm test tests/executor && pnpm typecheck`. Expected: PASS.
+- [x] **Step 6: Commit.** `git add -A && git commit -m "feat(executor): config, logger and Supabase access layer"`
 
 ---
 
