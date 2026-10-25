@@ -90,7 +90,7 @@ tests/
   - Trava (`for update`) a mensagem `p_source_event` com `delivery='claimed'` e `claimed_by=p_executor`; sem ela, `42501` `'source message is not claimed by this executor'`.
   - Insere com `piece_id`/`team_id` da mensagem, `author_id null`, `to_agent false`, `delivery 'not_applicable'`.
 
-- [ ] **Step 1: Write the failing tests** em `tests/db/agent-events.test.ts`
+- [x] **Step 1: Write the failing tests** em `tests/db/agent-events.test.ts`
 
 ```ts
 it('executor adds agent event on its claimed message', async () => {
@@ -107,10 +107,10 @@ it('authenticated cannot call add_agent_event', async () => { /* rpc como admin:
 it('members of the team see the agent event; other team does not', async () => {})
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/agent-events.test.ts`. Expected: FAIL (função não existe).
-- [ ] **Step 3: Escrever `0009_agent_events.sql`** no padrão de `0005_inbox.sql` (comentário de cabeçalho, `revoke`/`grant` no fim).
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test tests/db/agent-events.test.ts`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git add -A && git commit -m "feat(db): agent events written under the executor claim"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/db/agent-events.test.ts`. Expected: FAIL (função não existe).
+- [x] **Step 3: Escrever `0009_agent_events.sql`** no padrão de `0005_inbox.sql` (comentário de cabeçalho, `revoke`/`grant` no fim).
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test tests/db/agent-events.test.ts`. Expected: PASS.
+- [x] **Step 5: Commit.** `git add -A && git commit -m "feat(db): agent events written under the executor claim"`
 
 ---
 
