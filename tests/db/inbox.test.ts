@@ -1,4 +1,4 @@
-import { createPieceFixture, serviceClient, type PieceFixture } from '../helpers/supabase'
+import { createPieceFixture, dbClient, serviceClient, type PieceFixture } from '../helpers/supabase'
 
 // The inbox is global: other tests leave queued messages behind. Settle them so
 // each test only sees the messages it posts.
@@ -42,6 +42,37 @@ it('same piece is never claimed twice under concurrency', async () => {
   await post(f, 'segunda')
   const won = (await Promise.all(['e1', 'e2', 'e3', 'e4', 'e5'].map(claim))).flat()
   expect(won.map((e) => e.id)).toEqual([first])
+})
+
+it('a claim held by an open transaction is skipped, not waited on', async () => {
+  // PostgREST may serialize parallel RPCs; two direct connections make the
+  // lock contention real: c1 keeps its claim uncommitted while c2 claims.
+  const f1 = await createPieceFixture()
+  const f2 = await createPieceFixture(f1.t)
+  const first = await post(f1, 'primeira')
+  await post(f1, 'segunda')
+  const otherPiece = await post(f2, 'outra peça')
+  const ids = (r: { rows: { id: string }[] }) => r.rows.map((row) => Number(row.id))
+
+  const c1 = await dbClient()
+  const c2 = await dbClient()
+  try {
+    // Fail instead of hanging if c2 ever waits on c1's lock.
+    await c2.query("set lock_timeout = '2s'")
+    await c1.query('begin')
+    expect(ids(await c1.query("select id from public.claim_next_message('A')"))).toEqual([first])
+
+    // c2 still sees `first` as queued but locked: it skips it, does not fall
+    // through to `segunda` of the same piece, and takes the other piece.
+    expect(ids(await c2.query("select id from public.claim_next_message('B')"))).toEqual([otherPiece])
+
+    await c1.query('commit')
+    expect(ids(await c2.query("select id from public.claim_next_message('C')"))).toEqual([])
+    expect(await deliveryOf(first)).toBe('claimed')
+  } finally {
+    await c1.query('rollback').catch(() => undefined)
+    await Promise.all([c1.end(), c2.end()])
+  }
 })
 
 it('second message of same piece waits while first is claimed', async () => {

@@ -31,10 +31,16 @@ export function serviceClient(): SupabaseClient {
   return createClient(env.url, env.serviceRoleKey, clientOptions)
 }
 
-/** Runs SQL as `postgres` on the local DB, for checks PostgREST cannot reach (such as the Vault). */
-export async function dbQuery<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
+/** Opens a direct connection to the local DB as `postgres`. The caller must `end()` it. */
+export async function dbClient(): Promise<pg.Client> {
   const client = new pg.Client({ connectionString: env.dbUrl })
   await client.connect()
+  return client
+}
+
+/** Runs SQL as `postgres` on the local DB, for checks PostgREST cannot reach (such as the Vault). */
+export async function dbQuery<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
+  const client = await dbClient()
   try {
     return (await client.query(sql, params)).rows as T[]
   } finally {
