@@ -136,3 +136,17 @@ it('reference asset needs an uploaded file', async () => {
   expect(error).toBeNull()
   expect(data).toEqual({ uploaded_by: f.t.members.designer.userId })
 })
+
+it('bucket accepts only PNG, JPG and WebP up to 25 MB', async () => {
+  const t = await createTestTeam()
+  const storage = t.members.designer.client.storage.from('team-files')
+  for (const [name, type] of [['a.svg', 'image/svg+xml'], ['a.html', 'text/html']] as const) {
+    const { error } = await storage.upload(`${t.teamId}/${name}`, new Blob(['<svg/>'], { type }), { contentType: type })
+    expect(error, type).not.toBeNull()
+  }
+  // Positive control: an allowed type from the same member goes through.
+  expect((await storage.upload(`${t.teamId}/ok.webp`, new Blob(['x'], { type: 'image/webp' }), { contentType: 'image/webp' })).error).toBeNull()
+
+  const { data } = await serviceClient().storage.getBucket('team-files')
+  expect(data).toMatchObject({ file_size_limit: 26214400, allowed_mime_types: ['image/png', 'image/jpeg', 'image/webp'] })
+})

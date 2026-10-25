@@ -86,8 +86,10 @@ create policy reference_assets_select_members on public.reference_assets
   using (private.team_role_of(team_id) is not null);
 
 -- Storage: private bucket, every object path starts with `<team_id>/`.
-insert into storage.buckets (id, name, public)
-values ('team-files', 'team-files', false);
+-- Images only (spec: at least PNG, JPG and WebP), up to 25 MB: enough for a
+-- final exported from Photoshop, and no SVG/HTML that could carry scripts.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('team-files', 'team-files', false, 26214400, array['image/png', 'image/jpeg', 'image/webp']);
 
 -- Team owning an object path, or null when the first segment is not a lowercase
 -- uuid. Lowercase only, matching the `like team_id::text || '/%'` checks on

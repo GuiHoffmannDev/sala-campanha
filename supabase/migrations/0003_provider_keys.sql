@@ -55,6 +55,8 @@ security definer
 set search_path = ''
 as $$
 declare
+  -- Keys are often pasted with a trailing newline or spaces; providers reject those.
+  v_key text := btrim(p_key, E' \t\r\n');
   v_secret_id uuid;
 begin
   if private.team_role_of(p_team) is distinct from 'admin' then
@@ -62,32 +64,42 @@ begin
   end if;
   -- Every supported provider issues keys well over 20 characters; a shorter
   -- minimum would let the 4-character mask reveal a large share of the key.
-  if p_key is null or length(p_key) < 20 then
-    raise exception 'provider key must have at least 20 characters' using errcode = '22023';
+  if v_key is null or length(v_key) < 20 or v_key ~ '\s' then
+    raise exception 'provider key must have at least 20 characters and no spaces' using errcode = '22023';
   end if;
 
-  -- Lock the row so two concurrent saves cannot each create a secret.
+  -- Lock the row so two concurrent replacements serialize.
   select k.vault_secret_id into v_secret_id
   from public.provider_keys k
   where k.team_id = p_team and k.provider = p_provider
   for update;
 
   if v_secret_id is null then
-    v_secret_id := vault.create_secret(p_key);
+    v_secret_id := vault.create_secret(v_key);
     insert into public.provider_keys (team_id, provider, vault_secret_id, last4, updated_by)
-    values (p_team, p_provider, v_secret_id, right(p_key, 4), auth.uid());
-  else
-    -- If the secret was removed outside these RPCs, update_secret would be a
-    -- silent no-op; store a fresh secret so the row never points at nothing.
-    if exists (select 1 from vault.secrets s where s.id = v_secret_id) then
-      perform vault.update_secret(v_secret_id, p_key);
-    else
-      v_secret_id := vault.create_secret(p_key);
+    values (p_team, p_provider, v_secret_id, right(v_key, 4), auth.uid())
+    on conflict (team_id, provider) do nothing;
+    if found then
+      return;
     end if;
-    update public.provider_keys
-    set vault_secret_id = v_secret_id, last4 = right(p_key, 4), updated_by = auth.uid(), updated_at = now()
-    where team_id = p_team and provider = p_provider;
+    -- A concurrent first save won the insert: drop our secret and replace theirs.
+    delete from vault.secrets where id = v_secret_id;
+    select k.vault_secret_id into v_secret_id
+    from public.provider_keys k
+    where k.team_id = p_team and k.provider = p_provider
+    for update;
   end if;
+
+  -- If the secret was removed outside these RPCs, update_secret would be a
+  -- silent no-op; store a fresh secret so the row never points at nothing.
+  if exists (select 1 from vault.secrets s where s.id = v_secret_id) then
+    perform vault.update_secret(v_secret_id, v_key);
+  else
+    v_secret_id := vault.create_secret(v_key);
+  end if;
+  update public.provider_keys
+  set vault_secret_id = v_secret_id, last4 = right(v_key, 4), updated_by = auth.uid(), updated_at = now()
+  where team_id = p_team and provider = p_provider;
 end
 $$;
 

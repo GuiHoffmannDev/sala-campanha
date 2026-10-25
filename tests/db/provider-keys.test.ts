@@ -151,3 +151,31 @@ it('Postgres does not log statement text with keys', async () => {
   const [row] = await dbQuery<{ log_statement: string }>('show log_statement')
   expect(['none', 'ddl']).toContain(row?.log_statement)
 })
+
+it('a pasted key is trimmed; a key with inner spaces is rejected', async () => {
+  const t = await createTestTeam()
+  const admin = t.members.admin.client
+  expect((await admin.rpc('set_provider_key', { p_team: t.teamId, p_provider: 'openai', p_key: `  ${KEY}\n` })).error).toBeNull()
+  const { data: plain } = await serviceClient().rpc('get_provider_key_for_executor', { p_team: t.teamId, p_provider: 'openai' })
+  expect(plain).toBe(KEY)
+  const { data } = await t.members.designer.client.from('provider_keys').select('last4')
+  expect(data).toEqual([{ last4: 'abcd' }])
+
+  const inner = await admin.rpc('set_provider_key', { p_team: t.teamId, p_provider: 'openai', p_key: 'sk-test-1234 567890abcd' })
+  expect(inner.error?.code).toBe('22023')
+  const { data: kept } = await serviceClient().rpc('get_provider_key_for_executor', { p_team: t.teamId, p_provider: 'openai' })
+  expect(kept).toBe(KEY)
+})
+
+it('two concurrent first saves both succeed and leave one secret', async () => {
+  const t = await createTestTeam()
+  const admin = t.members.admin.client
+  const keys = ['sk-concurrent-key-one-1111', 'sk-concurrent-key-two-2222']
+  const results = await Promise.all(keys.map((p_key) => admin.rpc('set_provider_key', { p_team: t.teamId, p_provider: 'fal', p_key })))
+  for (const r of results) expect(r.error).toBeNull()
+
+  const { data: plain } = await serviceClient().rpc('get_provider_key_for_executor', { p_team: t.teamId, p_provider: 'fal' })
+  expect(keys).toContain(plain)
+  const secrets = await dbQuery('select 1 from vault.decrypted_secrets where decrypted_secret = any($1)', [keys])
+  expect(secrets).toHaveLength(1)
+})

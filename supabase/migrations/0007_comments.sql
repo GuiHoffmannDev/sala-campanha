@@ -1,6 +1,7 @@
 -- Comments on a piece version. A comment targets one of:
 --   a point of the image: x and y relative to the image (0..1);
---   a caption excerpt: [text_start, text_end) in characters, plus the quoted text;
+--   a caption excerpt: [text_start, text_end) in Unicode code points (not UTF-16
+--   units; clients use Array.from(caption)), plus the quoted text;
 --   nothing: a plain comment on the version.
 -- Threads are one level deep: a reply points to a root comment and has no
 -- target of its own. Every comment is also written to the piece conversation
