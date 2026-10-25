@@ -158,7 +158,7 @@ it('members of the team see the agent event; other team does not', async () => {
     | `invalid_output` | `provider` | `${provider} devolveu uma resposta que o agente não entendeu. Tente de novo.` |
     | `internal` | — | `Erro interno do agente. Tente de novo.` |
 
-- [ ] **Step 1: Write the failing tests** em `tests/shared/agent.test.ts`
+- [x] **Step 1: Write the failing tests** em `tests/shared/agent.test.ts`
 
 ```ts
 it('catalog only uses known providers and has a text and an image model', () => {
@@ -183,11 +183,13 @@ it('error messages match the fixed copy', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/shared/agent.test.ts`. Expected: FAIL (módulo não existe).
-- [ ] **Step 3: Conferir os IDs de modelo.** Consultar no Context7 a documentação atual de OpenAI, Anthropic, Gemini e fal. Se algum ID da tabela não existir mais, trocar pelo equivalente atual e registrar a troca numa nota no fim desta task. `MODEL_CATALOG` é o único lugar com IDs de modelo.
-- [ ] **Step 4: Implementar `agent.ts`** e as mudanças em `package.json` e `tsconfig.json`.
-- [ ] **Step 5: Run.** Run: `pnpm test tests/shared/agent.test.ts && pnpm typecheck`. Expected: PASS, sem erro de tipo.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "feat(shared): model catalog, model choice and agent event contract"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/shared/agent.test.ts`. Expected: FAIL (módulo não existe).
+- [x] **Step 3: Conferir os IDs de modelo.** Consultar no Context7 a documentação atual de OpenAI, Anthropic, Gemini e fal. Se algum ID da tabela não existir mais, trocar pelo equivalente atual e registrar a troca numa nota no fim desta task. `MODEL_CATALOG` é o único lugar com IDs de modelo.
+- [x] **Step 4: Implementar `agent.ts`** e as mudanças em `package.json` e `tsconfig.json`.
+- [x] **Step 5: Run.** Run: `pnpm test tests/shared/agent.test.ts && pnpm typecheck`. Expected: PASS, sem erro de tipo.
+- [x] **Step 6: Commit.** `git add -A && git commit -m "feat(shared): model catalog, model choice and agent event contract"`
+
+> **Nota (Step 3, 2026-10-25):** IDs conferidos no Context7 (Anthropic, OpenAI, Gemini, fal); todos existem, nenhuma troca. A doc do Gemini lista até 14 referências no total (Nano Banana Pro: até 6 objetos em alta fidelidade); os limites da tabela ficam como estão.
 
 ---
 
