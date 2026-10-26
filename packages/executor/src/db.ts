@@ -54,10 +54,13 @@ const INBOX_COLUMNS = 'id, piece_id, team_id, author_id, body'
 
 type SupabaseError = { message: string; code?: string } | null
 
-/** Returns `data`, or throws ClaimLostError for 42501 and a named Error for anything else. */
-function check<T>(operation: string, result: { data: T; error: SupabaseError }): T {
+/**
+ * Returns `data`, or throws a named Error. Only the claim RPCs (`claimRpc`) map
+ * 42501 to ClaimLostError; elsewhere 42501 is a missing privilege, not a lost claim.
+ */
+function check<T>(operation: string, result: { data: T; error: SupabaseError }, claimRpc = false): T {
   if (result.error) {
-    if (result.error.code === '42501') throw new ClaimLostError(operation)
+    if (claimRpc && result.error.code === '42501') throw new ClaimLostError(operation)
     throw new Error(`${operation} failed: ${result.error.message}`)
   }
   return result.data
@@ -76,16 +79,16 @@ export function createExecutorDb(client: SupabaseClient, executorId: string): Ex
     },
 
     async absorbPending(pieceId) {
-      const rows = check('absorbPending', await client.rpc('absorb_pending', { p_piece: pieceId, p_executor: executorId })) as InboxMessage[]
+      const rows = check('absorbPending', await client.rpc('absorb_pending', { p_piece: pieceId, p_executor: executorId }), true) as InboxMessage[]
       return rows.map(toInbox)
     },
 
     async touchClaim(pieceId) {
-      check('touchClaim', await client.rpc('touch_claim', { p_piece: pieceId, p_executor: executorId }))
+      check('touchClaim', await client.rpc('touch_claim', { p_piece: pieceId, p_executor: executorId }), true)
     },
 
     async complete(eventId, status) {
-      check('complete', await client.rpc('complete_message', { p_event: eventId, p_executor: executorId, p_status: status }))
+      check('complete', await client.rpc('complete_message', { p_event: eventId, p_executor: executorId, p_status: status }), true)
     },
 
     async releaseStale(olderThanSeconds) {
@@ -95,13 +98,13 @@ export function createExecutorDb(client: SupabaseClient, executorId: string): Ex
     async addAgentEvent(sourceEvent, kind, body) {
       check('addAgentEvent', await client.rpc('add_agent_event', {
         p_source_event: sourceEvent, p_executor: executorId, p_kind: kind, p_body: body,
-      }))
+      }), true)
     },
 
     async addAgentVersion(pieceId, imagePath, caption, sourceEvent) {
       const v = check('addAgentVersion', await client.rpc('add_agent_version', {
         p_piece: pieceId, p_image_path: imagePath, p_caption: caption, p_source_event: sourceEvent, p_executor: executorId,
-      })) as { id: string; number: number }
+      }), true) as { id: string; number: number }
       return { id: v.id, number: v.number }
     },
 

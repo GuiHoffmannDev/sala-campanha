@@ -192,6 +192,10 @@ cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia do
 cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 2 do plano docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md) contra a Task 2, Global Constraints e Review Focus. Foque nos IDs de MODEL_CATALOG (conferidos no Context7), nos textos exatos de agentErrorMessage e em ModelChoiceSchema rejeitar chaves e provedores desconhecidos. Só reporte problemas, com arquivo:linha. Não edite nada."
 ```
 
+**Pendências da revisão (commit `4d7925b`, 2026-10-25).** Resolver numa próxima sessão ou, no mais tardar, na revisão final do Plano 2:
+- [ ] **Limites de referência do Gemini divergem da doc atual** (`packages/shared/src/agent.ts:23` e `:25`). A doc (Context7, `ai.google.dev`) aceita no Nano Banana 2.1 até 10 objetos + 4 personagens (o catálogo diz `5`). No Nano Banana Pro aceita até 6 objetos + 5 personagens + 3 de estilo (o catálogo diz `10`). Os valores parecem invertidos. O código segue a tabela da Task 2, então decidir os limites, corrigir a tabela do plano e a nota da linha 193 junto com `MODEL_CATALOG`.
+- [ ] **`ModelRefSchema` aceita chaves extras** (`packages/shared/src/agent.ts:28`). Sem `.strict()`, `{ text: { provider: 'openai', model: 'gpt-6-astra', foo: 1 } }` passa em `ModelChoiceSchema` e `foo` é descartado sem aviso. Decidir se `ModelRefSchema` vira `.strict()` e adicionar o caso em `tests/shared/agent.test.ts`.
+
 ### Tarefa 3 — Pacote do executor: configuração, log e banco
 - [ ] Implementada
 - [ ] Revisada
@@ -297,7 +301,7 @@ cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia do
 ```
 **Revisar (revisão final do Plano 2 inteiro):**
 ```
-cd ~/Documents/sala-campanha && claude "Faça a revisão final de todo o Plano 2 (docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md) contra o spec docs/superpowers/specs/2026-10-21-sala-campanha-design.md e as interfaces do Plano 1. Confira cobertura de cada task, os 5 itens de Review Focus, e que nenhuma chave de provedor ou service role aparece em log, evento, erro ou imagem Docker. Rode pnpm db:reset && pnpm test && pnpm typecheck. Só reporte problemas, com arquivo:linha. Não edite nada."
+cd ~/Documents/sala-campanha && claude "Faça a revisão final de todo o Plano 2 (docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md) contra o spec docs/superpowers/specs/2026-10-21-sala-campanha-design.md e as interfaces do Plano 1. Confira cobertura de cada task, os 5 itens de Review Focus, as pendências de revisão abertas no HANDOFF.md (ex.: Tarefa 2), e que nenhuma chave de provedor ou service role aparece em log, evento, erro ou imagem Docker. Rode pnpm db:reset && pnpm test && pnpm typecheck. Só reporte problemas, com arquivo:linha. Não edite nada."
 ```
 
 ---

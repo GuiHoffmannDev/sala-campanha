@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { ClaimLostError, createExecutorDb } from '../../packages/executor/src/db.ts'
 import {
   createAgentVersion, createClaimedMessage, createPieceFixture, loadEvent, serviceClient, TEST_EXECUTOR,
@@ -73,6 +74,11 @@ it('history excludes queued and people-only messages', async () => {
   expect((await gestor.rpc('post_message', {
     p_piece: f.pieceId, p_text: '@designer olha isso', p_mention_user_ids: [f.t.members.designer.userId],
   })).error).toBeNull()
+  // Delivered but not for the agent: only the to_agent filter keeps it out.
+  expect((await serviceClient().from('session_events').insert({
+    piece_id: f.pieceId, team_id: f.t.teamId, author_id: f.t.members.gestor.userId, kind: 'user_message',
+    body: { text: 'Só para pessoas', model: null, reference_asset_ids: [] }, to_agent: false, delivery: 'done',
+  })).error).toBeNull()
   const ctx = await db().loadPieceContext(f.pieceId)
   expect(ctx.history.map((h) => h.id)).toEqual([claimed])
   expect(ctx.latestVersion).toBeNull()
@@ -107,6 +113,18 @@ it('non-claim errors keep the Supabase message and the operation name', async ()
   expect(err).toBeInstanceOf(Error)
   expect(err).not.toBeInstanceOf(ClaimLostError)
   expect(err.message).toMatch(/addAgentVersion/)
+})
+
+it('42501 outside the claim RPCs is a plain Error, not ClaimLostError', async () => {
+  const denied = { data: null, error: { code: '42501', message: 'permission denied for table pieces' } }
+  const query = { select: () => query, eq: () => query, single: async () => denied }
+  const client = { rpc: async () => denied, from: () => query } as unknown as SupabaseClient
+  const fake = createExecutorDb(client, TEST_EXECUTOR)
+  for (const call of [() => fake.getProviderKey(randomUUID(), 'openai'), () => fake.loadPieceContext(randomUUID()), () => fake.releaseStale(60)]) {
+    const err = await call().catch((e) => e)
+    expect(err).not.toBeInstanceOf(ClaimLostError)
+    expect(err.message).toMatch(/permission denied/)
+  }
 })
 
 it('absorbPending and touchClaim work on the executor claim', async () => {
