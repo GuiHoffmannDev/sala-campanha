@@ -3,10 +3,19 @@ import { ProviderError } from './types.ts'
 
 const RETRY_DELAY_MS = 2000
 const MAX_DETAIL = 300
+/** What fetch rejects in a header value after trimming: NUL, CR, LF, or a character above U+00FF. */
+const INVALID_HEADER_VALUE = /[\0\r\n]|[^\0-\xff]/
+const HTTP_WHITESPACE_ENDS = /^[\t\n\r ]+|[\t\n\r ]+$/g
 
-/** Replaces every occurrence of `key` with `[chave]`. An empty key leaves the text unchanged. */
+/**
+ * Replaces every occurrence of `key` with `[chave]`, and also the key without whitespace
+ * at the ends, which is what fetch sends and what a provider echoes back. An empty key
+ * leaves the text unchanged.
+ */
 export function redact(text: string, key: string): string {
-  return key ? text.replaceAll(key, '[chave]') : text
+  const sent = key.replace(HTTP_WHITESPACE_ENDS, '')
+  if (!sent) return text
+  return text.replaceAll(key, '[chave]').replaceAll(sent, '[chave]')
 }
 
 export type PostJsonOptions = {
@@ -21,16 +30,28 @@ export type PostJsonOptions = {
 
 /**
  * POSTs JSON and returns the parsed JSON reply. Retries once, after 2 s, on 429,
- * 5xx or a network error. Every failure is a ProviderError with a redacted detail.
+ * 5xx or a network error. Every failure is a ProviderError with a redacted detail,
+ * except an abort that is not a timeout: that rethrows `signal.reason` as is.
  */
 export async function postJson(o: PostJsonOptions): Promise<unknown> {
   const fail = (code: 'provider_error' | 'invalid_output', detail: string) =>
     new ProviderError(code, o.provider, redact(detail, o.key).slice(0, MAX_DETAIL))
-  const timeout = () => new ProviderError('timeout', o.provider, 'timeout')
+  // Only a deadline is a provider timeout. Any other abort (shutdown, lost claim) keeps its own reason.
+  const aborted = () =>
+    (o.signal.reason as { name?: unknown } | undefined)?.name === 'TimeoutError'
+      ? new ProviderError('timeout', o.provider, 'timeout')
+      : o.signal.reason
+
+  // fetch throws a TypeError for these, which would look like a network error and be retried.
+  // The detail names the header, never its value: the value usually carries the key.
+  for (const [name, value] of Object.entries(o.headers)) {
+    if (INVALID_HEADER_VALUE.test(value.replace(HTTP_WHITESPACE_ENDS, ''))) throw fail('provider_error', `invalid header value: ${name}`)
+  }
 
   for (let attempt = 1; ; attempt++) {
     const last = attempt === 2
     let res: Response
+    let text: string
     try {
       res = await o.fetchFn(o.url, {
         method: 'POST',
@@ -38,19 +59,13 @@ export async function postJson(o: PostJsonOptions): Promise<unknown> {
         body: JSON.stringify(o.body),
         signal: o.signal,
       })
-    } catch (err) {
-      if (o.signal.aborted) throw timeout()
-      if (last) throw fail('provider_error', err instanceof Error ? err.message : String(err))
-      if (!(await wait(RETRY_DELAY_MS, o.signal))) throw timeout()
-      continue
-    }
-
-    let text: string
-    try {
+      // Reading the body is inside the same try: a connection dropped mid-body is a network error too.
       text = await res.text()
     } catch (err) {
-      if (o.signal.aborted) throw timeout()
-      throw fail('provider_error', err instanceof Error ? err.message : String(err))
+      if (o.signal.aborted) throw aborted()
+      if (last) throw fail('provider_error', err instanceof Error ? err.message : String(err))
+      if (!(await wait(RETRY_DELAY_MS, o.signal))) throw aborted()
+      continue
     }
 
     if (res.ok) {
@@ -63,7 +78,7 @@ export async function postJson(o: PostJsonOptions): Promise<unknown> {
 
     const retryable = res.status === 429 || res.status >= 500
     if (retryable && !last) {
-      if (!(await wait(RETRY_DELAY_MS, o.signal))) throw timeout()
+      if (!(await wait(RETRY_DELAY_MS, o.signal))) throw aborted()
       continue
     }
     throw fail('provider_error', errorMessage(text) ?? `HTTP ${res.status}`)

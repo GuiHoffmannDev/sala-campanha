@@ -1,7 +1,11 @@
-import { postJson } from './http.ts'
+import { postJson, redact } from './http.ts'
 import { ProviderError, type TextProvider } from './types.ts'
 
-type MessagesReply = { content?: { type?: string; text?: string }[] }
+type MessagesReply = {
+  stop_reason?: string
+  stop_details?: { category?: unknown } | null
+  content?: { type?: string; text?: string }[]
+}
 
 /** Anthropic Messages API (`POST /v1/messages`), text out. */
 export function createAnthropic(fetchFn: typeof fetch): TextProvider {
@@ -14,6 +18,15 @@ export function createAnthropic(fetchFn: typeof fetch): TextProvider {
         body: { model: req.model, max_tokens: req.maxOutputTokens, system: req.system, messages: [{ role: 'user', content: req.prompt }] },
         key, signal, fetchFn,
       }) as MessagesReply | null
+      // Text cut at the token limit is partial output, not a usable answer.
+      if (reply?.stop_reason === 'max_tokens') throw new ProviderError('invalid_output', 'anthropic', 'output truncated (max_tokens)')
+      // A refusal arrives as HTTP 200 with empty content (declined before output) or partial text
+      // (declined mid-generation); neither is a usable answer. `stop_details` may be null.
+      if (reply?.stop_reason === 'refusal') {
+        const category = reply.stop_details?.category
+        const shown = typeof category === 'string' && category ? redact(category, key).slice(0, 100) : 'unknown'
+        throw new ProviderError('invalid_output', 'anthropic', `refused (${shown})`)
+      }
       const text = (reply?.content ?? [])
         .filter((b) => b.type === 'text' && typeof b.text === 'string')
         .map((b) => b.text)

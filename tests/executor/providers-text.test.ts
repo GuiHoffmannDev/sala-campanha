@@ -53,6 +53,45 @@ it('empty text output is invalid_output', async () => {
   expect(openai).toBeInstanceOf(ProviderError)
 })
 
+it('anthropic output cut by max_tokens is invalid_output', async () => {
+  const fake = fakeFetch([{ status: 200, json: { stop_reason: 'max_tokens', content: [{ type: 'text', text: '{"caption":"O' }] } }])
+  const err = await createAnthropic(fake.fn).generateText(KEY, REQ, signal()).catch((e) => e)
+  expect(err).toBeInstanceOf(ProviderError)
+  expect(err).toMatchObject({ code: 'invalid_output', provider: 'anthropic', detail: 'output truncated (max_tokens)' })
+})
+
+it('anthropic refusal is invalid_output, even with partial text', async () => {
+  const fake = fakeFetch([
+    { status: 200, json: { stop_reason: 'refusal', stop_details: { type: 'refusal', category: 'general_harms' }, content: [{ type: 'text', text: '{"caption":"Comp' }] } },
+    { status: 200, json: { stop_reason: 'refusal', stop_details: null, content: [] } },
+    { status: 200, json: { stop_reason: 'refusal', stop_details: { category: `odd ${KEY}` }, content: [{ type: 'text', text: 'I cannot help with that.' }] } },
+  ])
+  const anthropic = createAnthropic(fake.fn)
+  const errs = await Promise.all([1, 2, 3].map(() => anthropic.generateText(KEY, REQ, signal()).catch((e) => e)))
+  expect(errs.every((e) => e instanceof ProviderError)).toBe(true)
+  expect(errs.map((e) => [e.code, e.provider, e.detail])).toEqual([
+    ['invalid_output', 'anthropic', 'refused (general_harms)'],
+    ['invalid_output', 'anthropic', 'refused (unknown)'],
+    ['invalid_output', 'anthropic', 'refused (odd [chave])'],
+  ])
+})
+
+it('openai incomplete response is invalid_output, with the reason redacted', async () => {
+  const output = [{ type: 'message', content: [{ type: 'output_text', text: '{"caption":"O' }] }]
+  const fake = fakeFetch([
+    { status: 200, json: { status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' }, output } },
+    { status: 200, json: { status: 'incomplete', incomplete_details: { reason: `odd ${KEY}` }, output } },
+    { status: 200, json: { status: 'incomplete', output } },
+  ])
+  const openai = createOpenAI(fake.fn)
+  const errs = await Promise.all([1, 2, 3].map(() => openai.generateText(KEY, REQ, signal()).catch((e) => e)))
+  expect(errs.map((e) => [e.code, e.detail])).toEqual([
+    ['invalid_output', 'output incomplete (max_output_tokens)'],
+    ['invalid_output', 'output incomplete (odd [chave])'],
+    ['invalid_output', 'output incomplete (unknown)'],
+  ])
+})
+
 it('retries once on 429 then succeeds', async () => {
   vi.useFakeTimers()
   const fake = fakeFetch([{ status: 429, json: { error: { message: 'slow down' } } }, { status: 200, json: { content: [{ type: 'text', text: 'ok' }] } }])
@@ -72,6 +111,32 @@ it('retries once on 5xx and network errors, then gives up', async () => {
   const err = await pending
   expect(fake.calls).toHaveLength(2)
   expect(err).toMatchObject({ code: 'provider_error', provider: 'gemini', detail: 'HTTP 503' })
+})
+
+it('retries once when the connection drops while reading the body', async () => {
+  vi.useFakeTimers()
+  const broken = new ReadableStream({ start(c) { c.error(new TypeError('terminated')) } })
+  const fake = fakeFetch([{ status: 200, json: { content: [{ type: 'text', text: 'ok' }] } }])
+  let calls = 0
+  const fn = (async (input: string | URL | Request, init?: RequestInit) =>
+    ++calls === 1 ? new Response(broken, { status: 200 }) : fake.fn(input, init)) as typeof fetch
+  const out = createAnthropic(fn).generateText(KEY, REQ, new AbortController().signal)
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(await out).toBe('ok')
+  expect(calls).toBe(2)
+})
+
+it('a key fetch would reject as a header fails at once, without a call', async () => {
+  for (const bad of ['sk-a\nb', 'sk-a\rb', 'sk-a\0b', 'sk-açãoΩ']) {
+    const fake = fakeFetch([])
+    const err = await createOpenAI(fake.fn).generateText(bad, REQ, signal()).catch((e) => e)
+    expect(err).toMatchObject({ code: 'provider_error', provider: 'openai', detail: 'invalid header value: Authorization' })
+    expect(err.message).not.toContain(bad)
+    expect(fake.calls).toHaveLength(0)
+  }
+  // fetch trims whitespace at the ends of a header value, so a trailing newline still goes out.
+  const fake = fakeFetch([{ status: 200, json: { content: [{ type: 'text', text: 'ok' }] } }])
+  expect(await createAnthropic(fake.fn).generateText('sk-ok\n', REQ, signal())).toBe('ok')
 })
 
 it('does not retry on 401', async () => {
@@ -118,9 +183,34 @@ it('a timeout during the retry wait stops without a second call', async () => {
   expect(fake.calls).toHaveLength(1)
 })
 
+it('an abort that is not a timeout rethrows the signal reason', async () => {
+  const during = new AbortController()
+  const pending = createOpenAI(hangingFetch()).generateText(KEY, REQ, during.signal).catch((e) => e)
+  during.abort()
+  const err = await pending
+  expect(err).not.toBeInstanceOf(ProviderError)
+  expect(err).toMatchObject({ name: 'AbortError' })
+
+  vi.useFakeTimers()
+  const inWait = new AbortController()
+  const fake = fakeFetch([{ status: 503, text: '' }])
+  const waiting = postJson({ provider: 'fal', url: 'https://x.test', headers: {}, body: {}, key: KEY, signal: inWait.signal, fetchFn: fake.fn }).catch((e) => e)
+  await vi.advanceTimersByTimeAsync(500)
+  const shutdown = new Error('shutdown')
+  inWait.abort(shutdown)
+  expect(await waiting).toBe(shutdown)
+  expect(fake.calls).toHaveLength(1)
+})
+
 it('redact replaces every occurrence and leaves text alone for an empty key', () => {
   expect(redact(`a ${KEY} b ${KEY}`, KEY)).toBe('a [chave] b [chave]')
   expect(redact('nothing here', '')).toBe('nothing here')
+})
+
+it('redact also replaces the key as fetch sends it, without whitespace at the ends', () => {
+  expect(redact(`Incorrect API key provided: ${KEY}.`, `\t ${KEY}\n`)).toBe('Incorrect API key provided: [chave].')
+  expect(redact(`raw " ${KEY}\n"`, ` ${KEY}\n`)).toBe('raw "[chave]"')
+  expect(redact('a \n b', ' \n ')).toBe('a \n b')
 })
 
 it('createProviders registers the text providers only', () => {
