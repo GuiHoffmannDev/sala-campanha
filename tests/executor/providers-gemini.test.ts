@@ -41,6 +41,23 @@ it('sends prompt and reference images as inline_data', async () => {
   })
 })
 
+it('rejects reference images over the 20 MB request limit without calling Gemini', async () => {
+  const fake = fakeFetch([])
+  const big = { bytes: new Uint8Array(8 * 1024 * 1024), mimeType: 'image/png' } // 8 MiB, about 11.2 MB in base64
+  const err = await createGemini(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [big, big] }, signal()).catch((e) => e)
+  expect(err).toBeInstanceOf(ProviderError)
+  expect(err.code).toBe('provider_error')
+  expect(err.detail).toMatch(/^as imagens de referência somam 22,4 MB; o limite do Gemini é 20 MB por pedido/)
+  expect(fake.calls).toHaveLength(0)
+})
+
+it('sends reference images just under the request limit', async () => {
+  const fake = fakeFetch([reply([{ inlineData: { mimeType: 'image/png', data: b64('out') } }])])
+  const img = { bytes: new Uint8Array(14_900_000), mimeType: 'image/png' } // about 19.9 MB in base64
+  await createGemini(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [img] }, signal())
+  expect(fake.calls).toHaveLength(1)
+})
+
 it('decodes the returned image', async () => {
   const fake = fakeFetch([reply([{ text: 'Aqui está' }, { inlineData: { mimeType: 'image/png', data: b64('png-bytes') } }])])
   const out = await createGemini(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal())
@@ -78,6 +95,17 @@ it('no image and no text reports finishReason or the prompt block reason', async
   expect((await generateError({})).code).toBe('provider_error')
 })
 
+it('no-image detail without model text is readable Portuguese', async () => {
+  expect((await generateError({ candidates: [{ content: { parts: [] }, finishReason: 'IMAGE_SAFETY' }] })).detail)
+    .toBe('imagem bloqueada pelo filtro de segurança (IMAGE_SAFETY)')
+  expect((await generateError({ promptFeedback: { blockReason: 'PROHIBITED_CONTENT' } })).detail)
+    .toBe('conteúdo proibido pela política do Gemini (PROHIBITED_CONTENT)')
+  // STOP without an image is not a safety block: say only that no image came back.
+  expect((await generateError({ candidates: [{ content: { parts: [] }, finishReason: 'STOP' }] })).detail)
+    .toBe('o modelo não devolveu imagem (STOP)')
+  expect((await generateError({})).detail).toBe('o modelo não devolveu imagem')
+})
+
 it('no-image detail is redacted and cut at 300 characters', async () => {
   const err = await generateError({ candidates: [{ content: { parts: [{ text: `chave ${KEY} ${'x'.repeat(400)}` }] } }] })
   expect(err.detail).not.toContain(KEY)
@@ -89,6 +117,22 @@ it('image with an unsupported mimeType is invalid_output', async () => {
   const err = await generateError({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/gif', data: b64('gif') } }] } }] })
   expect(err.code).toBe('invalid_output')
   expect(err.provider).toBe('gemini')
+})
+
+it('invalid base64 image data is invalid_output', async () => {
+  // Buffer.from would silently drop the bad characters and return garbage bytes.
+  for (const data of ['not base64!!', `${b64('png-bytes')}$$`, 'abc']) {
+    const err = await generateError({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data } }] } }] })
+    expect(err.code).toBe('invalid_output')
+    expect(err.detail).toBe('invalid base64 image data')
+  }
+})
+
+it('decodes a multi-megabyte image without overflowing the base64 check', async () => {
+  const big = 'x'.repeat(20 * 1024 * 1024)
+  const fake = fakeFetch([reply([{ inlineData: { mimeType: 'image/png', data: b64(big) } }])])
+  const out = await createGemini(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal())
+  expect(out.bytes.length).toBe(big.length)
 })
 
 it('empty image data is invalid_output', async () => {
