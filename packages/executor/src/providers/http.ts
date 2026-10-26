@@ -92,15 +92,31 @@ export async function postJson(o: PostJsonOptions): Promise<unknown> {
   }
 }
 
-/** `error.message` from an OpenAI, Anthropic or Gemini error body, or fal's `detail` string, if present. */
+/**
+ * `error.message` from an OpenAI, Anthropic or Gemini error body, or fal's `detail`: a string,
+ * or on a 422 a list of `{ loc, msg }` validation errors, if present.
+ */
 function errorMessage(text: string): string | undefined {
   try {
     const body = JSON.parse(text) as { error?: { message?: unknown }; detail?: unknown } | null
     const message = body?.error?.message ?? body?.detail
+    if (Array.isArray(message)) return validationMessage(message)
     return typeof message === 'string' && message ? message : undefined
   } catch {
     return undefined
   }
+}
+
+/** `loc: msg` per item, joined. Only `loc` and `msg`: `input` echoes what was sent (data URIs, prompts). */
+function validationMessage(items: unknown[]): string | undefined {
+  const parts = items.flatMap((item) => {
+    const { loc, msg } = (item ?? {}) as { loc?: unknown; msg?: unknown }
+    if (typeof msg !== 'string' || !msg) return []
+    // `body` is the root of every request field; the rest names the field.
+    const path = Array.isArray(loc) ? loc.filter((p, i) => !(i === 0 && p === 'body')).join('.') : ''
+    return [path ? `${path}: ${msg}` : msg]
+  })
+  return parts.length > 0 ? parts.join('; ') : undefined
 }
 
 /** Resolves true after `ms`, or false as soon as `signal` aborts. */

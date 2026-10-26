@@ -1,5 +1,9 @@
-/** A scripted reply: a JSON body, a raw text body, or a thrown network error. */
-export type FakeReply = { status: number; json: unknown } | { status: number; text: string } | { error: Error }
+/** A scripted reply: a JSON body, a raw text body, a binary body, or a thrown network error. */
+export type FakeReply =
+  | { status: number; json: unknown }
+  | { status: number; text: string }
+  | { status: number; bytes: Uint8Array<ArrayBuffer> }
+  | { error: Error }
 
 export type FakeCall = { url: string; method: string; headers: Record<string, string>; body: unknown }
 
@@ -19,7 +23,7 @@ export function fakeFetch(replies: FakeReply[]): { fn: typeof fetch; calls: Fake
     const reply = replies[calls.length - 1]
     if (!reply) throw new Error(`fakeFetch: no reply scripted for call ${calls.length}`)
     if ('error' in reply) throw reply.error
-    const body = 'json' in reply ? JSON.stringify(reply.json) : reply.text
+    const body = 'json' in reply ? JSON.stringify(reply.json) : 'bytes' in reply ? reply.bytes : reply.text
     return new Response(body, { status: reply.status, headers: { 'content-type': 'application/json' } })
   }) as typeof fetch
   return { fn, calls }

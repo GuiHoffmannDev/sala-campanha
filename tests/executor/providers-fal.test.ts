@@ -9,6 +9,11 @@ const signal = () => AbortSignal.timeout(5000)
 const bytes = (s: string) => new TextEncoder().encode(s)
 const b64 = (s: string) => Buffer.from(s).toString('base64')
 const dataUri = (mime: string, s: string) => `data:${mime};base64,${b64(s)}`
+/** File signatures: the downloaded image's type comes from these, never from `content_type`. */
+const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+const JPEG = [0xff, 0xd8, 0xff, 0xe0]
+const WEBP = [...bytes('RIFF'), 0, 0, 0, 0, ...bytes('WEBP')]
+const file = (sig: number[], size = 64) => { const b = new Uint8Array(size); b.set(sig); return b }
 const result = (url: string, content_type = 'image/png') => ({ status: 200, json: { images: [{ url, content_type }], prompt: 'P' } })
 
 /** Runs one text-to-image generation against scripted replies and returns the thrown error. */
@@ -41,6 +46,23 @@ it('uses the multi endpoint with data URIs when there are references', async () 
   })
 })
 
+it('rejects reference images over the 20 MB request limit without calling fal', async () => {
+  const fake = fakeFetch([])
+  const big = { bytes: new Uint8Array(8 * 1024 * 1024), mimeType: 'image/png' as const } // 8 MiB, about 11.2 MB in base64
+  const err = await createFal(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [big, big] }, signal()).catch((e) => e)
+  expect(err).toBeInstanceOf(ProviderError)
+  expect(err.code).toBe('provider_error')
+  expect(err.detail).toMatch(/^as imagens de referência somam 22,4 MB; o limite do Flux Kontext é 20 MB por pedido/)
+  expect(fake.calls).toHaveLength(0)
+})
+
+it('sends reference images just under the request limit', async () => {
+  const fake = fakeFetch([result(dataUri('image/png', 'out'))])
+  const img = { bytes: new Uint8Array(14_900_000), mimeType: 'image/png' as const } // about 19.9 MB in base64
+  await createFal(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [img] }, signal())
+  expect(fake.calls).toHaveLength(1)
+})
+
 it('uses text-to-image without references', async () => {
   const fake = fakeFetch([result(dataUri('image/png', 'out'))])
   await createFal(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'Só texto', images: [] }, signal())
@@ -57,14 +79,67 @@ it('decodes a data URI result', async () => {
 })
 
 it('downloads an https result without sending the key', async () => {
-  const fake = fakeFetch([result('https://v3.fal.media/files/x/out.png'), { status: 200, text: 'downloaded-bytes' }])
+  const fake = fakeFetch([result('https://v3.fal.media/files/x/out.png'), { status: 200, bytes: file(PNG) }])
   const out = await createFal(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal())
   expect(fake.calls).toHaveLength(2)
   expect(fake.calls[1]).toMatchObject({ url: 'https://v3.fal.media/files/x/out.png', method: 'GET' })
   expect(fake.calls[1]!.headers).toEqual({})
   expect(JSON.stringify(fake.calls[1])).not.toContain(KEY)
   expect(out.mimeType).toBe('image/png')
-  expect(new TextDecoder().decode(out.bytes)).toBe('downloaded-bytes')
+  expect(out.bytes).toEqual(file(PNG))
+})
+
+it('a redirected https download is refused, never followed', async () => {
+  const urls: string[] = []
+  // Mimics real fetch: a 302 is followed unless the caller asks for redirect 'error', which rejects.
+  const fn = (async (input: string | URL | Request, init?: RequestInit) => {
+    urls.push(String(input))
+    if (urls.length === 1) return Response.json({ images: [{ url: 'https://v3.fal.media/files/x/out.png', content_type: 'image/png' }] })
+    if (init?.redirect !== 'error') {
+      urls.push('http://169.254.169.254/latest/meta-data')
+      return new Response('metadata', { status: 200 })
+    }
+    throw new TypeError('fetch failed: unexpected redirect')
+  }) as typeof fetch
+  const err = await createFal(fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal()).catch((e) => e)
+  expect(err).toBeInstanceOf(ProviderError)
+  expect(err.code).toBe('provider_error')
+  expect(urls).toEqual(['https://fal.run/fal-ai/flux-pro/kontext/max/text-to-image', 'https://v3.fal.media/files/x/out.png'])
+})
+
+/** A fetch whose first reply is an https result and whose second is the download response `res`. */
+function downloadFetch(res: Response): typeof fetch {
+  let n = 0
+  return (async () => (++n === 1
+    ? Response.json({ images: [{ url: 'https://v3.fal.media/files/x/out.png', content_type: 'image/png' }] })
+    : res)) as typeof fetch
+}
+
+it('a download whose content-length is over 25 MB is refused without reading the body', async () => {
+  let pulled = false
+  const body = new ReadableStream<Uint8Array>({ pull(c) { pulled = true; c.enqueue(new Uint8Array(10)); c.close() } }, { highWaterMark: 0 })
+  const res = new Response(body, { headers: { 'content-length': String(26_214_401) } })
+  const err = await createFal(downloadFetch(res)).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal()).catch((e) => e)
+  expect(err).toBeInstanceOf(ProviderError)
+  expect(err.code).toBe('invalid_output')
+  expect(pulled).toBe(false)
+})
+
+it('a download that streams past 25 MB is cut off and refused', async () => {
+  let sent = 0
+  const chunk = new Uint8Array(1024 * 1024)
+  // No content-length and an endless body: the reader must stop on its own.
+  const body = new ReadableStream<Uint8Array>({ pull(c) { sent += chunk.length; c.enqueue(chunk) } }, { highWaterMark: 0 })
+  const err = await createFal(downloadFetch(new Response(body))).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal()).catch((e) => e)
+  expect(err).toBeInstanceOf(ProviderError)
+  expect(err.code).toBe('invalid_output')
+  expect(sent).toBeLessThanOrEqual(27 * 1024 * 1024)
+})
+
+it('a download of exactly 25 MB is accepted', async () => {
+  const res = new Response(file(PNG, 26_214_400))
+  const out = await createFal(downloadFetch(res)).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal())
+  expect(out.bytes.length).toBe(26_214_400)
 })
 
 it('a failed https download is provider_error', async () => {
@@ -95,9 +170,20 @@ it('a data URI with an unsupported type or invalid base64 is invalid_output', as
   expect((await generateError([result('data:image/png;base64,')])).code).toBe('invalid_output')
 })
 
-it('an https result with an unsupported content_type is invalid_output', async () => {
-  const err = await generateError([result('https://v3.fal.media/files/x/out.gif', 'image/gif'), { status: 200, text: 'gif' }])
-  expect(err.code).toBe('invalid_output')
+it('a downloaded file takes its type from its bytes, not from content_type', async () => {
+  for (const [sig, type] of [[PNG, 'image/png'], [JPEG, 'image/jpeg'], [WEBP, 'image/webp']] as const) {
+    // content_type says gif: ignored, the signature decides.
+    const fake = fakeFetch([result('https://v3.fal.media/files/x/out', 'image/gif'), { status: 200, bytes: file([...sig]) }])
+    const out = await createFal(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal())
+    expect(out.mimeType).toBe(type)
+  }
+})
+
+it('a downloaded file that is not PNG, JPEG or WebP is invalid_output', async () => {
+  for (const body of [bytes('GIF89a-not-allowed'), bytes('<html>error page</html>'), new Uint8Array([0x89, 0x50]), bytes('RIFF\0\0\0\0WAVE')]) {
+    const err = await generateError([result('https://v3.fal.media/files/x/out.png'), { status: 200, bytes: body }])
+    expect(err.code).toBe('invalid_output')
+  }
 })
 
 it('reports the fal error detail, redacted', async () => {
@@ -105,6 +191,20 @@ it('reports the fal error detail, redacted', async () => {
   expect(err.code).toBe('provider_error')
   expect(err.detail).toContain('invalid key')
   expect(err.detail).not.toContain(KEY)
+})
+
+it('reports each fal validation error from a detail list, without echoing the input', async () => {
+  const err = await generateError([{ status: 422, json: { detail: [
+    { loc: ['body', 'image_urls', 0], msg: 'File too large', type: 'file_too_large', input: `data:image/png;base64,${KEY}` },
+    { loc: ['body', 'prompt'], msg: `bad prompt ${KEY}`, type: 'value_error' },
+  ] } }])
+  expect(err.code).toBe('provider_error')
+  expect(err.detail).toBe('image_urls.0: File too large; prompt: bad prompt [chave]')
+})
+
+it('a detail list with no usable msg falls back to the HTTP status', async () => {
+  const err = await generateError([{ status: 422, json: { detail: [{ type: 'x' }, 'text'] } }])
+  expect(err.detail).toBe('HTTP 422')
 })
 
 it('createProviders registers gemini and fal as image providers', () => {
