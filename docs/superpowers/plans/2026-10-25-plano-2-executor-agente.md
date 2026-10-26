@@ -351,7 +351,7 @@ it('timeout becomes ProviderError timeout', async () => { /* fetch que espera o 
   - Resultado: a primeira parte de `candidates[0].content.parts` com `inlineData` (ou `inline_data`), decodificada de base64. `mimeType` fora de png/jpeg/webp: `invalid_output`.
   - Sem parte de imagem: `ProviderError('provider_error', 'gemini', detail)`. O `detail` é o texto devolvido pelo modelo ou `finishReason` (ex.: recusa por segurança), redigido e cortado em 300 caracteres.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('sends prompt and reference images as inline_data', async () => {
@@ -363,10 +363,10 @@ it('no image part becomes provider_error with the model text', async () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/providers-gemini.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implementar `gemini.ts`.** Conferir no Context7 o endpoint (`v1` ou `v1beta`) e o formato de `inlineData` da resposta.
-- [ ] **Step 4: Run.** Run: `pnpm test tests/executor/providers-gemini.test.ts && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git add -A && git commit -m "feat(executor): Gemini image provider with reference images"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/providers-gemini.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implementar `gemini.ts`.** Conferir no Context7 o endpoint (`v1` ou `v1beta`) e o formato de `inlineData` da resposta.
+- [x] **Step 4: Run.** Run: `pnpm test tests/executor/providers-gemini.test.ts && pnpm typecheck`. Expected: PASS.
+- [x] **Step 5: Commit.** `git add -A && git commit -m "feat(executor): Gemini image provider with reference images"`
 
 ---
 

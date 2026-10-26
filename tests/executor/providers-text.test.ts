@@ -213,8 +213,7 @@ it('redact also replaces the key as fetch sends it, without whitespace at the en
   expect(redact('a \n b', ' \n ')).toBe('a \n b')
 })
 
-it('createProviders registers the text providers only', () => {
+it('createProviders registers the text providers', () => {
   const p = createProviders(fakeFetch([]).fn)
   expect(Object.keys(p.text).sort()).toEqual(['anthropic', 'openai'])
-  expect(p.image).toEqual({})
 })
