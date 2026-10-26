@@ -521,7 +521,7 @@ finally: desliga o timer
 
 Erros em qualquer passo: `ProviderError` vira `agent_error` com `code` e `message` de `agentErrorMessage` (o `detail` já vem redigido; redigir de novo com todas as chaves da rodada) e `image_prompt` quando já existe → `'failed'`. `ClaimLostError` em `addAgentEvent` → `'claim_lost'`. Outro erro: log `error` com a mensagem redigida e `agent_error` `internal` → `'failed'`.
 
-- [ ] **Step 1: Write the failing tests** em `tests/executor/job.test.ts` (Supabase local, `fakeProviders`, chaves fictícias com 20+ caracteres via `set_provider_key` como admin, mensagens com `createClaimedMessage` e `loadEvent`)
+- [x] **Step 1: Write the failing tests** em `tests/executor/job.test.ts` (Supabase local, `fakeProviders`, chaves fictícias com 20+ caracteres via `set_provider_key` como admin, mensagens com `createClaimedMessage` e `loadEvent`)
 
 ```ts
 it('imagem_texto: one version with image and caption, events started/result, message done', async () => {
@@ -555,10 +555,10 @@ it('approval during generation: wrong_status, file removed', async () => {})
 it('touches the claim while generating', async () => { /* touchIntervalMs 50; image() espera 200 ms; claimed_at mudou */ })
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/job.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implementar `fake-providers.ts` e `job.ts`.**
-- [ ] **Step 4: Run.** Run: `pnpm test tests/executor/job.test.ts` três vezes seguidas. Expected: PASS nas 3, sem falha intermitente.
-- [ ] **Step 5: Commit.** `git add -A && git commit -m "feat(executor): claim rounds with redirection, model resolution and safe errors"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/job.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implementar `fake-providers.ts` e `job.ts`.**
+- [x] **Step 4: Run.** Run: `pnpm test tests/executor/job.test.ts` três vezes seguidas. Expected: PASS nas 3, sem falha intermitente.
+- [x] **Step 5: Commit.** `git add -A && git commit -m "feat(executor): claim rounds with redirection, model resolution and safe errors"`
 
 ---
 
