@@ -442,7 +442,7 @@ Pedido atual:
 [#<id>] <nome>: <text>            (cada mensagem do batch, em ordem)
 ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('lists history before the current request and excludes batch ids from history', () => {
@@ -460,10 +460,10 @@ it('missing required key is invalid_output', () => { /* imagem_texto sem caption
 it('non-JSON output is invalid_output', () => {})
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/orchestrator.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implementar `orchestrator.ts`.**
-- [ ] **Step 4: Run.** Run: `pnpm test tests/executor/orchestrator.test.ts && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git add -A && git commit -m "feat(executor): orchestrator prompt and plan parsing"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/orchestrator.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implementar `orchestrator.ts`.**
+- [x] **Step 4: Run.** Run: `pnpm test tests/executor/orchestrator.test.ts && pnpm typecheck`. Expected: PASS.
+- [x] **Step 5: Commit.** `git add -A && git commit -m "feat(executor): orchestrator prompt and plan parsing"`
 
 ---
 
