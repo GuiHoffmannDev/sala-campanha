@@ -18,6 +18,13 @@ export function redact(text: string, key: string): string {
   return text.replaceAll(key, '[chave]').replaceAll(sent, '[chave]')
 }
 
+/**
+ * Standard padded base64, as the APIs encode bytes; Buffer.from would silently skip anything else.
+ * Plain character class plus a length check: a repeated group overflows the regex stack on multi-MB images.
+ */
+const BASE64_CHARS = /^[A-Za-z0-9+/]*={0,2}$/
+export const isBase64 = (s: string) => s.length % 4 === 0 && BASE64_CHARS.test(s)
+
 export type PostJsonOptions = {
   provider: Provider
   url: string
@@ -85,10 +92,11 @@ export async function postJson(o: PostJsonOptions): Promise<unknown> {
   }
 }
 
-/** `error.message` from an OpenAI, Anthropic or Gemini error body, if present. */
+/** `error.message` from an OpenAI, Anthropic or Gemini error body, or fal's `detail` string, if present. */
 function errorMessage(text: string): string | undefined {
   try {
-    const message = (JSON.parse(text) as { error?: { message?: unknown } } | null)?.error?.message
+    const body = JSON.parse(text) as { error?: { message?: unknown }; detail?: unknown } | null
+    const message = body?.error?.message ?? body?.detail
     return typeof message === 'string' && message ? message : undefined
   } catch {
     return undefined

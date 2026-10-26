@@ -1,16 +1,10 @@
-import { postJson, redact } from './http.ts'
+import { isBase64, postJson, redact } from './http.ts'
 import { type GeneratedImage, type ImageProvider, ProviderError } from './types.ts'
 
 const MAX_DETAIL = 300
 /** Gemini's cap on a request with inline data. Decimal megabytes: the stricter reading of "20 MB". */
 const MAX_REQUEST_BYTES = 20_000_000
 const IMAGE_TYPES: readonly string[] = ['image/png', 'image/jpeg', 'image/webp'] satisfies GeneratedImage['mimeType'][]
-/**
- * Standard padded base64, as the API encodes bytes; Buffer.from would silently skip anything else.
- * Plain character class plus a length check: a repeated group overflows the regex stack on multi-MB images.
- */
-const BASE64_CHARS = /^[A-Za-z0-9+/]*={0,2}$/
-const isBase64 = (s: string) => s.length % 4 === 0 && BASE64_CHARS.test(s)
 
 type InlineData = { mimeType?: string; mime_type?: string; data?: string }
 type Part = { text?: string; thought?: boolean; inlineData?: InlineData; inline_data?: InlineData }

@@ -140,8 +140,7 @@ it('empty image data is invalid_output', async () => {
   expect(err.code).toBe('invalid_output')
 })
 
-it('createProviders registers gemini as the only image provider so far', () => {
+it('createProviders registers gemini as an image provider', () => {
   const p = createProviders(fakeFetch([]).fn)
-  expect(Object.keys(p.image)).toEqual(['gemini'])
   expect(typeof p.image.gemini?.generateImage).toBe('function')
 })

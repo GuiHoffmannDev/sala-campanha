@@ -387,7 +387,7 @@ Segundo provedor de imagem. É o item 4 da ordem de corte do spec ("mais de um p
   - Corpo: `{ prompt, image_urls: images.map(dataUri), sync_mode: true, output_format: 'png' }` (sem `image_urls` no text-to-image). As referências vão como data URI, sem URL assinada do Storage, para nenhum arquivo privado do time ficar acessível por link.
   - Resultado: `images[0].url`. Se for data URI, decodifica; se for `https://`, baixa com `fetchFn` (sem a chave no header). Nenhuma imagem: `invalid_output`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('uses the multi endpoint with data URIs when there are references', async () => {})
@@ -396,10 +396,10 @@ it('decodes a data URI result', async () => {})
 it('downloads an https result without sending the key', async () => { /* 2ª chamada sem header Authorization */ })
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/providers-fal.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implementar `fal.ts`.** Conferir no Context7 se os endpoints `kontext/max/multi` e `kontext/max/text-to-image` aceitam data URI e `sync_mode`.
-- [ ] **Step 4: Run.** Run: `pnpm test tests/executor/providers-fal.test.ts && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git add -A && git commit -m "feat(executor): fal Flux Kontext image provider"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/providers-fal.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implementar `fal.ts`.** Conferir no Context7 se os endpoints `kontext/max/multi` e `kontext/max/text-to-image` aceitam data URI e `sync_mode`.
+- [x] **Step 4: Run.** Run: `pnpm test tests/executor/providers-fal.test.ts && pnpm typecheck`. Expected: PASS.
+- [x] **Step 5: Commit.** `git add -A && git commit -m "feat(executor): fal Flux Kontext image provider"`
 
 ---
 
