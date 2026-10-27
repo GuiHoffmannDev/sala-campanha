@@ -1,0 +1,10 @@
+# Keep secrets, dependencies and dev-only files out of the build context.
+.env*
+**/.env*
+node_modules
+**/node_modules
+tests
+supabase
+.superpowers
+.git
+docs

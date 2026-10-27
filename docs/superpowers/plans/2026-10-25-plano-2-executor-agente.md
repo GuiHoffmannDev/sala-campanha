@@ -623,12 +623,12 @@ it('main exits on missing config without printing secrets', async () => {
   - Teste ao vivo: um `describe.skipIf(!process.env.LIVE_<PROVIDER>_KEY)` por provedor (`LIVE_ANTHROPIC_KEY`, `LIVE_OPENAI_KEY`, `LIVE_GEMINI_KEY`, `LIVE_FAL_KEY`). Texto: pede `{"caption":"..."}` e passa em `parsePlan`. Imagem: gera 1 imagem com 1 referência PNG pequena e confere o `mimeType`. Nunca imprime a chave. Sem as variáveis, o arquivo inteiro é pulado e `pnpm test` continua sem rede.
   - `Dockerfile`: base `node:24-slim`, `corepack enable`, `pnpm install --frozen-lockfile --prod --filter @sala/executor...`, usuário não root, `CMD ["node", "packages/executor/src/main.ts"]`. Sem `.env*` na imagem (`.dockerignore` exclui `.env*`, `node_modules`, `tests`, `supabase`, `.superpowers`).
 
-- [ ] **Step 1: Escrever `tests/live/providers.live.test.ts`.**
-- [ ] **Step 2: Run sem chaves.** Run: `pnpm test tests/live`. Expected: todos os testes pulados (skipped), nenhum erro.
-- [ ] **Step 3: Run com chaves (opcional, se o fundador fornecer).** Run: `LIVE_ANTHROPIC_KEY=... LIVE_GEMINI_KEY=... pnpm test tests/live`. Expected: PASS nos provedores com chave. Se falhar por formato de API, corrigir o adaptador e o teste unitário dele juntos.
-- [ ] **Step 4: Escrever `Dockerfile` e `.dockerignore`.** Run: `docker build -f packages/executor/Dockerfile -t sala-executor . && docker run --rm sala-executor`. Expected: a imagem builda; o container sai com erro de configuração citando `SUPABASE_URL`.
-- [ ] **Step 5: Conferir que a imagem não tem segredo.** Run: `docker run --rm --entrypoint sh sala-executor -c 'ls -a /app; find / -name ".env*" 2>/dev/null'`. Expected: nenhum arquivo `.env`.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "chore(executor): live provider smoke test, Docker image and deploy checklist"`
+- [x] **Step 1: Escrever `tests/live/providers.live.test.ts`.**
+- [x] **Step 2: Run sem chaves.** Run: `pnpm test tests/live`. Expected: todos os testes pulados (skipped), nenhum erro.
+- [x] **Step 3: Run com chaves (opcional, se o fundador fornecer).** Run: `LIVE_ANTHROPIC_KEY=... LIVE_GEMINI_KEY=... pnpm test tests/live`. Expected: PASS nos provedores com chave. Se falhar por formato de API, corrigir o adaptador e o teste unitário dele juntos. _Não executado em 2026-10-27: nenhuma chave `LIVE_*` fornecida. Com chaves falsas, OpenAI e Gemini responderam erro de chave inválida, com a chave redigida no detalhe._
+- [x] **Step 4: Escrever `Dockerfile` e `.dockerignore`.** Run: `docker build -f packages/executor/Dockerfile -t sala-executor . && docker run --rm sala-executor`. Expected: a imagem builda; o container sai com erro de configuração citando `SUPABASE_URL`.
+- [x] **Step 5: Conferir que a imagem não tem segredo.** Run: `docker run --rm --entrypoint sh sala-executor -c 'ls -a /app; find / -name ".env*" 2>/dev/null'`. Expected: nenhum arquivo `.env`.
+- [x] **Step 6: Commit.** `git add -A && git commit -m "chore(executor): live provider smoke test, Docker image and deploy checklist"`
 
 ---
 
@@ -660,3 +660,11 @@ it('main exits on missing config without printing secrets', async () => {
 - Grace period de desligamento da plataforma ≥ `SHUTDOWN_GRACE_MS` (120 s), para a rodada em andamento terminar.
 - A migration `0009_agent_events.sql` aplicada no projeto hospedado antes de subir o executor.
 - Os itens do "Checklist de deploy" do Plano 1 continuam valendo (logs do Postgres sem parâmetros de `set_provider_key`).
+
+### Verificado em 2026-10-27 (Task 10, local)
+
+- [x] `docker build -f packages/executor/Dockerfile -t sala-executor .` builda a partir da raiz.
+- [x] Sem variáveis, o container sai com código 1 e `Invalid executor configuration: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY`.
+- [x] A imagem não tem `.env*` (`find / -name ".env*"` vazio), nem `tests`, `supabase` ou `.superpowers`; roda como usuário `node`.
+- [x] Com `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` do Supabase local, o container loga `executor started`, sai com 0 no `SIGTERM` e o log não contém a service role key.
+- [ ] Itens acima que dependem da hospedagem (segredos, `EXECUTOR_ID`, logs, grace period, migration `0009` no projeto hospedado): conferir no primeiro deploy.
