@@ -42,7 +42,7 @@ O time de teste usar o app **numa campanha real**, do pedido à peça aprovada, 
 
 1. Campanhas compartilhadas entre membros do time, com presença (quem está online e quem está em cada peça).
 2. Um chat por peça, compartilhado entre pessoas e agente, onde cada mensagem mostra quem a enviou.
-3. Geração de **texto e imagem** no mesmo chat, com escolha de modelo e provedor por pedido.
+3. Geração de **texto e imagem** no mesmo chat, com escolha de modelo e provedor por pedido e, quando o modelo permite, do esforço (quanto ele raciocina). *(Esforço incluído em 2026-10-27, por decisão do fundador.)*
 4. **Chaves do time** (traga suas próprias chaves): o admin cadastra uma vez as chaves de OpenAI, Anthropic, Krea e outros provedores suportados, e todo o time usa.
 5. **Fotos do produto como referência:** uma biblioteca por campanha. As fotos podem ser anexadas como referência em qualquer geração de imagem.
 6. **Redirecionar durante a geração:** alguém pode mandar mensagem enquanto o agente trabalha, e o pedido é incorporado sem recomeçar a conversa.
@@ -76,7 +76,7 @@ Layout no estilo Conductor, **chat no centro** (opção A escolhida nos mockups)
   - Cada mensagem mostra autor e avatar.
   - Textos e imagens gerados aparecem no fio da conversa.
   - Dá para marcar um colega com `@Nome`.
-  - No campo de mensagem ficam o seletor de modelo e provedor, o botão de anexar referência e o botão de enviar.
+  - No campo de mensagem ficam o seletor de modelo e provedor (com o esforço, quando o modelo permite), o botão de anexar referência e o botão de enviar. *(Esforço incluído em 2026-10-27, por decisão do fundador.)*
 - **Lateral direita:** as peças da campanha, com miniatura, tipo (imagem, texto ou ambos) e status (seção 5).
 - **Topo:** nome da campanha e da peça, avatares de quem está na peça agora e botão **Compartilhar**, que copia o link do workspace.
 

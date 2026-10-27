@@ -538,7 +538,8 @@ it('texto piece calls only the text provider', async () => { /* calls.image vazi
 it('uses the model chosen in the message', async () => { /* model { text: openai gpt-6-astra, image: fal ... }: calls usam esses modelos */ })
 it('defaults to the first catalog model with a key', async () => { /* só chave openai + gemini: texto gpt-6-astra, imagem gemini-nano-banana-2.1 */ })
 it('sends current version image first, then references, capped at maxReferenceImages', async () => {
-  // versão anterior com imagem + 6 referências, gemini-nano-banana-2.1 (máx. 5): 5 imagens; agent_started.dropped_reference_ids tem 2 ids
+  // versão anterior com imagem + 11 referências, gemini-nano-banana-2.1 (máx. 10, lido do catálogo): 10 imagens; agent_started.dropped_reference_ids tem 2 ids
+  // (correção A, 2026-10-27: o limite era 5 e o teste usava 6 referências fixas)
 })
 it('folds messages queued during generation into the next round', async () => {
   // plan() do fake posta uma 2ª mensagem via post_message na 1ª chamada
