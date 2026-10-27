@@ -43,6 +43,21 @@ it('openai sends the request shape and reads output_text', async () => {
   expect(fake.calls[0]!.body).toEqual({ model: 'gpt-6-astra', instructions: 'S', input: 'P', max_output_tokens: 2000 })
 })
 
+it('sends the chosen effort only when there is one', async () => {
+  const ok = { status: 200, json: { content: [{ type: 'text', text: 'x' }], output: [{ type: 'message', content: [{ type: 'output_text', text: 'x' }] }] } }
+  const anthropic = fakeFetch([ok, ok])
+  await createAnthropic(anthropic.fn).generateText(KEY, { ...REQ, effort: 'low' }, signal())
+  await createAnthropic(anthropic.fn).generateText(KEY, REQ, signal())
+  expect(anthropic.calls.map((c) => (c.body as Record<string, unknown>).output_config)).toEqual([{ effort: 'low' }, undefined])
+  expect(anthropic.calls[1]!.body).not.toHaveProperty('output_config')
+
+  const openai = fakeFetch([ok, ok])
+  await createOpenAI(openai.fn).generateText(KEY, { ...REQ, model: 'gpt-6-astra', effort: 'low' }, signal())
+  await createOpenAI(openai.fn).generateText(KEY, { ...REQ, model: 'gpt-6-astra' }, signal())
+  expect(openai.calls.map((c) => (c.body as Record<string, unknown>).reasoning)).toEqual([{ effort: 'low' }, undefined])
+  expect(openai.calls[1]!.body).not.toHaveProperty('reasoning')
+})
+
 it('empty text output is invalid_output', async () => {
   const anthropic = await createAnthropic(fakeFetch([{ status: 200, json: { content: [{ type: 'text', text: '' }] } }]).fn)
     .generateText(KEY, REQ, signal()).catch((e) => e)

@@ -293,10 +293,10 @@ it('uploadFile then downloadFile round-trips bytes and mime type', async () => {
 
 **Interfaces:**
 - Produces (`types.ts`):
-  - `type TextRequest = { model: string; system: string; prompt: string; maxOutputTokens: number }`
+  - `type TextRequest = { model: string; system: string; prompt: string; maxOutputTokens: number; effort?: string }`. `effort` é o esforço escolhido com o modelo; sem ele vale o padrão do provedor *(correção B, 2026-10-27)*.
   - `type TextProvider = { generateText(key: string, req: TextRequest, signal: AbortSignal): Promise<string> }`
   - `type InputImage = { bytes: Uint8Array; mimeType: string }`
-  - `type ImageRequest = { model: string; prompt: string; images: InputImage[] }`
+  - `type ImageRequest = { model: string; prompt: string; images: InputImage[]; effort?: string }` *(correção B, 2026-10-27)*
   - `type GeneratedImage = { bytes: Uint8Array; mimeType: 'image/png' | 'image/jpeg' | 'image/webp' }`
   - `type ImageProvider = { generateImage(key: string, req: ImageRequest, signal: AbortSignal): Promise<GeneratedImage> }`
   - `type Providers = { text: Partial<Record<Provider, TextProvider>>; image: Partial<Record<Provider, ImageProvider>> }`
@@ -308,8 +308,8 @@ it('uploadFile then downloadFile round-trips bytes and mime type', async () => {
     - Resposta não ok: `ProviderError('provider_error', provider, detail)`. O `detail` é `error.message` do JSON (formatos OpenAI/Anthropic/Gemini) ou `HTTP <status>`, redigido e cortado em 300 caracteres.
     - `signal` abortado por timeout: `ProviderError('timeout', ...)`.
     - JSON inválido na resposta: `ProviderError('invalid_output', ...)`.
-- Produces (`anthropic.ts`): `createAnthropic(fetchFn: typeof fetch): TextProvider`. `POST https://api.anthropic.com/v1/messages`, headers `x-api-key`, `anthropic-version: 2023-06-01`, corpo `{ model, max_tokens, system, messages: [{ role: 'user', content: prompt }] }`. Resultado: os blocos `content[].type === 'text'` concatenados. Vazio: `invalid_output`.
-- Produces (`openai.ts`): `createOpenAI(fetchFn: typeof fetch): TextProvider`. `POST https://api.openai.com/v1/responses`, header `Authorization: Bearer <key>`, corpo `{ model, instructions: system, input: prompt, max_output_tokens }`. Resultado: `output[]` do tipo `message`, com `content[]` do tipo `output_text`, concatenados. Vazio: `invalid_output`.
+- Produces (`anthropic.ts`): `createAnthropic(fetchFn: typeof fetch): TextProvider`. `POST https://api.anthropic.com/v1/messages`, headers `x-api-key`, `anthropic-version: 2023-06-01`, corpo `{ model, max_tokens, system, messages: [{ role: 'user', content: prompt }] }`, mais `output_config: { effort }` só quando há esforço *(correção B, 2026-10-27)*. Resultado: os blocos `content[].type === 'text'` concatenados. Vazio: `invalid_output`.
+- Produces (`openai.ts`): `createOpenAI(fetchFn: typeof fetch): TextProvider`. `POST https://api.openai.com/v1/responses`, header `Authorization: Bearer <key>`, corpo `{ model, instructions: system, input: prompt, max_output_tokens }`, mais `reasoning: { effort }` só quando há esforço *(correção B, 2026-10-27)*. Resultado: `output[]` do tipo `message`, com `content[]` do tipo `output_text`, concatenados. Vazio: `invalid_output`.
 - Produces (`index.ts`): `createProviders(fetchFn: typeof fetch = fetch): Providers`, com `text: { anthropic, openai }` e `image: {}` (as Tasks 5 e 6 completam).
 
 - [x] **Step 1: Write the failing tests** com um `fetch` falso que grava as chamadas.
@@ -351,6 +351,7 @@ it('timeout becomes ProviderError timeout', async () => { /* fetch que espera o 
 - Produces: `createGemini(fetchFn: typeof fetch): ImageProvider`.
   - `POST https://generativelanguage.googleapis.com/v1/models/${model}:generateContent`, header `x-goog-api-key`.
   - Corpo: `{ contents: [{ parts: [{ text: prompt }, ...images.map(i => ({ inline_data: { mime_type, data: base64 } }))] }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'] } }`.
+  - Com esforço, `generationConfig.thinkingConfig = { thinkingLevel }`, com o nome do enum `ThinkingLevel` do `generateContent` (`MINIMAL`, `MEDIUM`, `HIGH`): o esforço do catálogo em maiúsculas. Sem esforço, sem `thinkingConfig` *(correção B, 2026-10-27)*.
   - Resultado: a primeira parte de `candidates[0].content.parts` com `inlineData` (ou `inline_data`), decodificada de base64. `mimeType` fora de png/jpeg/webp: `invalid_output`.
   - Sem parte de imagem: `ProviderError('provider_error', 'gemini', detail)`. O `detail` é o texto devolvido pelo modelo ou `finishReason` (ex.: recusa por segurança), redigido e cortado em 300 caracteres.
 
@@ -418,8 +419,9 @@ it('downloads an https result without sending the key', async () => { /* 2ª cha
   - `type Plan = { imagePrompt: string | null; caption: string | null }`
   - `ORCHESTRATOR_SYSTEM: string`, com o texto exato abaixo.
   - `buildOrchestratorPrompt(ctx: PieceContext, batch: InboxMessage[], referenceCount: number, hasCurrentImage: boolean): string`. O nome de cada mensagem do lote vem de `ctx.memberNames[author_id]`, ou `'Alguém'`.
-  - `parsePlan(raw: string, kind: PieceKind, provider: Provider): Plan`. Pega o trecho do primeiro `{` ao último `}`, faz `JSON.parse` e valida `{ image_prompt?: string, caption?: string }`. Apara os valores. Regras por tipo: `imagem` exige `image_prompt` e descarta `caption`; `texto` exige `caption` e descarta `image_prompt`; `imagem_texto` exige os dois. Falta, valor vazio ou JSON inválido: `ProviderError('invalid_output', provider, ...)`.
-  - `planRound(o: { text: TextProvider; provider: Provider; key: string; model: string; ctx: PieceContext; batch: InboxMessage[]; referenceCount: number; hasCurrentImage: boolean; signal: AbortSignal }): Promise<Plan>`, com `maxOutputTokens: 2000`.
+  - `parsePlan(raw: string, kind: PieceKind, provider: Provider): Plan`. Pega o trecho do primeiro `{` ao último `}`, faz `JSON.parse` e valida `{ image_prompt?: string | null, caption?: string | null }` (`null` numa chave que o tipo da peça descarta não é erro *(correção B, 2026-10-27)*). Apara os valores. Regras por tipo: `imagem` exige `image_prompt` e descarta `caption`; `texto` exige `caption` e descarta `image_prompt`; `imagem_texto` exige os dois. Falta, valor vazio ou JSON inválido: `ProviderError('invalid_output', provider, ...)`.
+  - `export const MAX_OUTPUT_TOKENS = 32000`. Era 2000; o raciocínio conta nesse teto na OpenAI e na Anthropic *(correção B, 2026-10-27)*.
+  - `planRound(o: { text: TextProvider; provider: Provider; key: string; model: string; effort: string | null; ctx: PieceContext; batch: InboxMessage[]; referenceCount: number; hasCurrentImage: boolean; signal: AbortSignal }): Promise<Plan>`, com `maxOutputTokens: MAX_OUTPUT_TOKENS`. Repassa `effort` em `TextRequest.effort` só quando não é null *(correção B, 2026-10-27)*.
 
 `ORCHESTRATOR_SYSTEM` (texto exato):
 
@@ -482,7 +484,7 @@ it('non-JSON output is invalid_output', () => {})
   - `type JobDeps = { db: ExecutorDb; providers: Providers; log: Logger; touchIntervalMs: number; textTimeoutMs: number; imageTimeoutMs: number }`
   - `type RoundOutcome = 'ok' | 'failed' | 'claim_lost'`
   - `processClaim(deps: JobDeps, first: InboxMessage): Promise<void>`. Nunca lança: erros da rodada viram `agent_error` dentro de `runRound`; erro da fila (`absorbPending`, `complete`) só vai para o log, sem `agent_error` (a rodada pode já ter postado o resultado). As mensagens ficam `claimed` até `release_stale_claims` devolvê-las, e `answeredMessages` impede uma segunda versão.
-  - `resolveModels(kind: PieceKind, batch: InboxMessage[], history: HistoryMessage[], keyed: Provider[]): { text: CatalogModel; image: CatalogModel | null } | AgentErrorInput`
+  - `resolveModels(kind: PieceKind, batch: InboxMessage[], history: HistoryMessage[], keyed: Provider[]): { text: ChosenModel; image: ChosenModel | null } | AgentErrorInput`, com `ChosenModel = CatalogModel & { effort: string | null }` *(correção B, 2026-10-27)*
 - Produces (`tests/helpers/fake-providers.ts`): `fakeProviders(o?: { plan?: string | (() => Promise<string>); image?: () => Promise<GeneratedImage>; textError?: ProviderError }): { providers: Providers; calls: { text: TextRequest[]; image: ImageRequest[] } }`. Registra `anthropic`/`openai` como texto e `gemini`/`fal` como imagem.
 
 Algoritmo de `processClaim` (a ordem importa):
@@ -509,10 +511,12 @@ finally: desliga o timer
 `runRound(deps, batch, round): Promise<RoundOutcome>`, em ordem:
 1. `ctx = loadPieceContext(piece)`. `sourceId` = `id` da última mensagem do batch, usado em todos os eventos e na versão.
 2. Status fora de `gerando`/`base_em_revisao`: `agent_error` `wrong_status` → `'failed'`. Nenhuma chave lida, nenhum provedor chamado.
-3. `resolveModels`:
-   - Escolha = o `body.model` mais recente do batch que não seja null; se não houver, o mais recente do `history`; se não houver, nenhuma.
-   - Escolha que não passa em `ModelChoiceSchema`: `invalid_model`.
-   - Por capacidade necessária (texto sempre; imagem para `imagem` e `imagem_texto`): se a escolha tem o ref, `findModel(ref, cap)` (sem resultado: `invalid_model`) e provedor em `keyed` (senão: `missing_key` com `provider`). Sem ref, o primeiro item de `MODEL_CATALOG` com essa capacidade e provedor em `keyed` (nenhum: `missing_key` com `capability`).
+3. `resolveModels` *(correção B, 2026-10-27)*:
+   - Uma escolha é válida quando passa em `ModelChoiceSchema`, cada ref dela (texto e imagem) está no catálogo para a capacidade (`findModel`) e cada `effort` está em `model.efforts`.
+   - Escolha do lote = o `body.model` mais recente do batch que não seja null. Se ela não é válida: `invalid_model`. Esforço recusado: `{ code: 'invalid_model', model: '<id> com esforço <effort>', capability }`, que vira "O modelo gpt-6-astra com esforço turbo não está disponível para texto.".
+   - Sem escolha no lote: a última escolha **válida** do `history`. As inválidas são puladas, para um erro antigo ou um modelo que saiu do catálogo não prender a peça. Sem nenhuma válida, nenhuma escolha.
+   - Por capacidade necessária (texto sempre; imagem para `imagem` e `imagem_texto`): se a escolha tem o ref, o modelo dele com o esforço escolhido, e provedor em `keyed` (senão: `missing_key` com `provider`). Sem ref, o primeiro item de `MODEL_CATALOG` com essa capacidade e provedor em `keyed`, com `effort: null` (nenhum: `missing_key` com `capability`).
+   - O esforço vai para `planRound`, para `generateImage` e para `agent_started.models` (o `ModelRef` ganha `effort` só quando há).
    - Erro: `agent_error` → `'failed'`.
 4. `getProviderKey` para cada provedor escolhido. Null (chave removida depois do cadastro): `missing_key` → `'failed'`.
 5. Imagens de entrada (só com modelo de imagem): primeiro a imagem de `ctx.latestVersion` (se tiver `image_path`); depois as referências do batch (união, ordem de chegada). Se o batch não tem referência, usar as da mensagem mais recente do `history` que tenha. Cortar em `maxReferenceImages`; os ids cortados vão em `dropped_reference_ids`. Baixar com `downloadFile`.
@@ -565,6 +569,8 @@ it('touches the claim while generating', async () => { /* touchIntervalMs 50; im
 - [x] **Step 3: Implementar `fake-providers.ts` e `job.ts`.**
 - [x] **Step 4: Run.** Run: `pnpm test tests/executor/job.test.ts` três vezes seguidas. Expected: PASS nas 3, sem falha intermitente.
 - [x] **Step 5: Commit.** `git add -A && git commit -m "feat(executor): claim rounds with redirection, model resolution and safe errors"`
+
+> **Correção (2026-10-27, Task B de `2026-10-27-plano-2-correcoes.md`):** por decisão do fundador, o usuário escolhe o esforço junto do modelo. O executor confere o esforço contra `efforts` do catálogo e o repassa ao provedor (OpenAI `reasoning.effort`, Anthropic `output_config.effort`, Gemini `thinkingConfig.thinkingLevel`). Uma mensagem sem modelo herda a última escolha válida do histórico, não a última escolha. O teto de saída do orquestrador sobe de 2000 para 32000 tokens, porque o raciocínio conta nele. `parsePlan` aceita `null` na chave que o tipo da peça descarta. Ajustes nas Tasks 4, 5, 7 e 8 e na linha "Modelo padrão" das decisões.
 
 ---
 
@@ -645,7 +651,7 @@ it('main exits on missing config without printing secrets', async () => {
 | Redirecionamento | Incorporado na rodada seguinte (`absorb_pending` antes de concluir a rodada). A requisição em andamento não é cancelada: as APIs de imagem não aceitam mudança no meio, e cancelar não devolve o custo |
 | Lote | Mensagens que chegam juntas viram uma rodada só, com uma versão |
 | Falha na rodada | Conclui o lote como `failed` e para; as mensagens na fila ficam para o próximo claim |
-| Modelo padrão | O primeiro de `MODEL_CATALOG` com chave cadastrada, por capacidade; a escolha vale até alguém mudar (última escolha da peça) |
+| Modelo padrão | O primeiro de `MODEL_CATALOG` com chave cadastrada, por capacidade, no esforço padrão do provedor. A escolha vale até alguém mudar: uma mensagem sem modelo herda a última escolha **válida** da peça (correção B, 2026-10-27: antes herdava a última, mesmo inválida, e a peça ficava presa em `invalid_model`) |
 | Orquestrador | Sempre o modelo de texto; devolve JSON `{image_prompt, caption}` conforme o tipo da peça |
 | Imagem atual | A imagem da versão mais recente entra como primeira referência, para "fundo mais claro" editar o que existe |
 | Referências | As do lote; sem nenhuma no lote, as da última mensagem que tinha; cortadas em `maxReferenceImages` |

@@ -78,6 +78,11 @@ it('texto piece drops image_prompt', () => {
   expect(parsePlan('{"caption":"x","image_prompt":"y"}', 'texto', 'openai')).toEqual({ imagePrompt: null, caption: 'x' })
 })
 
+it('null in a key the piece kind drops is not an error', () => {
+  expect(parsePlan('{"image_prompt":"x","caption":null}', 'imagem', 'openai')).toEqual({ imagePrompt: 'x', caption: null })
+  expect(parsePlan('{"image_prompt":null,"caption":"x"}', 'texto', 'openai')).toEqual({ imagePrompt: null, caption: 'x' })
+})
+
 it('imagem_texto keeps both keys', () => {
   expect(parsePlan('{"caption":" x ","image_prompt":"y"}', 'imagem_texto', 'openai')).toEqual({ imagePrompt: 'y', caption: 'x' })
 })
@@ -96,6 +101,11 @@ it('missing required key is invalid_output', () => {
   planError('{"caption":"x"}', 'imagem')
 })
 
+it('null in a required key is invalid_output', () => {
+  planError('{"image_prompt":null}', 'imagem')
+  planError('{"image_prompt":"y","caption":null}', 'imagem_texto')
+})
+
 it('blank required value is invalid_output', () => {
   planError('{"caption":"   "}', 'texto')
 })
@@ -110,17 +120,31 @@ it('non-JSON output is invalid_output', () => {
   planError('[]', 'texto')
 })
 
-it('planRound sends the system prompt and the built prompt with 2000 tokens', async () => {
+it('planRound sends the system prompt, the built prompt and the output cap', async () => {
   const calls: { key: string; req: TextRequest; signal: AbortSignal }[] = []
   const text = { async generateText(key: string, req: TextRequest, signal: AbortSignal) { calls.push({ key, req, signal }); return '{"image_prompt":"z"}' } }
   const signal = AbortSignal.timeout(5000)
-  const plan = await planRound({ text, provider: 'anthropic', key: 'sk-x', model: 'claude-sonnet-5-5', ctx, batch, referenceCount: 2, hasCurrentImage: true, signal })
+  const plan = await planRound({
+    text, provider: 'anthropic', key: 'sk-x', model: 'claude-sonnet-5-5', effort: null, ctx, batch, referenceCount: 2, hasCurrentImage: true, signal,
+  })
   expect(plan).toEqual({ imagePrompt: 'z', caption: null })
-  expect(calls).toEqual([{
-    key: 'sk-x',
-    req: { model: 'claude-sonnet-5-5', system: ORCHESTRATOR_SYSTEM, prompt: buildOrchestratorPrompt(ctx, batch, 2, true), maxOutputTokens: 2000 },
-    signal,
-  }])
+  expect(calls).toHaveLength(1)
+  expect(calls[0]!.key).toBe('sk-x')
+  expect(calls[0]!.signal).toBe(signal)
+  // Without a chosen effort the request has no effort key, so the adapter sends the provider default.
+  expect(calls[0]!.req).toStrictEqual({
+    model: 'claude-sonnet-5-5', system: ORCHESTRATOR_SYSTEM, prompt: buildOrchestratorPrompt(ctx, batch, 2, true), maxOutputTokens: 32000,
+  })
+})
+
+it('planRound passes the chosen effort to the text provider', async () => {
+  const reqs: TextRequest[] = []
+  const text = { async generateText(_key: string, req: TextRequest) { reqs.push(req); return '{"image_prompt":"z"}' } }
+  await planRound({
+    text, provider: 'openai', key: 'sk-x', model: 'gpt-6-astra', effort: 'xhigh', ctx, batch, referenceCount: 0, hasCurrentImage: false,
+    signal: AbortSignal.timeout(5000),
+  })
+  expect(reqs.map((r) => r.effort)).toEqual(['xhigh'])
 })
 
 it('ORCHESTRATOR_SYSTEM asks for JSON only and keeps the product faithful', () => {

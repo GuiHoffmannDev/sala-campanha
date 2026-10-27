@@ -14,7 +14,8 @@ export const ORCHESTRATOR_SYSTEM = [
 ].join('\n')
 
 const NO_AUTHOR = 'Alguém'
-const MAX_OUTPUT_TOKENS = 2000
+// Reasoning tokens count toward this cap on OpenAI and Anthropic, so it leaves room for a high effort.
+export const MAX_OUTPUT_TOKENS = 32000
 
 const REQUESTED_KEYS: Record<PieceKind, string> = {
   imagem: 'image_prompt',
@@ -39,7 +40,8 @@ export function buildOrchestratorPrompt(ctx: PieceContext, batch: InboxMessage[]
   ].join('\n')
 }
 
-const PlanSchema = z.object({ image_prompt: z.string().optional(), caption: z.string().optional() })
+// null is allowed: a model may fill the key the piece kind drops with null.
+const PlanSchema = z.object({ image_prompt: z.string().nullish(), caption: z.string().nullish() })
 
 /** Reads the model's JSON plan, tolerating prose or code fences around the object. */
 export function parsePlan(raw: string, kind: PieceKind, provider: Provider): Plan {
@@ -66,6 +68,7 @@ export async function planRound(o: {
   provider: Provider
   key: string
   model: string
+  effort: string | null
   ctx: PieceContext
   batch: InboxMessage[]
   referenceCount: number
@@ -73,6 +76,7 @@ export async function planRound(o: {
   signal: AbortSignal
 }): Promise<Plan> {
   const prompt = buildOrchestratorPrompt(o.ctx, o.batch, o.referenceCount, o.hasCurrentImage)
-  const raw = await o.text.generateText(o.key, { model: o.model, system: ORCHESTRATOR_SYSTEM, prompt, maxOutputTokens: MAX_OUTPUT_TOKENS }, o.signal)
+  const req = { model: o.model, system: ORCHESTRATOR_SYSTEM, prompt, maxOutputTokens: MAX_OUTPUT_TOKENS, ...(o.effort && { effort: o.effort }) }
+  const raw = await o.text.generateText(o.key, req, o.signal)
   return parsePlan(raw, o.ctx.piece.kind, o.provider)
 }

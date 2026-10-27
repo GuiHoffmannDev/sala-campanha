@@ -270,6 +270,69 @@ it('invalid model choice fails with invalid_model', async () => {
   expect(await delivery(id)).toBe('failed')
 })
 
+it('an invalid choice in the history falls back to the default model', async () => {
+  const s = await setup()
+  const old = await createClaimedMessage(s.f, TEST_EXECUTOR, { model: { image: { provider: 'gemini', model: 'nope' } } })
+  await s.db.complete(old, 'failed')
+  const p = fakeProviders()
+  const id = await createClaimedMessage(s.f)
+
+  await processClaim(s.deps(p), await loadEvent(id))
+
+  expect(p.calls.image.map((c) => c.model)).toEqual(['gemini-nano-banana-2.1'])
+  expect(await delivery(id)).toBe('done')
+})
+
+it('inherits the latest valid choice in the history, skipping a later invalid one', async () => {
+  const s = await setup('imagem_texto', ['anthropic', 'openai', 'gemini'])
+  const valid = await createClaimedMessage(s.f, TEST_EXECUTOR, { model: { text: { provider: 'openai', model: 'gpt-6-astra' } } })
+  await s.db.complete(valid, 'done')
+  const invalid = await createClaimedMessage(s.f, TEST_EXECUTOR, { model: { text: { provider: 'anthropic', model: 'nope' } } })
+  await s.db.complete(invalid, 'failed')
+  const p = fakeProviders()
+  const id = await createClaimedMessage(s.f)
+
+  await processClaim(s.deps(p), await loadEvent(id))
+
+  expect(p.calls.text.map((c) => c.model)).toEqual(['gpt-6-astra'])
+  expect(await delivery(id)).toBe('done')
+})
+
+it('an effort the model does not accept fails with invalid_model before reading keys', async () => {
+  const s = await setup('imagem_texto', ['anthropic', 'openai', 'gemini'])
+  const p = fakeProviders()
+  const getKey = vi.spyOn(s.db, 'getProviderKey')
+  const id = await createClaimedMessage(s.f, TEST_EXECUTOR, { model: { text: { provider: 'openai', model: 'gpt-6-astra', effort: 'turbo' } } })
+
+  await processClaim(s.deps(p), await loadEvent(id))
+
+  const [error, ...rest] = await eventsAfter(s.f, id)
+  expect(rest).toHaveLength(0)
+  expect(error).toMatchObject({
+    kind: 'agent_error', body: { code: 'invalid_model', message: 'O modelo gpt-6-astra com esforço turbo não está disponível para texto.' },
+  })
+  expect(getKey).not.toHaveBeenCalled()
+  expect(p.calls).toEqual({ text: [], image: [] })
+  expect(await delivery(id)).toBe('failed')
+})
+
+it('the chosen effort reaches the providers and agent_started', async () => {
+  const s = await setup('imagem_texto', ['anthropic', 'openai', 'gemini'])
+  const p = fakeProviders()
+  const model = {
+    text: { provider: 'openai', model: 'gpt-6-astra', effort: 'low' },
+    image: { provider: 'gemini', model: 'gemini-nano-banana-2.1', effort: 'high' },
+  }
+  const id = await createClaimedMessage(s.f, TEST_EXECUTOR, { model })
+
+  await processClaim(s.deps(p), await loadEvent(id))
+
+  expect(p.calls.text.map((c) => c.effort)).toEqual(['low'])
+  expect(p.calls.image.map((c) => c.effort)).toEqual(['high'])
+  expect((await eventsAfter(s.f, id))[0]!.body.models).toEqual(model)
+  expect(await delivery(id)).toBe('done')
+})
+
 it('agent_error never contains the key', async () => {
   const s = await setup()
   // An adapter that forgot to redact: the job must redact again with the round's keys.
@@ -480,5 +543,15 @@ describe('resolveModels', () => {
   it('a text model chosen for the image capability is invalid_model', () => {
     expect(resolveModels('imagem', [msg({ image: { provider: 'anthropic', model: 'claude-sonnet-5-5' } })], [], ['anthropic']))
       .toEqual({ code: 'invalid_model', model: 'claude-sonnet-5-5', capability: 'image' })
+  })
+
+  it('an effort on a model without effort control is invalid_model', () => {
+    expect(resolveModels('imagem', [msg({ image: { provider: 'fal', model: 'fal-ai/flux-pro/kontext/max/multi', effort: 'high' } })], [], ['anthropic', 'fal']))
+      .toEqual({ code: 'invalid_model', model: 'fal-ai/flux-pro/kontext/max/multi com esforço high', capability: 'image' })
+  })
+
+  it('carries the chosen effort, and null for a default model', () => {
+    expect(resolveModels('imagem', [msg({ text: { provider: 'anthropic', model: 'claude-opus-5-5', effort: 'max' } })], [], ['anthropic', 'gemini']))
+      .toMatchObject({ text: { model: 'claude-opus-5-5', effort: 'max' }, image: { model: 'gemini-nano-banana-2.1', effort: null } })
   })
 })

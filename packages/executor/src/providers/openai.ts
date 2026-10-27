@@ -15,7 +15,10 @@ export function createOpenAI(fetchFn: typeof fetch): TextProvider {
         provider: 'openai',
         url: 'https://api.openai.com/v1/responses',
         headers: { Authorization: `Bearer ${key}` },
-        body: { model: req.model, instructions: req.system, input: req.prompt, max_output_tokens: req.maxOutputTokens },
+        body: {
+          model: req.model, instructions: req.system, input: req.prompt, max_output_tokens: req.maxOutputTokens,
+          ...(req.effort && { reasoning: { effort: req.effort } }),
+        },
         key, signal, fetchFn,
       }) as ResponsesReply | null
       // An incomplete response (token limit, content filter) carries partial output, not a usable answer.

@@ -15,7 +15,10 @@ export function createAnthropic(fetchFn: typeof fetch): TextProvider {
         provider: 'anthropic',
         url: 'https://api.anthropic.com/v1/messages',
         headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-        body: { model: req.model, max_tokens: req.maxOutputTokens, system: req.system, messages: [{ role: 'user', content: req.prompt }] },
+        body: {
+          model: req.model, max_tokens: req.maxOutputTokens, system: req.system, messages: [{ role: 'user', content: req.prompt }],
+          ...(req.effort && { output_config: { effort: req.effort } }),
+        },
         key, signal, fetchFn,
       }) as MessagesReply | null
       // Text cut at the token limit is partial output, not a usable answer.

@@ -1,10 +1,11 @@
 import type { Provider } from '@sala/shared'
 
-export type TextRequest = { model: string; system: string; prompt: string; maxOutputTokens: number }
+// `effort` is the reasoning effort chosen with the model; without it the provider default applies.
+export type TextRequest = { model: string; system: string; prompt: string; maxOutputTokens: number; effort?: string }
 export type TextProvider = { generateText(key: string, req: TextRequest, signal: AbortSignal): Promise<string> }
 
 export type InputImage = { bytes: Uint8Array; mimeType: string }
-export type ImageRequest = { model: string; prompt: string; images: InputImage[] }
+export type ImageRequest = { model: string; prompt: string; images: InputImage[]; effort?: string }
 export type GeneratedImage = { bytes: Uint8Array; mimeType: 'image/png' | 'image/jpeg' | 'image/webp' }
 export type ImageProvider = { generateImage(key: string, req: ImageRequest, signal: AbortSignal): Promise<GeneratedImage> }
 

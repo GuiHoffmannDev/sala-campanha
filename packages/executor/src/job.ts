@@ -12,7 +12,10 @@ import { ProviderError, type GeneratedImage, type InputImage, type Providers } f
 export type JobDeps = { db: ExecutorDb; providers: Providers; log: Logger; touchIntervalMs: number; textTimeoutMs: number; imageTimeoutMs: number }
 export type RoundOutcome = 'ok' | 'failed' | 'claim_lost'
 
-type Models = { text: CatalogModel; image: CatalogModel | null }
+/** A catalog model with the effort chosen for it; null means the provider default. */
+type ChosenModel = CatalogModel & { effort: string | null }
+type Models = { text: ChosenModel; image: ChosenModel | null }
+type Choice = Partial<Record<ModelCapability, ChosenModel>>
 
 const AGENT_STATUSES: readonly PieceStatus[] = ['gerando', 'base_em_revisao']
 const EXTENSIONS: Record<GeneratedImage['mimeType'], string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }
@@ -21,28 +24,53 @@ const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 const redactAll = (text: string, keys: string[]) => keys.reduce(redact, text)
 
 /**
- * Picks the text model (always) and the image model (imagem and imagem_texto pieces).
- * The choice is the latest non-null `model` of the batch, else of the history.
- * Without a choice for a capability, the first catalog model whose provider has a key.
+ * Checks a stored model choice: it passes ModelChoiceSchema, every model it names is in the
+ * catalog for its capability, and every effort is one the model accepts.
  */
-export function resolveModels(kind: PieceKind, batch: InboxMessage[], history: HistoryMessage[], keyed: Provider[]): Models | AgentErrorInput {
-  const latest = (list: unknown[]) => list.findLast((v) => v != null)
-  const chosen = latest(batch.map((m) => m.body.model)) ?? latest(history.map((m) => m.model))
-
-  const parsed = ModelChoiceSchema.safeParse(chosen ?? {})
+function checkChoice(choice: unknown): Choice | AgentErrorInput {
+  const parsed = ModelChoiceSchema.safeParse(choice)
   if (!parsed.success) {
     // shortcut: the malformed choice has no readable model name, so the copy names none.
     return { code: 'invalid_model', model: '(inválido)', capability: 'text' }
   }
-
-  const pick = (capability: ModelCapability): CatalogModel | AgentErrorInput => {
+  const chosen: Choice = {}
+  for (const capability of ['text', 'image'] as const) {
     const ref = parsed.data[capability]
-    if (ref) {
-      const model = findModel(ref, capability)
-      if (!model) return { code: 'invalid_model', model: ref.model, capability }
-      return keyed.includes(model.provider) ? model : { code: 'missing_key', provider: model.provider }
+    if (!ref) continue
+    const model = findModel(ref, capability)
+    if (!model) return { code: 'invalid_model', model: ref.model, capability }
+    if (ref.effort !== undefined && !model.efforts.includes(ref.effort)) {
+      return { code: 'invalid_model', model: `${ref.model} com esforço ${ref.effort}`, capability }
     }
-    return MODEL_CATALOG.find((m) => m.capability === capability && keyed.includes(m.provider)) ?? { code: 'missing_key', capability }
+    chosen[capability] = { ...model, effort: ref.effort ?? null }
+  }
+  return chosen
+}
+
+/**
+ * Picks the text model (always) and the image model (imagem and imagem_texto pieces), each with its effort.
+ * The choice is the latest non-null `model` of the batch; an invalid one fails the round.
+ * Without one, the latest valid choice of the history: invalid ones are skipped, so an old
+ * mistake or a model since removed from the catalog never locks the piece.
+ * Without a choice for a capability, the first catalog model whose provider has a key, at the provider's default effort.
+ */
+export function resolveModels(kind: PieceKind, batch: InboxMessage[], history: HistoryMessage[], keyed: Provider[]): Models | AgentErrorInput {
+  const isError = (c: Choice | AgentErrorInput): c is AgentErrorInput => 'code' in c
+  const fromBatch = batch.map((m) => m.body.model).findLast((v) => v != null)
+  let choice: Choice
+  if (fromBatch != null) {
+    const checked = checkChoice(fromBatch)
+    if (isError(checked)) return checked
+    choice = checked
+  } else {
+    choice = history.map((m) => checkChoice(m.model)).findLast((c): c is Choice => !isError(c)) ?? {}
+  }
+
+  const pick = (capability: ModelCapability): ChosenModel | AgentErrorInput => {
+    const model = choice[capability]
+    if (model) return keyed.includes(model.provider) ? model : { code: 'missing_key', provider: model.provider }
+    const fallback = MODEL_CATALOG.find((m) => m.capability === capability && keyed.includes(m.provider))
+    return fallback ? { ...fallback, effort: null } : { code: 'missing_key', capability }
   }
 
   const text = pick('text')
@@ -112,7 +140,7 @@ async function runRound(deps: JobDeps, batch: InboxMessage[], round: number): Pr
       referenceCount = Math.min(refs.length, room)
     }
 
-    const ref = (m: CatalogModel | null) => (m ? { provider: m.provider, model: m.model } : null)
+    const ref = (m: ChosenModel | null) => (m ? { provider: m.provider, model: m.model, ...(m.effort && { effort: m.effort }) } : null)
     await db.addAgentEvent(sourceId, 'agent_started', {
       message_ids: messageIds, round, models: { text: ref(models.text), image: ref(models.image) },
       reference_count: referenceCount, dropped_reference_ids: dropped,
@@ -121,7 +149,7 @@ async function runRound(deps: JobDeps, batch: InboxMessage[], round: number): Pr
     const textProvider = deps.providers.text[models.text.provider]
     if (!textProvider) throw new Error(`no text adapter for ${models.text.provider}`)
     plan = await planRound({
-      text: textProvider, provider: models.text.provider, key: textKey, model: models.text.model, ctx, batch,
+      text: textProvider, provider: models.text.provider, key: textKey, model: models.text.model, effort: models.text.effort, ctx, batch,
       referenceCount: images.length, hasCurrentImage, signal: AbortSignal.timeout(deps.textTimeoutMs),
     })
 
@@ -130,7 +158,9 @@ async function runRound(deps: JobDeps, batch: InboxMessage[], round: number): Pr
       const imageProvider = deps.providers.image[models.image.provider]
       if (!imageProvider) throw new Error(`no image adapter for ${models.image.provider}`)
       const generated = await imageProvider.generateImage(
-        imageKey, { model: models.image.model, prompt: plan.imagePrompt, images }, AbortSignal.timeout(deps.imageTimeoutMs),
+        imageKey,
+        { model: models.image.model, prompt: plan.imagePrompt, images, ...(models.image.effort && { effort: models.image.effort }) },
+        AbortSignal.timeout(deps.imageTimeoutMs),
       )
       path = `${ctx.piece.team_id}/${ctx.piece.id}/${randomUUID()}.${EXTENSIONS[generated.mimeType]}`
       await db.uploadFile(path, generated.bytes, generated.mimeType)

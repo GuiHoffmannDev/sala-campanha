@@ -115,7 +115,7 @@ Resolve os itens 2, 3 e 4 da revisão.
   - Esforço inválido retorna `{ code: 'invalid_model', model: '<id> com esforço <effort>', capability }`. A mensagem do chat fica "O modelo gpt-6-astra com esforço turbo não está disponível para texto.", sem código de erro novo.
   - O resultado leva o esforço de cada capacidade (`effort: string | null`). Ele vai para `planRound`, para `generateImage` e para `agent_started.models` (o `ModelRef` ganha `effort` quando houver).
 
-- [ ] **Step 1: Escrever os testes que falham.**
+- [x] **Step 1: Escrever os testes que falham.**
   - `job.test.ts`:
     - O histórico tem `{ image: { provider: 'gemini', model: 'nope' } }` e o lote não tem modelo: a rodada usa o modelo de imagem padrão.
     - O histórico tem [escolha válida A, escolha inválida B]: a rodada usa A.
@@ -128,11 +128,11 @@ Resolve os itens 2, 3 e 4 da revisão.
     - Com `effort: 'low'`, a OpenAI recebe `reasoning: { effort: 'low' }` e a Anthropic recebe `output_config: { effort: 'low' }`.
     - Sem `effort`, nenhum dos dois campos aparece no corpo.
   - `providers-gemini.test.ts`: com `effort`, aparece `thinkingConfig.thinkingLevel`; sem `effort`, não aparece.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/job.test.ts tests/executor/orchestrator.test.ts tests/executor/providers-text.test.ts tests/executor/providers-gemini.test.ts`. Expected: FAIL nos casos novos.
-- [ ] **Step 3: Implementar.**
-- [ ] **Step 4: Atualizar os documentos** do Plano 2 listados em Files, com uma nota datada da decisão.
-- [ ] **Step 5: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "feat(executor): user-chosen reasoning effort, valid inherited model choice and nullable plan keys"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/job.test.ts tests/executor/orchestrator.test.ts tests/executor/providers-text.test.ts tests/executor/providers-gemini.test.ts`. Expected: FAIL nos casos novos.
+- [x] **Step 3: Implementar.**
+- [x] **Step 4: Atualizar os documentos** do Plano 2 listados em Files, com uma nota datada da decisão.
+- [x] **Step 5: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
+- [x] **Step 6: Commit.** `git add -A && git commit -m "feat(executor): user-chosen reasoning effort, valid inherited model choice and nullable plan keys"`
 
 ---
 

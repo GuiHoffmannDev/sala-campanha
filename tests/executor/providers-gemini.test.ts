@@ -41,6 +41,18 @@ it('sends prompt and reference images as inline_data', async () => {
   })
 })
 
+it('sends the chosen effort as thinkingLevel only when there is one', async () => {
+  const ok = reply([{ inlineData: { mimeType: 'image/png', data: b64('out') } }])
+  const fake = fakeFetch([ok, ok])
+  const gemini = createGemini(fake.fn)
+  await gemini.generateImage(KEY, { model: MODEL, prompt: 'P', images: [], effort: 'high' }, signal())
+  await gemini.generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal())
+  const configs = fake.calls.map((c) => (c.body as { generationConfig: Record<string, unknown> }).generationConfig)
+  // generateContent takes the ThinkingLevel enum name; the catalog keeps the lowercase effort.
+  expect(configs[0]).toEqual({ responseModalities: ['TEXT', 'IMAGE'], thinkingConfig: { thinkingLevel: 'HIGH' } })
+  expect(configs[1]).toEqual({ responseModalities: ['TEXT', 'IMAGE'] })
+})
+
 it('rejects reference images over the 20 MB request limit without calling Gemini', async () => {
   const fake = fakeFetch([])
   const big = { bytes: new Uint8Array(8 * 1024 * 1024), mimeType: 'image/png' } // 8 MiB, about 11.2 MB in base64

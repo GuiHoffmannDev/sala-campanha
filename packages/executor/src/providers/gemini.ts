@@ -40,7 +40,11 @@ export function createGemini(fetchFn: typeof fetch): ImageProvider {
           { text: req.prompt },
           ...req.images.map((i) => ({ inline_data: { mime_type: i.mimeType, data: Buffer.from(i.bytes).toString('base64') } })),
         ] }],
-        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+        generationConfig: {
+          responseModalities: ['TEXT', 'IMAGE'],
+          // generateContent takes the ThinkingLevel enum name (MINIMAL, MEDIUM, HIGH); the catalog keeps the lowercase effort.
+          ...(req.effort && { thinkingConfig: { thinkingLevel: req.effort.toUpperCase() } }),
+        },
       }
       // Gemini rejects inline requests over 20 MB with an English 400; fail first, without spending a call.
       const size = Buffer.byteLength(JSON.stringify(body))
