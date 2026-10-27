@@ -9,6 +9,7 @@ Guia para executar o projeto tarefa por tarefa. Cada tarefa roda num **terminal 
 | Design aprovado (o que construir e por quê) | `docs/superpowers/specs/2026-10-21-sala-campanha-design.md` |
 | Plano 1 — Fundação do backend (Supabase) | `docs/superpowers/plans/2026-10-21-plano-1-fundacao-backend.md` |
 | Plano 2 — Executor do agente | `docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md` |
+| Plano 2 — Correções da revisão final | `docs/superpowers/plans/2026-10-27-plano-2-correcoes.md` |
 | Plano 3 — App Tauri para macOS | ainda não escrito |
 
 O progresso oficial fica nas caixinhas `- [ ]` dentro do plano. Este handoff tem uma lista resumida para você acompanhar.
@@ -167,8 +168,8 @@ cd ~/Documents/sala-campanha && claude "Faça a revisão final de todo o Plano 1
 Pré-requisitos: Plano 1 completo e Supabase local rodando (`supabase start`). Os testes usam provedores falsos; nenhuma chave real é necessária, exceto no passo opcional da Tarefa 10.
 
 ### Tarefa 1 — Eventos do agente no banco
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
@@ -180,8 +181,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 1 do plano
 ```
 
 ### Tarefa 2 — Contrato compartilhado do agente
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
@@ -197,8 +198,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 2 do plano
 - [ ] **`ModelRefSchema` aceita chaves extras** (`packages/shared/src/agent.ts:28`). Sem `.strict()`, `{ text: { provider: 'openai', model: 'gpt-6-astra', foo: 1 } }` passa em `ModelChoiceSchema` e `foo` é descartado sem aviso. Decidir se `ModelRefSchema` vira `.strict()` e adicionar o caso em `tests/shared/agent.test.ts`.
 
 ### Tarefa 3 — Pacote do executor: configuração, log e banco
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
@@ -210,8 +211,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 3 do plano
 ```
 
 ### Tarefa 4 — HTTP e adaptadores de texto (Anthropic e OpenAI)
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
@@ -223,8 +224,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 4 do plano
 ```
 
 ### Tarefa 5 — Adaptador de imagem Gemini
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
@@ -236,8 +237,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 5 do plano
 ```
 
 ### Tarefa 6 — Adaptador de imagem fal (Flux Kontext)
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 Esta tarefa é cortável (item 4 da ordem de corte do spec). Se pular, remova a linha `fal` de `MODEL_CATALOG`.
 
@@ -256,8 +257,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 6 do plano
 - [ ] **Nada da fal foi testado contra a API real.** Ainda não foram confirmados no serviço: data URI nas referências, `sync_mode`, o formato da lista `detail` nos erros 422 e o limite real do corpo do pedido (o Context7 não informa). Cobrir em `tests/live/providers.live.test.ts` (Task 10).
 
 ### Tarefa 7 — Orquestrador (monta o prompt)
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
@@ -269,8 +270,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 7 do plano
 ```
 
 ### Tarefa 8 — Processar uma reivindicação (rodadas e erros)
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
@@ -282,8 +283,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 8 do plano
 ```
 
 ### Tarefa 9 — Worker, entrypoint e desligamento
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
@@ -295,8 +296,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 9 do plano
 ```
 
 ### Tarefa 10 — Teste ao vivo, Docker e checklist de deploy
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 O passo com chaves reais é opcional. Para rodar, coloque as chaves só na linha de comando (`LIVE_ANTHROPIC_KEY=... pnpm test tests/live`), nunca num arquivo commitado.
 
@@ -307,6 +308,79 @@ cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia do
 **Revisar (revisão final do Plano 2 inteiro):**
 ```
 cd ~/Documents/sala-campanha && claude "Faça a revisão final de todo o Plano 2 (docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md) contra o spec docs/superpowers/specs/2026-10-21-sala-campanha-design.md e as interfaces do Plano 1. Confira cobertura de cada task, os 5 itens de Review Focus, as pendências de revisão abertas no HANDOFF.md (ex.: Tarefa 2), e que nenhuma chave de provedor ou service role aparece em log, evento, erro ou imagem Docker. Rode pnpm db:reset && pnpm test && pnpm typecheck. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+---
+
+## Plano 2 — Correções da revisão final
+
+A revisão final do Plano 2 (2026-10-27) encontrou 15 problemas. As decisões tomadas com você estão no topo de `docs/superpowers/plans/2026-10-27-plano-2-correcoes.md`. Rode as tarefas na ordem A → B → C → D → E, no mesmo ciclo de sempre: um terminal para implementar e outro para revisar.
+
+### Correção A — Contrato: esforço, schema estrito e limites do Gemini
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md, docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md e docs/superpowers/plans/2026-10-27-plano-2-correcoes.md. Execute SOMENTE a Task A do plano de correções, seguindo os passos com TDD. Respeite as Global Constraints e o Review Focus dos dois planos. Ao terminar: suite passando, checkboxes da Task A marcados no plano de correções, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task A de docs/superpowers/plans/2026-10-27-plano-2-correcoes.md) contra a Task A, as Decisões do fundador, as Global Constraints e o Review Focus. Foque em ModelRefSchema estrito, em efforts e maxReferenceImages iguais à tabela da Task A e nos trechos do Plano 2 e do spec atualizados. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Correção B — Escolha de modelo e esforço no executor
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md, docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md e docs/superpowers/plans/2026-10-27-plano-2-correcoes.md. Execute SOMENTE a Task B do plano de correções, seguindo os passos com TDD. Respeite as Global Constraints e o Review Focus dos dois planos. Ao terminar: suite passando, checkboxes da Task B marcados no plano de correções, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task B de docs/superpowers/plans/2026-10-27-plano-2-correcoes.md) contra a Task B, as Decisões do fundador, as Global Constraints e o Review Focus. Foque na herança da última escolha válida, em esforço inválido falhar sem ler chave nem chamar provedor, no esforço só ir no corpo quando existe, no formato do thinkingLevel do Gemini conferido no Context7 e em caption null aceito. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Correção C — Imagem devolvida pelo provedor e HTTP
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md, docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md e docs/superpowers/plans/2026-10-27-plano-2-correcoes.md. Execute SOMENTE a Task C do plano de correções, seguindo os passos com TDD. Respeite as Global Constraints e o Review Focus dos dois planos. Ao terminar: suite passando, checkboxes da Task C marcados no plano de correções, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task C de docs/superpowers/plans/2026-10-27-plano-2-correcoes.md) contra a Task C, as Decisões do fundador, as Global Constraints e o Review Focus. Foque no tipo da imagem vindo dos bytes, no limite de 25 MiB e no teto da resposta, em nenhuma nova tentativa de imagem depois de erro de rede, na chave redigida nos caminhos novos e em nada duplicado entre gemini.ts e fal.ts. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Correção D — Rodada, worker e desligamento
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md, docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md e docs/superpowers/plans/2026-10-27-plano-2-correcoes.md. Execute SOMENTE a Task D do plano de correções, seguindo os passos com TDD. Respeite as Global Constraints e o Review Focus dos dois planos. Ao terminar: suite passando 3 vezes seguidas, checkboxes da Task D marcados no plano de correções, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task D de docs/superpowers/plans/2026-10-27-plano-2-correcoes.md) contra a Task D, as Decisões do fundador, as Global Constraints e o Review Focus. Foque em claimed_by próprio por slot e ClaimLostError entre slots do mesmo processo, em latestVersion só de versões base, no Promise.all mantendo a ordem das imagens e na regra do SHUTDOWN_GRACE_MS sem expor valores. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Correção E — Teste ao vivo e fechamento do Plano 2
+- [ ] Implementada
+- [ ] Revisada
+
+No Step 3, rode o teste ao vivo você mesmo, num terminal comum, com as chaves só na linha de comando (ex.: `LIVE_GEMINI_KEY=... pnpm test tests/live`). Depois cole para o Claude só o resultado, nunca a chave.
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md, docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md e docs/superpowers/plans/2026-10-27-plano-2-correcoes.md. Execute SOMENTE a Task E do plano de correções. No Step 3, não peça as chaves: eu rodo o teste ao vivo no meu terminal e colo o resultado. Ao terminar: suite passando, checkboxes da Task E marcados no plano de correções, commit feito."
+```
+**Revisar (revisão final das correções):**
+```
+cd ~/Documents/sala-campanha && claude "Faça a revisão final das correções do Plano 2 (docs/superpowers/plans/2026-10-27-plano-2-correcoes.md) contra as Decisões do fundador e o Review Focus dos dois planos. Confira que cada um dos 15 problemas da revisão final foi resolvido ou ficou registrado como pendência, que as pendências do HANDOFF.md batem com o estado do código, e que nenhuma chave de provedor ou service role aparece em log, evento, erro ou imagem Docker. Rode pnpm db:reset && pnpm test && pnpm typecheck. Só reporte problemas, com arquivo:linha. Não edite nada."
 ```
 
 ---
