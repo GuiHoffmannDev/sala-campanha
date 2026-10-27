@@ -194,8 +194,10 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 2 do plano
 ```
 
 **Pendências da revisão (commit `4d7925b`, 2026-10-25).** Resolver numa próxima sessão ou, no mais tardar, na revisão final do Plano 2:
-- [ ] **Limites de referência do Gemini divergem da doc atual** (`packages/shared/src/agent.ts:23` e `:25`). A doc (Context7, `ai.google.dev`) aceita no Nano Banana 2.1 até 10 objetos + 4 personagens (o catálogo diz `5`). No Nano Banana Pro aceita até 6 objetos + 5 personagens + 3 de estilo (o catálogo diz `10`). Os valores parecem invertidos. O código segue a tabela da Task 2, então decidir os limites, corrigir a tabela do plano e a nota da linha 193 junto com `MODEL_CATALOG`.
-- [ ] **`ModelRefSchema` aceita chaves extras** (`packages/shared/src/agent.ts:28`). Sem `.strict()`, `{ text: { provider: 'openai', model: 'gpt-6-astra', foo: 1 } }` passa em `ModelChoiceSchema` e `foo` é descartado sem aviso. Decidir se `ModelRefSchema` vira `.strict()` e adicionar o caso em `tests/shared/agent.test.ts`.
+- [x] **Limites de referência do Gemini divergem da doc atual** (`packages/shared/src/agent.ts:23` e `:25`). A doc (Context7, `ai.google.dev`) aceita no Nano Banana 2.1 até 10 objetos + 4 personagens (o catálogo diz `5`). No Nano Banana Pro aceita até 6 objetos + 5 personagens + 3 de estilo (o catálogo diz `10`). Os valores parecem invertidos. O código segue a tabela da Task 2, então decidir os limites, corrigir a tabela do plano e a nota da linha 193 junto com `MODEL_CATALOG`.
+  - **Resolvida na Correção A (2026-10-27):** `maxReferenceImages` = 10 no Nano Banana 2.1 e 6 no Nano Banana Pro (vagas de objeto em alta fidelidade). Tabela e nota da Task 2 do Plano 2 atualizadas.
+- [x] **`ModelRefSchema` aceita chaves extras** (`packages/shared/src/agent.ts:28`). Sem `.strict()`, `{ text: { provider: 'openai', model: 'gpt-6-astra', foo: 1 } }` passa em `ModelChoiceSchema` e `foo` é descartado sem aviso. Decidir se `ModelRefSchema` vira `.strict()` e adicionar o caso em `tests/shared/agent.test.ts`.
+  - **Resolvida na Correção A (2026-10-27):** `ModelRefSchema` é `.strict()` e ganhou `effort` opcional. O caso `foo: 1` está em `tests/shared/agent.test.ts`.
 
 ### Tarefa 3 — Pacote do executor: configuração, log e banco
 - [x] Implementada

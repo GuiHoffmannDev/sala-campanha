@@ -91,7 +91,7 @@ Uma peça é a unidade de trabalho: por exemplo, "Banner Instagram — Black Fri
 ### Fase 1: base (no app, com o agente)
 
 1. Alguém sobe fotos do produto na biblioteca da campanha.
-2. O gestor ou a designer descreve a peça no chat e escolhe o modelo. O agente gera versões de imagem e/ou texto, usando as fotos marcadas como referência.
+2. O gestor ou a designer descreve a peça no chat, escolhe o modelo e, quando o modelo permite, o esforço (quanto ele raciocina). O agente usa a chave de API cadastrada pelo time. Ele gera versões de imagem e/ou texto, usando as fotos marcadas como referência. *(Esforço incluído em 2026-10-27, por decisão do fundador.)*
 3. Qualquer membro pode redirecionar durante a geração ("fundo mais claro"). O agente incorpora o pedido.
 4. O gestor aprova uma versão base. A peça passa para **Acabamento**.
 

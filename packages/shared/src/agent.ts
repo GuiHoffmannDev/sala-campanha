@@ -11,21 +11,27 @@ export type CatalogModel = {
   model: string
   label: string
   capability: ModelCapability
+  // Reasoning efforts the model accepts; empty when it has no effort control.
+  efforts: readonly string[]
   maxReferenceImages: number
 }
+
+// Effort values of OpenAI reasoning.effort and Anthropic output_config.effort.
+const TEXT_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 
 // The only place with model IDs. Order is the default-model preference: the
 // executor picks the first model of each capability whose provider has a key.
 export const MODEL_CATALOG: readonly CatalogModel[] = [
-  { provider: 'anthropic', model: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', capability: 'text', maxReferenceImages: 0 },
-  { provider: 'openai', model: 'gpt-6-astra', label: 'GPT-6 Astra', capability: 'text', maxReferenceImages: 0 },
-  { provider: 'anthropic', model: 'claude-opus-5-5', label: 'Claude Opus 5.5', capability: 'text', maxReferenceImages: 0 },
-  { provider: 'gemini', model: 'gemini-nano-banana-2.1', label: 'Nano Banana 2.1', capability: 'image', maxReferenceImages: 5 },
-  { provider: 'fal', model: 'fal-ai/flux-pro/kontext/max/multi', label: 'Flux Kontext Max', capability: 'image', maxReferenceImages: 4 },
-  { provider: 'gemini', model: 'gemini-3-pro-image', label: 'Nano Banana Pro', capability: 'image', maxReferenceImages: 10 },
+  { provider: 'anthropic', model: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', capability: 'text', efforts: TEXT_EFFORTS, maxReferenceImages: 0 },
+  { provider: 'openai', model: 'gpt-6-astra', label: 'GPT-6 Astra', capability: 'text', efforts: TEXT_EFFORTS, maxReferenceImages: 0 },
+  { provider: 'anthropic', model: 'claude-opus-5-5', label: 'Claude Opus 5.5', capability: 'text', efforts: TEXT_EFFORTS, maxReferenceImages: 0 },
+  { provider: 'gemini', model: 'gemini-nano-banana-2.1', label: 'Nano Banana 2.1', capability: 'image', efforts: ['minimal', 'medium', 'high'], maxReferenceImages: 10 },
+  { provider: 'fal', model: 'fal-ai/flux-pro/kontext/max/multi', label: 'Flux Kontext Max', capability: 'image', efforts: [], maxReferenceImages: 4 },
+  { provider: 'gemini', model: 'gemini-3-pro-image', label: 'Nano Banana Pro', capability: 'image', efforts: [], maxReferenceImages: 6 },
 ]
 
-export const ModelRefSchema = z.object({ provider: ProviderSchema, model: z.string().min(1) })
+// The schema only checks the shape; the executor checks that the model accepts the effort.
+export const ModelRefSchema = z.object({ provider: ProviderSchema, model: z.string().min(1), effort: z.string().min(1).optional() }).strict()
 export type ModelRef = z.infer<typeof ModelRefSchema>
 
 // Shape of p_model in post_message.

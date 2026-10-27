@@ -126,19 +126,19 @@ it('members of the team see the agent event; other team does not', async () => {
 - Consumes: `PROVIDERS`, `ProviderSchema`, `Provider`, `PieceStatus` de `domain.ts`.
 - Produces (`packages/shared/src/agent.ts`):
   - `type ModelCapability = 'text' | 'image'`
-  - `type CatalogModel = { provider: Provider; model: string; label: string; capability: ModelCapability; maxReferenceImages: number }`
+  - `type CatalogModel = { provider: Provider; model: string; label: string; capability: ModelCapability; efforts: readonly string[]; maxReferenceImages: number }`. `efforts` são os valores de esforço aceitos pelo modelo; lista vazia = modelo sem controle de esforço *(correção A, 2026-10-27)*.
   - `MODEL_CATALOG: readonly CatalogModel[]`. A ordem é a preferência do modelo padrão:
 
-    | provider | model | label | capability | maxReferenceImages |
-    |---|---|---|---|---|
-    | `anthropic` | `claude-sonnet-5-5` | Claude Sonnet 5.5 | text | 0 |
-    | `openai` | `gpt-6-astra` | GPT-6 Astra | text | 0 |
-    | `anthropic` | `claude-opus-5-5` | Claude Opus 5.5 | text | 0 |
-    | `gemini` | `gemini-nano-banana-2.1` | Nano Banana 2.1 | image | 5 |
-    | `fal` | `fal-ai/flux-pro/kontext/max/multi` | Flux Kontext Max | image | 4 |
-    | `gemini` | `gemini-3-pro-image` | Nano Banana Pro | image | 10 |
+    | provider | model | label | capability | efforts | maxReferenceImages |
+    |---|---|---|---|---|---|
+    | `anthropic` | `claude-sonnet-5-5` | Claude Sonnet 5.5 | text | `low`, `medium`, `high`, `xhigh`, `max` | 0 |
+    | `openai` | `gpt-6-astra` | GPT-6 Astra | text | `low`, `medium`, `high`, `xhigh`, `max` | 0 |
+    | `anthropic` | `claude-opus-5-5` | Claude Opus 5.5 | text | `low`, `medium`, `high`, `xhigh`, `max` | 0 |
+    | `gemini` | `gemini-nano-banana-2.1` | Nano Banana 2.1 | image | `minimal`, `medium`, `high` | 10 |
+    | `fal` | `fal-ai/flux-pro/kontext/max/multi` | Flux Kontext Max | image | (vazia) | 4 |
+    | `gemini` | `gemini-3-pro-image` | Nano Banana Pro | image | (vazia) | 6 |
 
-  - `ModelRefSchema = z.object({ provider: ProviderSchema, model: z.string().min(1) })`, `type ModelRef`
+  - `ModelRefSchema = z.object({ provider: ProviderSchema, model: z.string().min(1), effort: z.string().min(1).optional() }).strict()`, `type ModelRef`. O schema só confere o formato do esforço; a checagem de que o modelo aceita o esforço fica no executor (Task B do plano de correções) *(correção A, 2026-10-27: `.strict()` e `effort`)*.
   - `ModelChoiceSchema = z.object({ text: ModelRefSchema.optional(), image: ModelRefSchema.optional() }).strict()`, `type ModelChoice`. É o formato de `p_model` em `post_message`; o Plano 3 envia neste formato.
   - `findModel(ref: ModelRef, capability: ModelCapability): CatalogModel | undefined`
   - `AGENT_ERROR_CODES = ['missing_key','invalid_model','wrong_status','provider_error','timeout','invalid_output','internal'] as const`, `type AgentErrorCode`
@@ -190,6 +190,8 @@ it('error messages match the fixed copy', () => {
 - [x] **Step 6: Commit.** `git add -A && git commit -m "feat(shared): model catalog, model choice and agent event contract"`
 
 > **Nota (Step 3, 2026-10-25):** IDs conferidos no Context7 (Anthropic, OpenAI, Gemini, fal); todos existem, nenhuma troca. A doc do Gemini lista até 14 referências no total (Nano Banana Pro: até 6 objetos em alta fidelidade); os limites da tabela ficam como estão.
+>
+> **Correção (2026-10-27, Task A de `2026-10-27-plano-2-correcoes.md`):** os limites do Gemini estavam invertidos. Pela doc atual do Gemini (`ai.google.dev`, conferida no Context7 em 2026-10-27), o Nano Banana 2.1 aceita 10 objetos + 4 personagens e o Nano Banana Pro aceita 6 objetos + 5 personagens + 3 de estilo. `maxReferenceImages` passa a ser o número de vagas de objeto em alta fidelidade: 10 no Nano Banana 2.1 e 6 no Pro. A mesma correção acrescenta `efforts` ao catálogo, que o usuário escolhe junto do modelo, e torna `ModelRefSchema` estrito (chave desconhecida é recusada, não descartada).
 
 ---
 

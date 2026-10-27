@@ -39,6 +39,27 @@ it('ModelChoiceSchema rejects unknown keys and providers', () => {
   expect(ModelChoiceSchema.safeParse({ text: { provider: 'openai', model: '' } }).success).toBe(false)
 })
 
+it('ModelChoiceSchema rejects unknown keys inside a model ref', () => {
+  expect(ModelChoiceSchema.safeParse({ text: { provider: 'openai', model: 'gpt-6-astra', foo: 1 } }).success).toBe(false)
+})
+
+it('ModelChoiceSchema accepts an optional non-empty effort', () => {
+  expect(ModelChoiceSchema.safeParse({ text: { provider: 'openai', model: 'gpt-6-astra', effort: 'low' } }).success).toBe(true)
+  expect(ModelChoiceSchema.safeParse({ text: { provider: 'openai', model: 'gpt-6-astra', effort: '' } }).success).toBe(false)
+})
+
+it('catalog efforts and reference limits match the Task A table', () => {
+  const reasoning = ['low', 'medium', 'high', 'xhigh', 'max']
+  expect(MODEL_CATALOG.map(({ model, efforts, maxReferenceImages }) => ({ model, efforts, maxReferenceImages }))).toEqual([
+    { model: 'claude-sonnet-5-5', efforts: reasoning, maxReferenceImages: 0 },
+    { model: 'gpt-6-astra', efforts: reasoning, maxReferenceImages: 0 },
+    { model: 'claude-opus-5-5', efforts: reasoning, maxReferenceImages: 0 },
+    { model: 'gemini-nano-banana-2.1', efforts: ['minimal', 'medium', 'high'], maxReferenceImages: 10 },
+    { model: 'fal-ai/flux-pro/kontext/max/multi', efforts: [], maxReferenceImages: 4 },
+    { model: 'gemini-3-pro-image', efforts: [], maxReferenceImages: 6 },
+  ])
+})
+
 it('error messages match the fixed copy', () => {
   expect(agentErrorMessage({ code: 'missing_key', provider: 'gemini' }))
     .toBe('Nenhuma chave cadastrada para gemini. Peça ao admin do time para cadastrar.')
@@ -64,6 +85,11 @@ it('agent event bodies parse the contract shapes', () => {
     message_ids: [1], round: 1, models: { text: { provider: 'openai', model: 'gpt-6-astra' }, image: null },
     reference_count: 0, dropped_reference_ids: [],
   }).success).toBe(true)
+  // The effort must survive the parse, not be stripped as an unknown key.
+  expect(AgentStartedBodySchema.parse({
+    message_ids: [1], round: 1, models: { text: { provider: 'openai', model: 'gpt-6-astra', effort: 'low' }, image: null },
+    reference_count: 0, dropped_reference_ids: [],
+  }).models.text).toEqual({ provider: 'openai', model: 'gpt-6-astra', effort: 'low' })
   expect(AgentResultBodySchema.safeParse({
     message_ids: [1, 2], round: 2, version_id: 'v', version_number: 3, image_prompt: null,
   }).success).toBe(true)

@@ -74,19 +74,19 @@ Resolve os itens 11 e 12 da revisão e o contrato do esforço (item 2).
 - `ModelRefSchema = z.object({ provider: ProviderSchema, model: z.string().min(1), effort: z.string().min(1).optional() }).strict()`. `ModelChoiceSchema` e `AgentStartedBodySchema.models` passam a aceitar `effort` porque reusam `ModelRefSchema`.
 - A validação de que o esforço é aceito pelo modelo fica no executor (Task B). O schema só confere o formato.
 
-- [ ] **Step 1: Escrever os testes que falham** em `tests/shared/agent.test.ts`:
+- [x] **Step 1: Escrever os testes que falham** em `tests/shared/agent.test.ts`:
   - `ModelChoiceSchema` rejeita `{ text: { provider: 'openai', model: 'gpt-6-astra', foo: 1 } }`.
   - `ModelChoiceSchema` aceita `{ text: { provider: 'openai', model: 'gpt-6-astra', effort: 'low' } }` e rejeita `effort: ''`.
   - Os `efforts` e os `maxReferenceImages` de cada modelo são os da tabela acima.
   - `AgentStartedBodySchema` aceita `models.text` com `effort`.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/shared/agent.test.ts`. Expected: FAIL nos casos novos.
-- [ ] **Step 3: Implementar** as mudanças em `agent.ts`.
-- [ ] **Step 4: Atualizar os documentos.**
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/shared/agent.test.ts`. Expected: FAIL nos casos novos.
+- [x] **Step 3: Implementar** as mudanças em `agent.ts`.
+- [x] **Step 4: Atualizar os documentos.**
   - Plano 2, Task 2: a tabela do catálogo ganha a coluna `efforts` e os novos limites. A nota do Step 3 passa a registrar a correção de 2026-10-27, citando os limites da doc atual.
   - Spec, seção 4, Fase 1, item 2: "escolhe o modelo e, quando o modelo permite, o esforço (quanto ele raciocina). O agente usa a chave de API cadastrada pelo time."
   - `HANDOFF.md`: marcar as duas pendências da Tarefa 2 do Plano 2 como resolvidas.
-- [ ] **Step 5: Run.** Run: `pnpm test tests/shared && pnpm typecheck`. Expected: PASS, sem erro de tipo.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "feat(shared): reasoning effort in the model choice, strict model refs and Gemini reference limits"`
+- [x] **Step 5: Run.** Run: `pnpm test tests/shared && pnpm typecheck`. Expected: PASS, sem erro de tipo.
+- [x] **Step 6: Commit.** `git add -A && git commit -m "feat(shared): reasoning effort in the model choice, strict model refs and Gemini reference limits"`
 
 ---
 

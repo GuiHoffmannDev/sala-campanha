@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { findModel } from '../../packages/shared/src/agent.ts'
 import type { Provider } from '../../packages/shared/src/domain'
 import { createExecutorDb, type ExecutorDb } from '../../packages/executor/src/db.ts'
 import { processClaim, resolveModels, type JobDeps } from '../../packages/executor/src/job.ts'
@@ -153,8 +154,11 @@ it('defaults to the first catalog model with a key', async () => {
 it('sends current version image first, then references, capped at maxReferenceImages', async () => {
   const s = await setup()
   const current = await createAgentVersion(s.f, { caption: 'Atual' })
+  // The default image model; the current image takes one of its slots, so two references are dropped.
+  const cap = findModel({ provider: 'gemini', model: 'gemini-nano-banana-2.1' }, 'image')!.maxReferenceImages
+  const names = Array.from({ length: cap + 1 }, (_, i) => `ref${i + 1}`)
   const refs = []
-  for (let i = 1; i <= 6; i++) refs.push(await insertReference(s.f, `ref${i}`))
+  for (const name of names) refs.push(await insertReference(s.f, name))
   const p = fakeProviders()
   const id = await createClaimedMessage(s.f, TEST_EXECUTOR, { referenceAssetIds: refs })
 
@@ -162,10 +166,10 @@ it('sends current version image first, then references, capped at maxReferenceIm
 
   const images = p.calls.image[0]!.images
   const currentBytes = await s.db.downloadFile(current.image_path!)
-  expect(images.map((i) => text(i.bytes))).toEqual([text(currentBytes.bytes), 'ref1', 'ref2', 'ref3', 'ref4'])
+  expect(images.map((i) => text(i.bytes))).toEqual([text(currentBytes.bytes), ...names.slice(0, cap - 1)])
   const started = (await eventsAfter(s.f, id))[0]!
-  expect(started.body).toMatchObject({ reference_count: 4, dropped_reference_ids: [refs[4], refs[5]] })
-  expect(p.calls.text[0]!.prompt).toContain('Imagens anexadas: 5; a primeira é a versão atual da peça')
+  expect(started.body).toMatchObject({ reference_count: cap - 1, dropped_reference_ids: refs.slice(cap - 1) })
+  expect(p.calls.text[0]!.prompt).toContain(`Imagens anexadas: ${cap}; a primeira é a versão atual da peça`)
 })
 
 it('reuses the references of the latest message when the batch has none', async () => {
