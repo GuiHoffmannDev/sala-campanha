@@ -250,6 +250,11 @@ cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia do
 cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 6 do plano docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md) contra a Task 6, Global Constraints e Review Focus. Foque em data URI em vez de URL assinada, no endpoint sem referências e em não mandar a chave ao baixar o resultado. Só reporte problemas, com arquivo:linha. Não edite nada."
 ```
 
+**Pendências da revisão (commits `a0ef3c8` e `808c475`, 2026-10-26).** Resolver na revisão final do Plano 2. O `808c475` já corrigiu, no download `https`, o redirecionamento, o limite de 25 MiB e o tipo pela assinatura dos bytes. Também corrigiu o limite de 20 MB no pedido e os erros 422 da fal em lista.
+- [ ] **Imagem em data URI confia no tipo declarado** (`packages/executor/src/providers/fal.ts:65` e `packages/executor/src/providers/gemini.ts:73`). O tipo vem do prefixo `data:<tipo>` (fal) ou de `mimeType` (Gemini), não dos bytes. Um arquivo rotulado errado é gravado com o tipo errado. Usar a mesma checagem de assinatura do download `https` (`sniffType` em `fal.ts`), compartilhada pelos dois adaptadores.
+- [ ] **Imagem em data URI sem limite próprio de 25 MiB** (`packages/executor/src/providers/fal.ts:68` e `packages/executor/src/providers/gemini.ts:79`). Os bytes decodificados não são comparados com o limite do bucket `team-files`. Além disso, o `postJson` (`packages/executor/src/providers/http.ts`) lê a resposta JSON inteira para a memória, sem teto. Decidir o limite da resposta e recusar uma imagem decodificada acima de 25 MiB com `invalid_output`.
+- [ ] **Nada da fal foi testado contra a API real.** Ainda não foram confirmados no serviço: data URI nas referências, `sync_mode`, o formato da lista `detail` nos erros 422 e o limite real do corpo do pedido (o Context7 não informa). Cobrir em `tests/live/providers.live.test.ts` (Task 10).
+
 ### Tarefa 7 — Orquestrador (monta o prompt)
 - [ ] Implementada
 - [ ] Revisada
