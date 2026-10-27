@@ -23,13 +23,16 @@
 | Imagem atual | É a imagem da última versão **base**. A versão final (feita no Photoshop) nunca é editada pelo agente |
 | Nova tentativa em imagem | Chamadas de imagem não repetem depois de erro de rede (a geração pode ter sido cobrada). Continuam repetindo uma vez em 429 e 5xx |
 | Referências do Gemini | `maxReferenceImages`: Nano Banana 2.1 = 10 e Nano Banana Pro = 6. São as vagas de objeto em alta fidelidade da doc atual (2.1: 10 objetos + 4 personagens; Pro: 6 objetos + 5 personagens + 3 de estilo) |
-| Desligamento | `SHUTDOWN_GRACE_MS` passa a ter padrão `480000` e precisa ser `≥ TEXT_TIMEOUT_MS + IMAGE_TIMEOUT_MS + 60000` |
+| Tempo limite | `TEXT_TIMEOUT_MS` passa de `120000` para `240000`, para caber um esforço alto no teto de 32000 tokens. `TEXT_TIMEOUT_MS` e `IMAGE_TIMEOUT_MS` têm máximo `300000`, o limite do `fetch` do Node (revisão da Task B, 2026-10-27) |
+| Desligamento | `SHUTDOWN_GRACE_MS` passa a ter padrão `600000` (240 + 300 + 60 s) e precisa ser `≥ TEXT_TIMEOUT_MS + IMAGE_TIMEOUT_MS + 60000`. Era `480000` antes do novo tempo limite do texto (revisão da Task B, 2026-10-27) |
 | Teste ao vivo | O fundador tem chaves de alguns provedores. Roda o que houver; os outros ficam como pendência |
 
 Fatos conferidos no Context7 em 2026-10-27:
 - OpenAI Responses: `max_output_tokens` inclui os tokens de raciocínio. O GPT-6 Astra aceita `reasoning.effort` = `low`, `medium`, `high`, `xhigh` ou `max`, e não aceita `none`.
 - Anthropic Messages: Sonnet 5.5 e Opus 5.5 raciocinam por padrão quando `thinking` é omitido, e o raciocínio conta em `max_tokens`. O esforço vai em `output_config.effort`, com os mesmos cinco valores.
 - Gemini: o nível de raciocínio do Nano Banana 2.1 vai em `generationConfig.thinkingConfig.thinkingLevel`. Os níveis são `minimal`, `medium` (padrão) e `high`, e os tokens de raciocínio são cobrados.
+
+Fato conferido no binário do Node 24.22 (undici 7.29.1) em 2026-10-27: o `fetch` espera no máximo 300 s pelos cabeçalhos da resposta (`headersTimeout` padrão `3e5`). Numa chamada sem streaming, os cabeçalhos só chegam no fim da geração. Acima de 300 s, o corte parece erro de rede, e uma chamada de texto seria repetida e cobrada de novo.
 
 ## Global Constraints
 
@@ -134,6 +137,8 @@ Resolve os itens 2, 3 e 4 da revisão.
 - [x] **Step 5: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
 - [x] **Step 6: Commit.** `git add -A && git commit -m "feat(executor): user-chosen reasoning effort, valid inherited model choice and nullable plan keys"`
 
+> **Correção da revisão (2026-10-27):** a revisão do commit `a5e3fcf` achou dois problemas e duas lacunas de teste. Primeiro, a herança só olhava as 30 mensagens do histórico. Agora `PieceContext.modelChoices` traz, numa consulta própria, as 30 escolhas mais recentes, e `resolveModels` recebe `choices: unknown[]`. Segundo, o tempo limite do texto era curto para um esforço alto. `TEXT_TIMEOUT_MS` agora tem padrão `240000`, e o máximo é `300000` em texto e imagem. Os testes novos cobrem duas escolhas válidas no histórico (vale a mais recente) e uma escolha antiga com esforço recusado, que é pulada.
+
 ---
 
 ### Task C: Imagem devolvida pelo provedor e HTTP
@@ -206,7 +211,7 @@ Resolve os itens 1, 5, 6 e 13 da revisão e o resto do item 9.
 - No `job.ts`, as referências são baixadas com `Promise.all`, mantendo a ordem: imagem atual primeiro, depois as referências.
 - `log.ts` exporta `errorText`, usado em `job.ts`, `worker.ts` e `main.ts`. `db.ts` exporta `NO_AUTHOR`, usado em `orchestrator.ts`.
 - `config.ts`:
-  - `SHUTDOWN_GRACE_MS` com padrão `480000`.
+  - `SHUTDOWN_GRACE_MS` com padrão `600000`.
   - Nova regra: `SHUTDOWN_GRACE_MS ≥ TEXT_TIMEOUT_MS + IMAGE_TIMEOUT_MS + 60000`, com 60 s de margem para banco e Storage.
   - Um valor fora da regra dá erro citando `SHUTDOWN_GRACE_MS`, nunca o valor.
 
@@ -215,12 +220,12 @@ Resolve os itens 1, 5, 6 e 13 da revisão e o resto do item 9.
   - `db.test.ts`: numa peça com base v1 (agente) e final v2 (upload), `latestVersion` é v1. `pieceStatus` devolve o status.
   - `job.test.ts`: o caminho "someone stepped back while the image was generating" continua dando `wrong_status`.
   - `config.test.ts`:
-    - O padrão de `shutdownGraceMs` é `480000`.
+    - O padrão de `shutdownGraceMs` é `600000`.
     - `SHUTDOWN_GRACE_MS: '0'` falha citando `SHUTDOWN_GRACE_MS`.
     - Um grace igual a `TEXT + IMAGE + 60000` é aceito.
 - [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/worker.test.ts tests/executor/db.test.ts tests/executor/job.test.ts tests/executor/config.test.ts`. Expected: FAIL nos casos novos.
 - [ ] **Step 3: Implementar.**
-- [ ] **Step 4: Atualizar os documentos** do Plano 2 listados em Files. No checklist de deploy: "Grace period da plataforma ≥ `SHUTDOWN_GRACE_MS` (480 s)", e cada slot usa `<EXECUTOR_ID>#<n>`.
+- [ ] **Step 4: Atualizar os documentos** do Plano 2 listados em Files. No checklist de deploy: "Grace period da plataforma ≥ `SHUTDOWN_GRACE_MS` (600 s)", e cada slot usa `<EXECUTOR_ID>#<n>`.
 - [ ] **Step 5: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`, 3 vezes seguidas. Expected: PASS nas 3.
 - [ ] **Step 6: Commit.** `git add -A && git commit -m "fix(executor): per-slot claim ids, latest base version, parallel downloads and a shutdown grace that fits a round"`
 
@@ -261,4 +266,5 @@ Resolve os itens 14 e 15 da revisão.
 
 - O seletor de modelo e de esforço na tela fica para o Plano 3. Aqui entra só o contrato.
 - Login com conta Claude: fora, por decisão do fundador. O produto usa só a chave de API do time.
-- Os timeouts não mudam. Um esforço `xhigh` ou `max` pode passar de `TEXT_TIMEOUT_MS` (120 s). O usuário vê "não respondeu a tempo" e pode escolher um esforço menor.
+- Streaming nas chamadas de texto. Sem ele, nenhuma chamada passa de 300 s. Um esforço `xhigh` ou `max` ainda pode passar de `TEXT_TIMEOUT_MS` (240 s). O usuário vê "não respondeu a tempo" e pode escolher um esforço menor.
+- As referências herdadas ("as da última mensagem que tinha") continuam limitadas às 30 mensagens do histórico.

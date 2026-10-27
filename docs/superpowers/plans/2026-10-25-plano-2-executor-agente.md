@@ -216,15 +216,15 @@ it('error messages match the fixed copy', () => {
   | `TOUCH_INTERVAL_MS` | `touchIntervalMs` | `30000` | inteiro ≥ 1000 |
   | `STALE_AFTER_SECONDS` | `staleAfterSeconds` | `300` | `touchIntervalMs * 3 <= staleAfterSeconds * 1000` |
   | `SWEEP_INTERVAL_MS` | `sweepIntervalMs` | `60000` | inteiro ≥ 1000 |
-  | `TEXT_TIMEOUT_MS` | `textTimeoutMs` | `120000` | inteiro ≥ 1000 |
-  | `IMAGE_TIMEOUT_MS` | `imageTimeoutMs` | `300000` | inteiro ≥ 1000 |
+  | `TEXT_TIMEOUT_MS` | `textTimeoutMs` | `240000` | inteiro 1000..300000 |
+  | `IMAGE_TIMEOUT_MS` | `imageTimeoutMs` | `300000` | inteiro 1000..300000 |
   | `SHUTDOWN_GRACE_MS` | `shutdownGraceMs` | `120000` | inteiro ≥ 0 |
 
 - Produces (`log.ts`): `type Logger = { info(msg: string, fields?: Record<string, unknown>): void; warn(...); error(...) }`; `createLogger(write?: (line: string) => void): Logger`. Uma linha JSON por chamada: `{ level, msg, time, ...fields }`. Padrão `write` = `process.stdout.write(line + '\n')`.
 - Produces (`db.ts`):
   - `type InboxMessage = { id: number; piece_id: string; team_id: string; author_id: string | null; body: { text: string; model: unknown; reference_asset_ids: string[] } }`
-  - `type HistoryMessage = { id: number; author: string; text: string; model: unknown; reference_asset_ids: string[] }`
-  - `type PieceContext = { piece: { id: string; team_id: string; campaign_id: string; title: string; kind: PieceKind; status: PieceStatus }; campaignName: string; history: HistoryMessage[]; latestVersion: { id: string; number: number; image_path: string | null; caption: string | null } | null; lastImagePrompt: string | null; keyedProviders: Provider[]; memberNames: Record<string, string> }`
+  - `type HistoryMessage = { id: number; author: string; text: string; reference_asset_ids: string[] }` (sem `model`: a escolha vem de `modelChoices`) *(correção B, revisão de 2026-10-27)*
+  - `type PieceContext = { piece: { id: string; team_id: string; campaign_id: string; title: string; kind: PieceKind; status: PieceStatus }; campaignName: string; history: HistoryMessage[]; modelChoices: unknown[]; latestVersion: { id: string; number: number; image_path: string | null; caption: string | null } | null; lastImagePrompt: string | null; keyedProviders: Provider[]; memberNames: Record<string, string> }`
   - `class ClaimLostError extends Error` (lançada quando a RPC responde `42501`)
   - `createExecutorDb(client: SupabaseClient, executorId: string): ExecutorDb`, com:
     - `claimNext(): Promise<InboxMessage | null>`
@@ -243,6 +243,7 @@ it('error messages match the fixed copy', () => {
     - `answeredMessages(pieceId: string, ids: number[]): Promise<Set<number>>` (ids que já têm versão do agente: a última mensagem de um `agent_started` é o `source_event_id` de uma versão `agente`; adicionado na correção da Task 8)
   - Regras de `loadPieceContext`:
     - `history`: mensagens `user_message` da peça com `to_agent = true` e `delivery in ('claimed','done','failed')`, as 30 mais recentes, em ordem crescente de `id`. `author` = `team_members.display_name`, ou `'Alguém'` sem autor.
+    - `modelChoices`: o `body.model` das 30 mensagens mais recentes com os mesmos filtros do `history` e `body->>model` não nulo, em ordem crescente de `id`. É uma consulta à parte, para uma escolha antiga não sair junto com a janela do `history` *(correção B, revisão de 2026-10-27)*.
     - `latestVersion`: versão de maior `number`.
     - `lastImagePrompt`: `body.image_prompt` do `agent_result` mais recente.
     - `keyedProviders`: `provider_keys.provider` do time.
@@ -484,7 +485,7 @@ it('non-JSON output is invalid_output', () => {})
   - `type JobDeps = { db: ExecutorDb; providers: Providers; log: Logger; touchIntervalMs: number; textTimeoutMs: number; imageTimeoutMs: number }`
   - `type RoundOutcome = 'ok' | 'failed' | 'claim_lost'`
   - `processClaim(deps: JobDeps, first: InboxMessage): Promise<void>`. Nunca lança: erros da rodada viram `agent_error` dentro de `runRound`; erro da fila (`absorbPending`, `complete`) só vai para o log, sem `agent_error` (a rodada pode já ter postado o resultado). As mensagens ficam `claimed` até `release_stale_claims` devolvê-las, e `answeredMessages` impede uma segunda versão.
-  - `resolveModels(kind: PieceKind, batch: InboxMessage[], history: HistoryMessage[], keyed: Provider[]): { text: ChosenModel; image: ChosenModel | null } | AgentErrorInput`, com `ChosenModel = CatalogModel & { effort: string | null }` *(correção B, 2026-10-27)*
+  - `resolveModels(kind: PieceKind, batch: InboxMessage[], choices: unknown[], keyed: Provider[]): { text: ChosenModel; image: ChosenModel | null } | AgentErrorInput`, com `ChosenModel = CatalogModel & { effort: string | null }` *(correção B, 2026-10-27)*. `runRound` passa `ctx.modelChoices` em `choices` *(correção B, revisão de 2026-10-27)*.
 - Produces (`tests/helpers/fake-providers.ts`): `fakeProviders(o?: { plan?: string | (() => Promise<string>); image?: () => Promise<GeneratedImage>; textError?: ProviderError }): { providers: Providers; calls: { text: TextRequest[]; image: ImageRequest[] } }`. Registra `anthropic`/`openai` como texto e `gemini`/`fal` como imagem.
 
 Algoritmo de `processClaim` (a ordem importa):
@@ -514,7 +515,7 @@ finally: desliga o timer
 3. `resolveModels` *(correção B, 2026-10-27)*:
    - Uma escolha é válida quando passa em `ModelChoiceSchema`, cada ref dela (texto e imagem) está no catálogo para a capacidade (`findModel`) e cada `effort` está em `model.efforts`.
    - Escolha do lote = o `body.model` mais recente do batch que não seja null. Se ela não é válida: `invalid_model`. Esforço recusado: `{ code: 'invalid_model', model: '<id> com esforço <effort>', capability }`, que vira "O modelo gpt-6-astra com esforço turbo não está disponível para texto.".
-   - Sem escolha no lote: a última escolha **válida** do `history`. As inválidas são puladas, para um erro antigo ou um modelo que saiu do catálogo não prender a peça. Sem nenhuma válida, nenhuma escolha.
+   - Sem escolha no lote: a última escolha **válida** de `ctx.modelChoices` (antes, do `history`) *(correção B, revisão de 2026-10-27)*. As inválidas são puladas, para um erro antigo ou um modelo que saiu do catálogo não prender a peça. Sem nenhuma válida, nenhuma escolha.
    - Por capacidade necessária (texto sempre; imagem para `imagem` e `imagem_texto`): se a escolha tem o ref, o modelo dele com o esforço escolhido, e provedor em `keyed` (senão: `missing_key` com `provider`). Sem ref, o primeiro item de `MODEL_CATALOG` com essa capacidade e provedor em `keyed`, com `effort: null` (nenhum: `missing_key` com `capability`).
    - O esforço vai para `planRound`, para `generateImage` e para `agent_started.models` (o `ModelRef` ganha `effort` só quando há).
    - Erro: `agent_error` → `'failed'`.
@@ -571,6 +572,8 @@ it('touches the claim while generating', async () => { /* touchIntervalMs 50; im
 - [x] **Step 5: Commit.** `git add -A && git commit -m "feat(executor): claim rounds with redirection, model resolution and safe errors"`
 
 > **Correção (2026-10-27, Task B de `2026-10-27-plano-2-correcoes.md`):** por decisão do fundador, o usuário escolhe o esforço junto do modelo. O executor confere o esforço contra `efforts` do catálogo e o repassa ao provedor (OpenAI `reasoning.effort`, Anthropic `output_config.effort`, Gemini `thinkingConfig.thinkingLevel`). Uma mensagem sem modelo herda a última escolha válida do histórico, não a última escolha. O teto de saída do orquestrador sobe de 2000 para 32000 tokens, porque o raciocínio conta nele. `parsePlan` aceita `null` na chave que o tipo da peça descarta. Ajustes nas Tasks 4, 5, 7 e 8 e na linha "Modelo padrão" das decisões.
+
+> **Correção (2026-10-27, revisão da Task B de `2026-10-27-plano-2-correcoes.md`):** a escolha herdada vem de `PieceContext.modelChoices`, uma consulta própria com as 30 escolhas mais recentes, e não mais das 30 mensagens do `history`: uma escolha antiga não se perde quando a conversa cresce. `HistoryMessage` perde `model`. `TEXT_TIMEOUT_MS` passa de `120000` para `240000`, e `TEXT_TIMEOUT_MS` e `IMAGE_TIMEOUT_MS` têm máximo `300000`: o `fetch` do Node espera no máximo 300 s pelos cabeçalhos da resposta, e uma chamada sem streaming não dura mais que isso. Ajustes nas Tasks 3 e 8 e na linha "Modelo padrão" das decisões.
 
 ---
 
@@ -651,7 +654,7 @@ it('main exits on missing config without printing secrets', async () => {
 | Redirecionamento | Incorporado na rodada seguinte (`absorb_pending` antes de concluir a rodada). A requisição em andamento não é cancelada: as APIs de imagem não aceitam mudança no meio, e cancelar não devolve o custo |
 | Lote | Mensagens que chegam juntas viram uma rodada só, com uma versão |
 | Falha na rodada | Conclui o lote como `failed` e para; as mensagens na fila ficam para o próximo claim |
-| Modelo padrão | O primeiro de `MODEL_CATALOG` com chave cadastrada, por capacidade, no esforço padrão do provedor. A escolha vale até alguém mudar: uma mensagem sem modelo herda a última escolha **válida** da peça (correção B, 2026-10-27: antes herdava a última, mesmo inválida, e a peça ficava presa em `invalid_model`) |
+| Modelo padrão | O primeiro de `MODEL_CATALOG` com chave cadastrada, por capacidade, no esforço padrão do provedor. A escolha vale até alguém mudar: uma mensagem sem modelo herda a última escolha **válida** da peça (correção B, 2026-10-27: antes herdava a última, mesmo inválida, e a peça ficava presa em `invalid_model`). A escolha vem de uma consulta própria e sobrevive além das 30 mensagens do histórico (revisão da correção B, 2026-10-27) |
 | Orquestrador | Sempre o modelo de texto; devolve JSON `{image_prompt, caption}` conforme o tipo da peça |
 | Imagem atual | A imagem da versão mais recente entra como primeira referência, para "fundo mais claro" editar o que existe |
 | Referências | As do lote; sem nenhuma no lote, as da última mensagem que tinha; cortadas em `maxReferenceImages` |

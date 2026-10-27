@@ -9,9 +9,10 @@ function makeCtx(over: Partial<PieceContext> = {}): PieceContext {
     piece: { id: 'p1', team_id: 't1', campaign_id: 'c1', title: 'Post de lançamento', kind: 'imagem', status: 'gerando' },
     campaignName: 'Verão 2027',
     history: [
-      { id: 1, author: 'Ana', text: 'Garrafa na praia', model: null, reference_asset_ids: [] },
-      { id: 5, author: 'Bia', text: 'Mais luz', model: null, reference_asset_ids: [] },
+      { id: 1, author: 'Ana', text: 'Garrafa na praia', reference_asset_ids: [] },
+      { id: 5, author: 'Bia', text: 'Mais luz', reference_asset_ids: [] },
     ],
+    modelChoices: [],
     latestVersion: { id: 'v1', number: 1, image_path: 'x.png', caption: 'Refresque seu verão' },
     lastImagePrompt: 'a bottle on the beach',
     keyedProviders: ['anthropic'],

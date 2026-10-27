@@ -3,7 +3,7 @@ import type { PieceKind, PieceStatus, Provider } from '@sala/shared'
 import {
   agentErrorMessage, findModel, MODEL_CATALOG, ModelChoiceSchema, type AgentErrorInput, type CatalogModel, type ModelCapability,
 } from '@sala/shared/agent'
-import { ClaimLostError, type ExecutorDb, type HistoryMessage, type InboxMessage } from './db.ts'
+import { ClaimLostError, type ExecutorDb, type InboxMessage } from './db.ts'
 import type { Logger } from './log.ts'
 import { planRound, type Plan } from './orchestrator.ts'
 import { redact } from './providers/http.ts'
@@ -50,11 +50,11 @@ function checkChoice(choice: unknown): Choice | AgentErrorInput {
 /**
  * Picks the text model (always) and the image model (imagem and imagem_texto pieces), each with its effort.
  * The choice is the latest non-null `model` of the batch; an invalid one fails the round.
- * Without one, the latest valid choice of the history: invalid ones are skipped, so an old
- * mistake or a model since removed from the catalog never locks the piece.
+ * Without one, the latest valid one of `choices` (the piece's past choices, oldest first): invalid ones
+ * are skipped, so an old mistake or a model since removed from the catalog never locks the piece.
  * Without a choice for a capability, the first catalog model whose provider has a key, at the provider's default effort.
  */
-export function resolveModels(kind: PieceKind, batch: InboxMessage[], history: HistoryMessage[], keyed: Provider[]): Models | AgentErrorInput {
+export function resolveModels(kind: PieceKind, batch: InboxMessage[], choices: unknown[], keyed: Provider[]): Models | AgentErrorInput {
   const isError = (c: Choice | AgentErrorInput): c is AgentErrorInput => 'code' in c
   const fromBatch = batch.map((m) => m.body.model).findLast((v) => v != null)
   let choice: Choice
@@ -63,7 +63,7 @@ export function resolveModels(kind: PieceKind, batch: InboxMessage[], history: H
     if (isError(checked)) return checked
     choice = checked
   } else {
-    choice = history.map((m) => checkChoice(m.model)).findLast((c): c is Choice => !isError(c)) ?? {}
+    choice = choices.map(checkChoice).findLast((c): c is Choice => !isError(c)) ?? {}
   }
 
   const pick = (capability: ModelCapability): ChosenModel | AgentErrorInput => {
@@ -111,7 +111,7 @@ async function runRound(deps: JobDeps, batch: InboxMessage[], round: number): Pr
     const ctx = await db.loadPieceContext(pieceId)
     if (!AGENT_STATUSES.includes(ctx.piece.status)) return await fail({ code: 'wrong_status', status: ctx.piece.status })
 
-    const models = resolveModels(ctx.piece.kind, batch, ctx.history, ctx.keyedProviders)
+    const models = resolveModels(ctx.piece.kind, batch, ctx.modelChoices, ctx.keyedProviders)
     if ('code' in models) return await fail(models)
 
     const keyOf = async (provider: Provider) => {

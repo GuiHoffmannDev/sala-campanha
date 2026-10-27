@@ -49,10 +49,12 @@ it('loadPieceContext returns history with author names, keyed providers and late
   expect(Object.keys(ctx.memberNames)).toHaveLength(4)
   const tail = ctx.history.slice(-2)
   expect(tail).toEqual([
-    { id: first, author: 'gestor', text: 'Banner azul', model: { text: { provider: 'anthropic', model: 'm' } }, reference_asset_ids: [] },
+    { id: first, author: 'gestor', text: 'Banner azul', reference_asset_ids: [] },
     expect.objectContaining({ author: 'Alguém', text: 'Sem autor' }),
   ])
   expect(ctx.history.map((h) => h.id)).toEqual([...ctx.history.map((h) => h.id)].sort((a, b) => a - b))
+  // The JSON null model of 'Sem autor' is not a choice.
+  expect(ctx.modelChoices).toEqual([{ text: { provider: 'anthropic', model: 'm' } }])
 })
 
 it('history keeps only the 30 most recent agent messages', async () => {
@@ -64,6 +66,26 @@ it('history keeps only the 30 most recent agent messages', async () => {
   for (const row of rows) expect((await serviceClient().from('session_events').insert(row)).error).toBeNull()
   const { history } = await db().loadPieceContext(f.pieceId)
   expect(history.map((h) => h.text)).toEqual(rows.slice(2).map((r) => r.body.text))
+})
+
+it('modelChoices keeps a choice older than the 30-message history', async () => {
+  const f = await createPieceFixture()
+  const row = (model: unknown, delivery: string) => ({
+    piece_id: f.pieceId, team_id: f.t.teamId, author_id: f.t.members.gestor.userId, kind: 'user_message',
+    body: { text: 'x', model, reference_asset_ids: [] }, to_agent: true, delivery,
+  })
+  const choice = { text: { provider: 'openai', model: 'gpt-6-astra', effort: 'low' } }
+  const rows = [
+    row(choice, 'done'),
+    ...Array.from({ length: 31 }, () => row(null, 'done')),
+    // Still in the queue: not part of the piece's past choices.
+    row({ text: { provider: 'anthropic', model: 'claude-opus-5-5' } }, 'queued'),
+  ]
+  for (const r of rows) expect((await serviceClient().from('session_events').insert(r)).error).toBeNull()
+
+  const ctx = await db().loadPieceContext(f.pieceId)
+  expect(ctx.history).toHaveLength(30)
+  expect(ctx.modelChoices).toEqual([choice])
 })
 
 it('history excludes queued and people-only messages', async () => {

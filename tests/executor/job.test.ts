@@ -522,13 +522,24 @@ it('touches the claim while generating', async () => {
 
 describe('resolveModels', () => {
   const msg = (model: unknown) => ({ id: 1, piece_id: 'p', team_id: 't', author_id: null, body: { text: 'x', model, reference_asset_ids: [] } })
-  const hist = (model: unknown) => ({ id: 0, author: 'a', text: 'x', model, reference_asset_ids: [] })
+  const opus = { text: { provider: 'anthropic', model: 'claude-opus-5-5' } }
+  const astra = { text: { provider: 'openai', model: 'gpt-6-astra' } }
 
   it('prefers the latest non-null choice in the batch, then the history', () => {
-    const fromBatch = resolveModels('texto', [msg({ text: { provider: 'openai', model: 'gpt-6-astra' } }), msg(null)], [hist(null)], ['anthropic', 'openai'])
+    const fromBatch = resolveModels('texto', [msg(astra), msg(null)], [opus], ['anthropic', 'openai'])
     expect(fromBatch).toMatchObject({ text: { model: 'gpt-6-astra' }, image: null })
-    const fromHistory = resolveModels('texto', [msg(null)], [hist({ text: { provider: 'anthropic', model: 'claude-opus-5-5' } })], ['anthropic'])
+    const fromHistory = resolveModels('texto', [msg(null)], [opus], ['anthropic'])
     expect(fromHistory).toMatchObject({ text: { model: 'claude-opus-5-5' } })
+  })
+
+  it('inherits the latest of several valid choices in the history', () => {
+    expect(resolveModels('texto', [msg(null)], [opus, astra], ['anthropic', 'openai'])).toMatchObject({ text: { model: 'gpt-6-astra' } })
+  })
+
+  it('skips a history choice with an effort the model does not accept', () => {
+    const refused = { text: { provider: 'openai', model: 'gpt-6-astra', effort: 'turbo' } }
+    expect(resolveModels('texto', [msg(null)], [opus, refused], ['anthropic', 'openai']))
+      .toMatchObject({ text: { model: 'claude-opus-5-5', effort: null } })
   })
 
   it('a chosen model whose provider has no key is missing_key for that provider', () => {

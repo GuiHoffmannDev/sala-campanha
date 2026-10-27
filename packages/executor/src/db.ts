@@ -9,12 +9,14 @@ export type InboxMessage = {
   body: { text: string; model: unknown; reference_asset_ids: string[] }
 }
 
-export type HistoryMessage = { id: number; author: string; text: string; model: unknown; reference_asset_ids: string[] }
+export type HistoryMessage = { id: number; author: string; text: string; reference_asset_ids: string[] }
 
 export type PieceContext = {
   piece: { id: string; team_id: string; campaign_id: string; title: string; kind: PieceKind; status: PieceStatus }
   campaignName: string
   history: HistoryMessage[]
+  // body.model of the latest agent messages that carry one, oldest first; reaches past the history window.
+  modelChoices: unknown[]
   latestVersion: { id: string; number: number; image_path: string | null; caption: string | null } | null
   lastImagePrompt: string | null
   keyedProviders: Provider[]
@@ -119,12 +121,17 @@ export function createExecutorDb(client: SupabaseClient, executorId: string): Ex
         .select('id, team_id, campaign_id, title, kind, status, campaigns(name)')
         .eq('id', pieceId).single()) as unknown as PieceContext['piece'] & { campaigns: { name: string } }
 
-      const [members, messages, version, result, keys] = await Promise.all([
+      // Messages the agent took (claimed, done or failed), newest first.
+      const agentMessages = <C extends string>(columns: C) => client.from('session_events').select(columns)
+        .eq('piece_id', pieceId).eq('kind', 'user_message').eq('to_agent', true)
+        .in('delivery', ['claimed', 'done', 'failed'])
+        .order('id', { ascending: false }).limit(HISTORY_LIMIT)
+
+      const [members, messages, choices, version, result, keys] = await Promise.all([
         client.from('team_members').select('user_id, display_name').eq('team_id', piece.team_id),
-        client.from('session_events').select(INBOX_COLUMNS)
-          .eq('piece_id', pieceId).eq('kind', 'user_message').eq('to_agent', true)
-          .in('delivery', ['claimed', 'done', 'failed'])
-          .order('id', { ascending: false }).limit(HISTORY_LIMIT),
+        agentMessages(INBOX_COLUMNS),
+        // ->> turns a JSON null model into SQL null, so messages without a choice drop out.
+        agentMessages('model:body->model').not('body->>model', 'is', null),
         client.from('piece_versions').select('id, number, image_path, caption')
           .eq('piece_id', pieceId).order('number', { ascending: false }).limit(1).maybeSingle(),
         // Latest result that carried an image prompt: text-only rounds keep the previous one.
@@ -141,7 +148,6 @@ export function createExecutorDb(client: SupabaseClient, executorId: string): Ex
         id: m.id,
         author: (m.author_id && memberNames[m.author_id]) || NO_AUTHOR,
         text: m.body.text,
-        model: m.body.model,
         reference_asset_ids: m.body.reference_asset_ids,
       }))
       const lastResult = check(op, result) as { body: { image_prompt: string } } | null
@@ -150,6 +156,7 @@ export function createExecutorDb(client: SupabaseClient, executorId: string): Ex
         piece: { id: piece.id, team_id: piece.team_id, campaign_id: piece.campaign_id, title: piece.title, kind: piece.kind, status: piece.status },
         campaignName: piece.campaigns.name,
         history,
+        modelChoices: (check(op, choices) as { model: unknown }[]).reverse().map((c) => c.model),
         latestVersion: check(op, version) as PieceContext['latestVersion'],
         lastImagePrompt: lastResult?.body.image_prompt ?? null,
         keyedProviders: (check(op, keys) as { provider: Provider }[]).map((k) => k.provider),

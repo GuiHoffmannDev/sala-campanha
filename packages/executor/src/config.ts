@@ -19,6 +19,9 @@ export type Config = {
 const int = (fallback: number, min: number, max = Number.MAX_SAFE_INTEGER) =>
   z.string().regex(/^\d+$/).default(String(fallback)).transform(Number).pipe(z.number().int().min(min).max(max))
 
+// Node's fetch waits at most 300 s for response headers, so a non-streaming provider call cannot outlast it.
+const MAX_CALL_MS = 300_000
+
 const EnvSchema = z.object({
   SUPABASE_URL: z.url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
@@ -28,8 +31,8 @@ const EnvSchema = z.object({
   TOUCH_INTERVAL_MS: int(30000, 1000),
   STALE_AFTER_SECONDS: int(300, 1),
   SWEEP_INTERVAL_MS: int(60000, 1000),
-  TEXT_TIMEOUT_MS: int(120000, 1000),
-  IMAGE_TIMEOUT_MS: int(300000, 1000),
+  TEXT_TIMEOUT_MS: int(240000, 1000, MAX_CALL_MS),
+  IMAGE_TIMEOUT_MS: int(300000, 1000, MAX_CALL_MS),
   SHUTDOWN_GRACE_MS: int(120000, 0),
 }).check((ctx) => {
   // The claim must be touched at least three times before it counts as stale.
