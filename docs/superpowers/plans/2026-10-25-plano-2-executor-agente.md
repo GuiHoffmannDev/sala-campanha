@@ -238,6 +238,7 @@ it('error messages match the fixed copy', () => {
     - `downloadFile(path: string): Promise<{ bytes: Uint8Array; mimeType: string }>`
     - `uploadFile(path: string, bytes: Uint8Array, mimeType: string): Promise<void>` (`upsert: false`)
     - `removeFile(path: string): Promise<void>`
+    - `answeredMessages(pieceId: string, ids: number[]): Promise<Set<number>>` (ids que já têm versão do agente: a última mensagem de um `agent_started` é o `source_event_id` de uma versão `agente`; adicionado na correção da Task 8)
   - Regras de `loadPieceContext`:
     - `history`: mensagens `user_message` da peça com `to_agent = true` e `delivery in ('claimed','done','failed')`, as 30 mais recentes, em ordem crescente de `id`. `author` = `team_members.display_name`, ou `'Alguém'` sem autor.
     - `latestVersion`: versão de maior `number`.
@@ -478,7 +479,7 @@ it('non-JSON output is invalid_output', () => {})
 - Produces (`job.ts`):
   - `type JobDeps = { db: ExecutorDb; providers: Providers; log: Logger; touchIntervalMs: number; textTimeoutMs: number; imageTimeoutMs: number }`
   - `type RoundOutcome = 'ok' | 'failed' | 'claim_lost'`
-  - `processClaim(deps: JobDeps, first: InboxMessage): Promise<void>`. Nunca lança: erros inesperados viram log e `agent_error` `internal`.
+  - `processClaim(deps: JobDeps, first: InboxMessage): Promise<void>`. Nunca lança: erros da rodada viram `agent_error` dentro de `runRound`; erro da fila (`absorbPending`, `complete`) só vai para o log, sem `agent_error` (a rodada pode já ter postado o resultado). As mensagens ficam `claimed` até `release_stale_claims` devolvê-las, e `answeredMessages` impede uma segunda versão.
   - `resolveModels(kind: PieceKind, batch: InboxMessage[], history: HistoryMessage[], keyed: Provider[]): { text: CatalogModel; image: CatalogModel | null } | AgentErrorInput`
 - Produces (`tests/helpers/fake-providers.ts`): `fakeProviders(o?: { plan?: string | (() => Promise<string>); image?: () => Promise<GeneratedImage>; textError?: ProviderError }): { providers: Providers; calls: { text: TextRequest[]; image: ImageRequest[] } }`. Registra `anthropic`/`openai` como texto e `gemini`/`fal` como imagem.
 
@@ -490,10 +491,12 @@ round = 1
 liga timer: a cada touchIntervalMs, db.touchClaim(piece); erro só vai para o log
 try:
   loop:
-    outcome = await runRound(deps, batch, round)
+    answered = await db.answeredMessages(piece, ids do batch)   # já respondidas por versão de um claim anterior
+    todo = batch sem answered
+    outcome = todo vazio ? 'ok' : await runRound(deps, todo, round)
     if outcome == 'claim_lost': sair            # os claims já não são deste executor
     if outcome == 'failed':
-      complete(cada mensagem do batch, 'failed'); sair   # as que estão na fila ficam para o próximo claim
+      complete(answered, 'done'); complete(todo, 'failed'); sair   # as que estão na fila ficam para o próximo claim
     next = await db.absorbPending(piece)           # absorve ANTES de concluir: a peça nunca fica sem claim entre rodadas
     complete(cada mensagem do batch, 'done')
     if next vazio: sair
@@ -516,7 +519,7 @@ finally: desliga o timer
 8. Com imagem: `generateImage` com `AbortSignal.timeout(imageTimeoutMs)`; `uploadFile(`${team}/${piece}/${randomUUID()}.${png|jpg|webp}`)`.
 9. `addAgentVersion(piece, path | null, plan.caption, sourceId)`.
    - `ClaimLostError`: `removeFile(path)`, log `warn` → `'claim_lost'`, sem evento.
-   - Outro erro: `removeFile(path)` e recarregar o status. Se saiu de `gerando`/`base_em_revisao` (alguém aprovou ou voltou a etapa durante a geração), `agent_error` `wrong_status`; senão, `internal`. Nos dois casos → `'failed'`.
+   - Outro erro: primeiro `answeredMessages(piece, [sourceId])`, porque um erro de rede pode esconder um commit. Se a versão foi gravada, manter o arquivo, log `warn` → `'ok'` (sem `agent_result`). Se essa checagem falhar, o arquivo fica (órfão é melhor que versão sem imagem) e a rodada vira `internal`. Senão, `removeFile(path)` e recarregar o status. Se saiu de `gerando`/`base_em_revisao` (alguém aprovou ou voltou a etapa durante a geração), `agent_error` `wrong_status`; senão, `internal`. Nos dois casos → `'failed'`.
 10. `addAgentEvent(sourceId, 'agent_result', { message_ids, round, version_id, version_number, image_prompt })` → `'ok'`.
 
 Erros em qualquer passo: `ProviderError` vira `agent_error` com `code` e `message` de `agentErrorMessage` (o `detail` já vem redigido; redigir de novo com todas as chaves da rodada) e `image_prompt` quando já existe → `'failed'`. `ClaimLostError` em `addAgentEvent` → `'claim_lost'`. Outro erro: log `error` com a mensagem redigida e `agent_error` `internal` → `'failed'`.

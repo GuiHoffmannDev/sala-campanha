@@ -311,6 +311,81 @@ it('unexpected error becomes internal and is logged without failing the call', a
   expect(await delivery(id)).toBe('failed')
 })
 
+it('complete failing after the version: no agent_error, and the requeued message is not generated again', async () => {
+  const s = await setup()
+  const id = await createClaimedMessage(s.f)
+  vi.spyOn(s.db, 'complete').mockRejectedValueOnce(new Error('complete failed: db down'))
+
+  await expect(processClaim(s.deps(fakeProviders()), await loadEvent(id))).resolves.toBeUndefined()
+
+  expect((await eventsAfter(s.f, id)).map((e) => e.kind)).not.toContain('agent_error')
+  expect(await versions(s.f)).toHaveLength(1)
+  expect(await delivery(id)).toBe('claimed')
+  expect(s.lines.map((l) => JSON.parse(l).level)).toContain('error')
+
+  // release_stale_claims requeued the message and an executor claimed it again.
+  const { error } = await serviceClient().from('session_events')
+    .update({ delivery: 'claimed', claimed_by: TEST_EXECUTOR, claimed_at: new Date().toISOString() }).eq('id', id)
+  expect(error).toBeNull()
+  const again = fakeProviders()
+  await processClaim(s.deps(again), await loadEvent(id))
+
+  expect(again.calls.text).toEqual([])
+  expect(again.calls.image).toEqual([])
+  expect(await versions(s.f)).toHaveLength(1)
+  expect(await delivery(id)).toBe('done')
+})
+
+it('claim lost after the version: the requeued message is completed without a second version', async () => {
+  const s = await setup()
+  const id = await createClaimedMessage(s.f)
+  const requeue = { delivery: 'queued', claimed_by: null, claimed_at: null }
+  const addAgentEvent = s.db.addAgentEvent.bind(s.db)
+  vi.spyOn(s.db, 'addAgentEvent').mockImplementation(async (source, kind, body) => {
+    // release_stale_claims requeued the message between add_agent_version and agent_result.
+    if (kind === 'agent_result') expect((await serviceClient().from('session_events').update(requeue).eq('id', id)).error).toBeNull()
+    return addAgentEvent(source, kind, body)
+  })
+
+  await processClaim(s.deps(fakeProviders()), await loadEvent(id))
+
+  expect(await versions(s.f)).toHaveLength(1)
+  expect(await delivery(id)).toBe('queued')
+  vi.mocked(s.db.addAgentEvent).mockRestore()
+
+  // Another executor claims the requeued message.
+  const other = createExecutorDb(serviceClient(), 'other-executor')
+  const { error } = await serviceClient().from('session_events')
+    .update({ delivery: 'claimed', claimed_by: 'other-executor', claimed_at: new Date().toISOString() }).eq('id', id)
+  expect(error).toBeNull()
+  const again = fakeProviders()
+  await processClaim({ ...s.deps(again), db: other }, await loadEvent(id))
+
+  expect(again.calls.text).toEqual([])
+  expect(again.calls.image).toEqual([])
+  expect(await versions(s.f)).toHaveLength(1)
+  expect(await delivery(id)).toBe('done')
+  expect((await eventsAfter(s.f, id)).map((e) => e.kind)).not.toContain('agent_error')
+})
+
+it('addAgentVersion error after the commit keeps the file of the stored version', async () => {
+  const s = await setup()
+  const id = await createClaimedMessage(s.f)
+  const addAgentVersion = s.db.addAgentVersion.bind(s.db)
+  vi.spyOn(s.db, 'addAgentVersion').mockImplementation(async (...args) => {
+    await addAgentVersion(...args)
+    throw new Error('addAgentVersion failed: fetch failed')
+  })
+
+  await processClaim(s.deps(fakeProviders()), await loadEvent(id))
+
+  const [version] = await versions(s.f)
+  expect(version.image_path).toBeTruthy()
+  expect(await folderFiles(s.f)).toContain(version.image_path.split('/').at(-1))
+  expect((await eventsAfter(s.f, id)).map((e) => e.kind)).not.toContain('agent_error')
+  expect(await delivery(id)).toBe('done')
+})
+
 it('claim lost: no version, uploaded file removed', async () => {
   const s = await setup()
   const id = await createClaimedMessage(s.f)

@@ -37,6 +37,7 @@ export type ExecutorDb = {
   downloadFile(path: string): Promise<{ bytes: Uint8Array; mimeType: string }>
   uploadFile(path: string, bytes: Uint8Array, mimeType: string): Promise<void>
   removeFile(path: string): Promise<void>
+  answeredMessages(pieceId: string, ids: number[]): Promise<Set<number>>
 }
 
 /** The executor no longer holds the claim (released as stale or taken by another executor). */
@@ -175,6 +176,31 @@ export function createExecutorDb(client: SupabaseClient, executorId: string): Ex
 
     async removeFile(path) {
       check('removeFile', await storage().remove([path]))
+    },
+
+    /**
+     * The ids in `ids` that an earlier round already answered with a stored version.
+     * A round's version has the round's last message as `source_event_id`, and its
+     * `agent_started` lists every message of the round, in order. This catches a round
+     * whose messages went back to the queue after the version was stored.
+     */
+    async answeredMessages(pieceId, ids) {
+      if (ids.length === 0) return new Set()
+      const op = 'answeredMessages'
+      // Versions and agent_started events are always newer than the messages they answer.
+      const since = Math.min(...ids)
+      const [versions, started] = await Promise.all([
+        client.from('piece_versions').select('source_event_id')
+          .eq('piece_id', pieceId).eq('origin', 'agente').gte('source_event_id', since),
+        client.from('session_events').select('body')
+          .eq('piece_id', pieceId).eq('kind', 'agent_started').gt('id', since),
+      ])
+      const sources = new Set((check(op, versions) as { source_event_id: number }[]).map((v) => v.source_event_id))
+      const answered = new Set<number>()
+      for (const { body } of check(op, started) as { body: { message_ids: number[] } }[]) {
+        if (sources.has(body.message_ids.at(-1)!)) for (const id of body.message_ids) answered.add(id)
+      }
+      return new Set(ids.filter((id) => answered.has(id)))
     },
   }
 }

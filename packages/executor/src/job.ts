@@ -140,8 +140,20 @@ async function runRound(deps: JobDeps, batch: InboxMessage[], round: number): Pr
     try {
       version = await db.addAgentVersion(ctx.piece.id, path, plan.caption, sourceId)
     } catch (e) {
-      if (path) await db.removeFile(path).catch((re) => log.error('remove file failed', { path, error: errorText(re) }))
-      if (e instanceof ClaimLostError) return claimLost(e)
+      const removeUploaded = async () => {
+        if (path) await db.removeFile(path).catch((re) => log.error('remove file failed', { path, error: errorText(re) }))
+      }
+      // The RPC raised inside its transaction: nothing was stored.
+      if (e instanceof ClaimLostError) {
+        await removeUploaded()
+        return claimLost(e)
+      }
+      // A network error can hide a commit. If the check itself fails, the file stays: an orphan file beats a version without its image.
+      if ((await db.answeredMessages(ctx.piece.id, [sourceId])).has(sourceId)) {
+        log.warn('version stored despite the error', { piece_id: pieceId, round, error: errorText(e) })
+        return 'ok'
+      }
+      await removeUploaded()
       // Someone approved or stepped back while the image was generating.
       const { status } = (await db.loadPieceContext(ctx.piece.id)).piece
       if (!AGENT_STATUSES.includes(status)) return await fail({ code: 'wrong_status', status })
@@ -165,24 +177,27 @@ async function runRound(deps: JobDeps, batch: InboxMessage[], round: number): Pr
 }
 
 /**
- * Serves one claim: rounds run while redirections keep arriving. Never throws:
- * unexpected errors are logged and posted as an `internal` agent_error.
+ * Serves one claim: rounds run while redirections keep arriving. Never throws.
+ * Round errors become an agent_error inside runRound. A queue error (absorb or
+ * complete) is only logged: the messages stay claimed until release_stale_claims
+ * requeues them, and answeredMessages keeps a stored version from being made again.
  */
 export async function processClaim(deps: JobDeps, first: InboxMessage): Promise<void> {
   const { db, log } = deps
   const pieceId = first.piece_id
-  let batch = [first]
-  let round = 1
   const timer = setInterval(() => {
     db.touchClaim(pieceId).catch((e) => log.warn('touch claim failed', { piece_id: pieceId, error: errorText(e) }))
   }, deps.touchIntervalMs)
   try {
-    batch = [first, ...(await db.absorbPending(pieceId))]
-    for (; ; round++) {
-      const outcome = await runRound(deps, batch, round)
+    let batch = [first, ...(await db.absorbPending(pieceId))]
+    for (let round = 1; ; round++) {
+      // Messages answered by a version of an earlier claim are completed without a new round.
+      const answered = await db.answeredMessages(pieceId, batch.map((m) => m.id))
+      const todo = batch.filter((m) => !answered.has(m.id))
+      const outcome = todo.length > 0 ? await runRound(deps, todo, round) : 'ok'
       if (outcome === 'claim_lost') return
       if (outcome === 'failed') {
-        for (const m of batch) await db.complete(m.id, 'failed')
+        for (const m of batch) await db.complete(m.id, answered.has(m.id) ? 'done' : 'failed')
         return
       }
       // Absorb before completing: the piece is never left without a claim between rounds.
@@ -192,15 +207,9 @@ export async function processClaim(deps: JobDeps, first: InboxMessage): Promise<
       batch = next
     }
   } catch (e) {
-    if (e instanceof ClaimLostError) {
-      log.warn('claim lost', { piece_id: pieceId, error: e.message })
-      return
-    }
-    log.error('claim failed', { piece_id: pieceId, error: errorText(e) })
-    const last = batch[batch.length - 1]!
-    await db.addAgentEvent(last.id, 'agent_error', {
-      message_ids: batch.map((m) => m.id), round, code: 'internal', message: agentErrorMessage({ code: 'internal' }), image_prompt: null,
-    }).catch((ee) => log.error('agent_error event failed', { piece_id: pieceId, error: errorText(ee) }))
+    // No agent_error here: the round may already have posted its result.
+    if (e instanceof ClaimLostError) log.warn('claim lost', { piece_id: pieceId, error: e.message })
+    else log.error('claim failed', { piece_id: pieceId, error: errorText(e) })
   } finally {
     clearInterval(timer)
   }
