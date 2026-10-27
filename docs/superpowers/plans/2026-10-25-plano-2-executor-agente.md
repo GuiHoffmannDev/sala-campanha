@@ -583,7 +583,7 @@ it('touches the claim while generating', async () => { /* touchIntervalMs 50; im
     - Resolve quando todos os slots saíram. No abort, a rodada em andamento termina normalmente.
 - Produces (`main.ts`): lê `loadConfig(process.env)`, cria o client service role (`persistSession: false`, `autoRefreshToken: false`), `createExecutorDb`, `createProviders()`, `createLogger()`. Loga `executor started` com `executorId` e `concurrency` (sem segredos). `SIGTERM`/`SIGINT` abortam o worker; se os slots não saírem em `shutdownGraceMs`, `process.exit(1)` (as mensagens voltam à fila por `release_stale_claims`). Sai com 0 depois de um desligamento limpo.
 
-- [ ] **Step 1: Write the failing tests** em `tests/executor/worker.test.ts`
+- [x] **Step 1: Write the failing tests** em `tests/executor/worker.test.ts`
 
 ```ts
 beforeAll(async () => {
@@ -603,11 +603,11 @@ it('main exits on missing config without printing secrets', async () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/worker.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implementar `worker.ts` e `main.ts`.**
-- [ ] **Step 4: Rodar contra o Supabase local.** Run: `pnpm test tests/executor/worker.test.ts`, depois `SUPABASE_URL=http://127.0.0.1:55321 SUPABASE_SERVICE_ROLE_KEY=<do .env.test> pnpm executor` por alguns segundos e `Ctrl+C`. Expected: testes PASS; o processo loga `executor started` e sai com código 0 no `Ctrl+C`.
-- [ ] **Step 5: Rodar a suíte inteira.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: todos PASS.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "feat(executor): worker loop, entrypoint and graceful shutdown"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/worker.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implementar `worker.ts` e `main.ts`.**
+- [x] **Step 4: Rodar contra o Supabase local.** Run: `pnpm test tests/executor/worker.test.ts`, depois `SUPABASE_URL=http://127.0.0.1:55321 SUPABASE_SERVICE_ROLE_KEY=<do .env.test> pnpm executor` por alguns segundos e `Ctrl+C`. Expected: testes PASS; o processo loga `executor started` e sai com código 0 no `Ctrl+C`.
+- [x] **Step 5: Rodar a suíte inteira.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: todos PASS.
+- [x] **Step 6: Commit.** `git add -A && git commit -m "feat(executor): worker loop, entrypoint and graceful shutdown"`
 
 ---
 
