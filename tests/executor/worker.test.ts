@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import type { Provider } from '../../packages/shared/src/domain'
-import { createExecutorDb, type ExecutorDb } from '../../packages/executor/src/db.ts'
+import { createExecutorDb, type ExecutorDb, type InboxMessage } from '../../packages/executor/src/db.ts'
 import type { JobDeps } from '../../packages/executor/src/job.ts'
 import { createLogger } from '../../packages/executor/src/log.ts'
 import { runWorker, type WorkerOptions } from '../../packages/executor/src/worker.ts'
@@ -192,6 +192,83 @@ it('abort ends idle slots without waiting for the poll interval', async () => {
   const t = Date.now()
   await w.stop()
   expect(Date.now() - t).toBeLessThan(1_000)
+})
+
+it('abort leaves messages posted during the last round queued', async () => {
+  const f = await keyedPiece()
+  let imageStarted!: () => void
+  const started = new Promise<void>((resolve) => { imageStarted = resolve })
+  const w = start(fakeProviders({
+    image: async () => {
+      imageStarted()
+      await sleep(300)
+      return FAKE_IMAGE
+    },
+  }))
+  const first = await post(f)
+  await started
+  const redirect = await post(f, 'Mudar o fundo')
+  await w.stop()
+  try {
+    expect(await delivery(first)).toBe('done')
+    expect(await delivery(redirect)).toBe('queued')
+    expect(await versionCount(f)).toBe(1)
+  } finally {
+    // Later tests must not pick up this leftover.
+    const { error } = await serviceClient().from('session_events').update({ delivery: 'failed' }).eq('id', redirect)
+    expect(error).toBeNull()
+  }
+})
+
+it('an error escaping processClaim does not kill the slot', async () => {
+  let claims = 0
+  const db = {
+    claimNext: async () => (claims++ === 0 ? ({ id: 1, piece_id: 'piece-1' } as InboxMessage) : null),
+    absorbPending: async () => { throw new Error('db down') },
+    releaseStale: async () => 0,
+  } as unknown as ExecutorDb
+  const lines: string[] = []
+  let thrown = false
+  const log = createLogger((line) => {
+    // The first 'claim failed' line throws, so the error escapes processClaim.
+    if (!thrown && line.includes('"msg":"claim failed"')) {
+      thrown = true
+      throw new Error('log sink down')
+    }
+    lines.push(line)
+  })
+  const controller = new AbortController()
+  const done = runWorker(
+    { db, providers: fakeProviders().providers, log, touchIntervalMs: 60_000, textTimeoutMs: 5_000, imageTimeoutMs: 5_000 },
+    { ...OPTS, concurrency: 1 },
+    controller.signal,
+  )
+  await waitFor(async () => claims >= 2)
+  controller.abort()
+  await done
+  expect(lines.map((l) => JSON.parse(l))).toContainEqual(
+    expect.objectContaining({ level: 'error', msg: 'process claim crashed', piece_id: 'piece-1', error: 'log sink down' }),
+  )
+})
+
+it('main exits with 0 after SIGTERM', async () => {
+  const child = spawn(process.execPath, ['packages/executor/src/main.ts'], {
+    env: { SUPABASE_URL: process.env.SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY, EXECUTOR_CONCURRENCY: '1' },
+  })
+  let output = ''
+  let signaled = false
+  child.stdout.on('data', (d) => {
+    output += d
+    // Only one signal: a second one forces exit 1.
+    if (!signaled && output.includes('executor started')) {
+      signaled = true
+      child.kill('SIGTERM')
+    }
+  })
+  const code = await new Promise<number | null>((resolve) => child.on('close', resolve))
+  expect(code).toBe(0)
+  expect(output).toContain('executor stopped')
+  expect(output).not.toContain(process.env.SUPABASE_SERVICE_ROLE_KEY)
 })
 
 it('main exits on missing config without printing secrets', async () => {

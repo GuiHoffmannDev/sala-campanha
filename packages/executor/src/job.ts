@@ -182,7 +182,7 @@ async function runRound(deps: JobDeps, batch: InboxMessage[], round: number): Pr
  * complete) is only logged: the messages stay claimed until release_stale_claims
  * requeues them, and answeredMessages keeps a stored version from being made again.
  */
-export async function processClaim(deps: JobDeps, first: InboxMessage): Promise<void> {
+export async function processClaim(deps: JobDeps, first: InboxMessage, signal?: AbortSignal): Promise<void> {
   const { db, log } = deps
   const pieceId = first.piece_id
   const timer = setInterval(() => {
@@ -201,7 +201,8 @@ export async function processClaim(deps: JobDeps, first: InboxMessage): Promise<
         return
       }
       // Absorb before completing: the piece is never left without a claim between rounds.
-      const next = await db.absorbPending(pieceId)
+      // After an abort, new messages stay queued for the next executor instead of starting another round.
+      const next = signal?.aborted ? [] : await db.absorbPending(pieceId)
       for (const m of batch) await db.complete(m.id, 'done')
       if (next.length === 0) return
       batch = next

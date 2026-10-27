@@ -34,14 +34,22 @@ export async function runWorker(deps: JobDeps, opts: WorkerOptions, signal: Abor
         await wait()
         continue
       }
+      if (!message) {
+        await wait()
+        continue
+      }
+      const pieceId = message.piece_id
       // A message claimed after the abort is still served: leaving it would hold the piece until the sweep.
-      if (message) await processClaim(deps, message)
-      else await wait()
+      // processClaim logs its own errors; the catch keeps the slot alive if one still escapes.
+      await processClaim(deps, message, signal).catch((e) => log.error('process claim crashed', { piece_id: pieceId, error: errorText(e) }))
     }
   }
 
-  const sweeping = sweep()
-  const timer = setInterval(sweep, opts.sweepIntervalMs)
+  // One sweep at a time: a tick while one is running is skipped, and shutdown waits for the running one.
+  let sweeping: Promise<void> | null = null
+  const tick = () => { sweeping ??= sweep().finally(() => { sweeping = null }) }
+  tick()
+  const timer = setInterval(tick, opts.sweepIntervalMs)
   try {
     await Promise.all(Array.from({ length: opts.concurrency }, slot))
   } finally {

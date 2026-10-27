@@ -14,7 +14,11 @@ async function main(config: Config): Promise<void> {
   const controller = new AbortController()
 
   const shutdown = (signal: NodeJS.Signals) => {
-    if (controller.signal.aborted) return
+    if (controller.signal.aborted) {
+      // A second signal skips the grace period; claimed messages go back to the queue through release_stale_claims.
+      log.error('executor forced to stop', { signal })
+      process.exit(1)
+    }
     log.info('executor stopping', { signal, grace_ms: config.shutdownGraceMs })
     controller.abort()
     // Messages still claimed after the grace period go back to the queue through release_stale_claims.
@@ -27,18 +31,24 @@ async function main(config: Config): Promise<void> {
   process.on('SIGINT', shutdown)
 
   log.info('executor started', { executorId: config.executorId, concurrency: config.concurrency })
-  await runWorker(
-    {
-      db: createExecutorDb(client, config.executorId),
-      providers: createProviders(),
-      log,
-      touchIntervalMs: config.touchIntervalMs,
-      textTimeoutMs: config.textTimeoutMs,
-      imageTimeoutMs: config.imageTimeoutMs,
-    },
-    config,
-    controller.signal,
-  )
+  try {
+    await runWorker(
+      {
+        db: createExecutorDb(client, config.executorId),
+        providers: createProviders(),
+        log,
+        touchIntervalMs: config.touchIntervalMs,
+        textTimeoutMs: config.textTimeoutMs,
+        imageTimeoutMs: config.imageTimeoutMs,
+      },
+      config,
+      controller.signal,
+    )
+  } catch (e) {
+    // A failed slot must not leave the others serving without a sweep: stop them so the process exits.
+    controller.abort()
+    throw e
+  }
   log.info('executor stopped')
 }
 
