@@ -412,8 +412,8 @@ Nenhuma chave real de provedor é necessária: a partir da Tarefa 12, `pnpm fake
 - O login com Apple precisa de uma conta Apple Developer. Ela também é necessária para assinar o app antes do download público.
 
 ### Tarefa 1 — Pacote do app: Tauri, React e testes de interface
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
