@@ -1,0 +1,30 @@
+{
+  "name": "@sala/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.5"
+  },
+  "dependencies": {
+    "@sala/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.118.0",
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-clipboard-manager": "~2.5.0",
+    "@tauri-apps/plugin-deep-link": "~2.6.2",
+    "@tauri-apps/plugin-notification": "~2.7.0",
+    "@tauri-apps/plugin-opener": "~2.7.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
+  }
+}

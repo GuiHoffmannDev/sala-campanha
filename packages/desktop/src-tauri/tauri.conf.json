@@ -1,0 +1,49 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Sala da Campanha",
+  "version": "0.1.0",
+  "identifier": "app.salacampanha.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Sala da Campanha",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 680,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co http://127.0.0.1:55321 ws://127.0.0.1:55321; img-src 'self' data: blob: https://*.supabase.co http://127.0.0.1:55321; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "13.0"
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["sala"]
+      }
+    }
+  }
+}

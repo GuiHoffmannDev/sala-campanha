@@ -101,7 +101,7 @@ docs/instalar-no-mac.md
   - `core:default`, `deep-link:default`, `notification:default`, `clipboard-manager:allow-write-text`.
   - `opener:allow-open-url`, com escopo `https://*.supabase.co/*` e `http://127.0.0.1:55321/*`.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
 
 ```ts
 // tests/desktop/env.test.ts
@@ -119,18 +119,18 @@ it('renders the app title', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop`. Expected: FAIL (módulos não existem).
-- [ ] **Step 3: Criar o pacote.**
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop`. Expected: FAIL (módulos não existem).
+- [x] **Step 3: Criar o pacote.**
   - Criar `packages/desktop/package.json` (`@sala/desktop`, `private`, `type: module`, scripts `dev: vite`, `build: vite build`, `tauri: tauri`) e instalar as dependências da Global Constraints com `pnpm --filter @sala/desktop add ...`.
   - Na raiz, `pnpm add -D @testing-library/react @testing-library/user-event jsdom @vitejs/plugin-react`.
   - `vite.config.ts`: `react()`, `server.port 1420`, `strictPort`, `clearScreen: false`, `build.target 'safari16'`.
   - Rodar `pnpm --filter @sala/desktop tauri init --ci --app-name "Sala da Campanha" --window-title "Sala da Campanha" --frontend-dist ../dist --dev-url http://localhost:1420 --before-dev-command "pnpm dev" --before-build-command "pnpm build"`.
   - Depois, `pnpm --filter @sala/desktop tauri add deep-link`, e o mesmo para `notification`, `clipboard-manager` e `opener`.
   - Ajustar `tauri.conf.json` e `capabilities/default.json` como em Interfaces.
-- [ ] **Step 4: Run.** Run: `pnpm test && pnpm typecheck && cargo check --manifest-path packages/desktop/src-tauri/Cargo.toml`. Expected: PASS e `cargo check` sem erro.
-- [ ] **Step 5: Conferir que o executor continua buildando.** O lockfile ganhou o pacote `desktop`. Run: `docker build -f packages/executor/Dockerfile -t sala-executor .`. Expected: a imagem builda. Se o `pnpm install --frozen-lockfile --filter @sala/executor...` reclamar do pacote ausente, copiar também `packages/desktop/package.json` no `Dockerfile`, sem copiar o código do app.
-- [ ] **Step 6: Abrir a janela.** Run: `pnpm app`. Expected: a janela abre com "Sala da Campanha". Fechar.
-- [ ] **Step 7: Commit.** `git add -A && git commit -m "feat(desktop): Tauri 2 and React app shell with UI test setup"`
+- [x] **Step 4: Run.** Run: `pnpm test && pnpm typecheck && cargo check --manifest-path packages/desktop/src-tauri/Cargo.toml`. Expected: PASS e `cargo check` sem erro.
+- [x] **Step 5: Conferir que o executor continua buildando.** O lockfile ganhou o pacote `desktop`. Run: `docker build -f packages/executor/Dockerfile -t sala-executor .`. Expected: a imagem builda. Se o `pnpm install --frozen-lockfile --filter @sala/executor...` reclamar do pacote ausente, copiar também `packages/desktop/package.json` no `Dockerfile`, sem copiar o código do app.
+- [x] **Step 6: Abrir a janela.** Run: `pnpm app`. Expected: a janela abre com "Sala da Campanha". Fechar.
+- [x] **Step 7: Commit.** `git add -A && git commit -m "feat(desktop): Tauri 2 and React app shell with UI test setup"`
 
 ---
 

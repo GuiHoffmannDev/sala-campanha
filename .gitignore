@@ -10,3 +10,8 @@ coverage/
 .superpowers/
 
 .DS_Store
+
+# Desktop app build output (Vite bundle, Cargo target, Tauri generated schemas).
+packages/desktop/dist
+packages/desktop/src-tauri/target
+packages/desktop/src-tauri/gen

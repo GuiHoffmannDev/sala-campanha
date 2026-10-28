@@ -1,0 +1,14 @@
+:root {
+  color-scheme: light dark;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  padding: 24px;
+}
