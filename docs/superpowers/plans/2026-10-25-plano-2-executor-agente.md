@@ -56,7 +56,8 @@ packages/executor/
   src/log.ts         # logger JSON por linha
   src/db.ts          # ExecutorDb: RPCs, leitura de contexto, Storage
   src/providers/types.ts      # interfaces de provedor e ProviderError
-  src/providers/http.ts       # postJson com timeout, 1 nova tentativa e redação
+  src/providers/http.ts       # postJson com timeout, teto de resposta, 1 nova tentativa e redação
+  src/providers/image.ts      # decodeImage, sniffType e checkRequestSize, usados por gemini e fal (correção C)
   src/providers/openai.ts
   src/providers/anthropic.ts
   src/providers/gemini.ts
@@ -302,10 +303,14 @@ it('uploadFile then downloadFile round-trips bytes and mime type', async () => {
   - `type ImageProvider = { generateImage(key: string, req: ImageRequest, signal: AbortSignal): Promise<GeneratedImage> }`
   - `type Providers = { text: Partial<Record<Provider, TextProvider>>; image: Partial<Record<Provider, ImageProvider>> }`
   - `class ProviderError extends Error`, com campos `code: 'provider_error' | 'timeout' | 'invalid_output'`, `provider: Provider`, `detail: string` atribuídos no construtor `(code, provider, detail)` (sem parameter properties).
+  - `MAX_IMAGE_BYTES = 26_214_400`, o limite do bucket `team-files`. Fica aqui para `http.ts` e `image.ts` o importarem sem import circular *(correção C, 2026-10-27)*.
 - Produces (`http.ts`):
   - `redact(text: string, key: string): string`: troca toda ocorrência de `key` por `[chave]`. Chave vazia devolve o texto igual.
-  - `postJson(o: { provider: Provider; url: string; headers: Record<string, string>; body: unknown; key: string; signal: AbortSignal; fetchFn: typeof fetch }): Promise<unknown>`
-    - Uma nova tentativa, depois de 2000 ms, para status 429, 5xx ou erro de rede. Nenhuma nova tentativa para outros 4xx.
+  - `MAX_DETAIL = 300`, `abortError(signal, provider)` (um prazo vencido vira `ProviderError('timeout')`; outro abort devolve `signal.reason`) e `readCapped(res, cap, tooLarge)` (recusa um `content-length` acima do teto e lê em pedaços, parando ao passar dele). São usados por `postJson` e pelo download da fal *(correção C, 2026-10-27)*.
+  - `postJson(o: { provider: Provider; url: string; headers: Record<string, string>; body: unknown; key: string; signal: AbortSignal; fetchFn: typeof fetch; idempotent?: boolean }): Promise<unknown>`
+    - Uma nova tentativa, depois de 2000 ms, para status 429 ou 5xx. Nenhuma nova tentativa para outros 4xx.
+    - Erro de rede, inclusive no meio do corpo: uma nova tentativa só quando `idempotent` (padrão `true`). Com `idempotent: false`, vira `provider_error` na hora. As chamadas de imagem usam `false`, porque a geração pode ter sido cobrada *(correção C, 2026-10-27)*.
+    - O corpo da resposta tem teto de `Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 1_000_000` bytes (uma imagem de 25 MiB em base64 mais o JSON em volta). Acima dele: `invalid_output`, sem nova tentativa *(correção C, 2026-10-27)*.
     - Resposta não ok: `ProviderError('provider_error', provider, detail)`. O `detail` é `error.message` do JSON (formatos OpenAI/Anthropic/Gemini) ou `HTTP <status>`, redigido e cortado em 300 caracteres.
     - `signal` abortado por timeout: `ProviderError('timeout', ...)`.
     - JSON inválido na resposta: `ProviderError('invalid_output', ...)`.
@@ -353,7 +358,8 @@ it('timeout becomes ProviderError timeout', async () => { /* fetch que espera o 
   - `POST https://generativelanguage.googleapis.com/v1/models/${model}:generateContent`, header `x-goog-api-key`.
   - Corpo: `{ contents: [{ parts: [{ text: prompt }, ...images.map(i => ({ inline_data: { mime_type, data: base64 } }))] }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'] } }`.
   - Com esforço, `generationConfig.thinkingConfig = { thinkingLevel }`, com o nome do enum `ThinkingLevel` do `generateContent` (`MINIMAL`, `MEDIUM`, `HIGH`): o esforço do catálogo em maiúsculas. Sem esforço, sem `thinkingConfig` *(correção B, 2026-10-27)*.
-  - Resultado: a primeira parte de `candidates[0].content.parts` com `inlineData` (ou `inline_data`), decodificada de base64. `mimeType` fora de png/jpeg/webp: `invalid_output`.
+  - Resultado: a primeira parte de `candidates[0].content.parts` com `inlineData` (ou `inline_data`), decodificada por `decodeImage` (`image.ts`). O tipo vem da assinatura dos bytes, e o `mimeType` declarado é ignorado. Bytes que não são PNG, JPEG nem WebP, base64 inválido ou imagem acima de 25 MiB: `invalid_output` *(correção C, 2026-10-27)*.
+  - `postJson` com `idempotent: false`: um erro de rede não repete a chamada. O limite de 20 MB por pedido é conferido por `checkRequestSize` (`image.ts`) *(correção C, 2026-10-27)*.
   - Sem parte de imagem: `ProviderError('provider_error', 'gemini', detail)`. O `detail` é o texto devolvido pelo modelo ou `finishReason` (ex.: recusa por segurança), redigido e cortado em 300 caracteres.
 
 - [x] **Step 1: Write the failing tests**
@@ -391,6 +397,8 @@ Segundo provedor de imagem. É o item 4 da ordem de corte do spec ("mais de um p
   - Header `Authorization: Key <key>`.
   - Corpo: `{ prompt, image_urls: images.map(dataUri), sync_mode: true, output_format: 'png' }` (sem `image_urls` no text-to-image). As referências vão como data URI, sem URL assinada do Storage, para nenhum arquivo privado do time ficar acessível por link.
   - Resultado: `images[0].url`. Se for data URI, decodifica; se for `https://`, baixa com `fetchFn` (sem a chave no header). Nenhuma imagem: `invalid_output`.
+  - Validação da imagem *(correção C, 2026-10-27)*: o data URI passa por `decodeImage` (`image.ts`), e o tipo declarado no prefixo é ignorado. O download `https` é lido por `readCapped` com teto de 25 MiB, e o tipo vem de `sniffType`. Nos dois casos, bytes que não são PNG, JPEG nem WebP, ou acima de 25 MiB: `invalid_output`.
+  - `postJson` com `idempotent: false`: um erro de rede não repete a geração. O limite de 20 MB por pedido é conferido por `checkRequestSize` *(correção C, 2026-10-27)*.
 
 - [x] **Step 1: Write the failing tests**
 

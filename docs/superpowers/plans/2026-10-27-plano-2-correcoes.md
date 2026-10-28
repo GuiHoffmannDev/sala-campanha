@@ -173,18 +173,18 @@ Resolve os itens 7, 8 e 10 da revisão e a parte do item 9 que está nos provedo
   - O download `https` da fal usa `readCapped` e `sniffType`.
   - Somem `IMAGE_TYPES`, `checkType` e as constantes duplicadas.
 
-- [ ] **Step 1: Escrever os testes que falham.**
+- [x] **Step 1: Escrever os testes que falham.**
   - Gemini (`inlineData` com `mimeType: 'image/png'`) e fal (data URI `data:image/png;base64,...`) com bytes JPEG: o resultado tem `mimeType: 'image/jpeg'`.
   - Imagem decodificada acima de `MAX_IMAGE_BYTES`, nos dois adaptadores: `invalid_output`.
   - Bytes que não são PNG, JPEG nem WebP: `invalid_output`.
   - Resposta JSON com `content-length`, ou corpo real, acima do teto: `invalid_output` com uma chamada só.
   - Erro de rede numa chamada de imagem (Gemini e fal): uma chamada só e `provider_error`. Numa chamada de texto: continuam duas chamadas.
   - 429 numa chamada de imagem: continuam duas chamadas.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/providers-gemini.test.ts tests/executor/providers-fal.test.ts tests/executor/providers-text.test.ts`. Expected: FAIL nos casos novos.
-- [ ] **Step 3: Implementar.**
-- [ ] **Step 4: Atualizar os documentos** do Plano 2 listados em Files. Em `HANDOFF.md`, marcar como resolvidas as pendências "Imagem em data URI confia no tipo declarado" e "Imagem em data URI sem limite próprio de 25 MiB".
-- [ ] **Step 5: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "fix(executor): image type from bytes, size caps and no retried image calls after network errors"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/providers-gemini.test.ts tests/executor/providers-fal.test.ts tests/executor/providers-text.test.ts`. Expected: FAIL nos casos novos.
+- [x] **Step 3: Implementar.**
+- [x] **Step 4: Atualizar os documentos** do Plano 2 listados em Files. Em `HANDOFF.md`, marcar como resolvidas as pendências "Imagem em data URI confia no tipo declarado" e "Imagem em data URI sem limite próprio de 25 MiB".
+- [x] **Step 5: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
+- [x] **Step 6: Commit.** `git add -A && git commit -m "fix(executor): image type from bytes, size caps and no retried image calls after network errors"`
 
 ---
 

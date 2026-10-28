@@ -2,14 +2,20 @@ import { createGemini } from '../../packages/executor/src/providers/gemini.ts'
 import { createProviders } from '../../packages/executor/src/providers/index.ts'
 import { ProviderError } from '../../packages/executor/src/providers/types.ts'
 import { fakeFetch } from '../helpers/fake-fetch.ts'
+import { GIF, JPEG, PNG, WEBP, file } from '../helpers/images.ts'
 
 const KEY = 'AIza-test-abcdef1234567890'
 const MODEL = 'gemini-nano-banana-2.1'
 const signal = () => AbortSignal.timeout(5000)
+
+afterEach(() => { vi.useRealTimers() })
 const bytes = (s: string) => new TextEncoder().encode(s)
 const b64 = (s: string) => Buffer.from(s).toString('base64')
+const encode = (b: Uint8Array) => Buffer.from(b).toString('base64')
 const reply = (parts: unknown[], extra: Record<string, unknown> = {}) =>
   ({ status: 200, json: { candidates: [{ content: { role: 'model', parts }, ...extra }] } })
+/** A reply carrying one image part with `bytes`, labeled `mimeType`. */
+const imageReply = (bytes: Uint8Array, mimeType = 'image/png') => reply([{ inlineData: { mimeType, data: encode(bytes) } }])
 
 /** Runs one generation against a scripted reply and returns the thrown error. */
 async function generateError(json: unknown): Promise<ProviderError> {
@@ -20,7 +26,7 @@ async function generateError(json: unknown): Promise<ProviderError> {
 }
 
 it('sends prompt and reference images as inline_data', async () => {
-  const fake = fakeFetch([reply([{ inlineData: { mimeType: 'image/png', data: b64('out') } }])])
+  const fake = fakeFetch([imageReply(file(PNG))])
   await createGemini(fake.fn).generateImage(KEY, {
     model: MODEL,
     prompt: 'Banner de verão',
@@ -42,7 +48,7 @@ it('sends prompt and reference images as inline_data', async () => {
 })
 
 it('sends the chosen effort as thinkingLevel only when there is one', async () => {
-  const ok = reply([{ inlineData: { mimeType: 'image/png', data: b64('out') } }])
+  const ok = imageReply(file(PNG))
   const fake = fakeFetch([ok, ok])
   const gemini = createGemini(fake.fn)
   await gemini.generateImage(KEY, { model: MODEL, prompt: 'P', images: [], effort: 'high' }, signal())
@@ -64,34 +70,58 @@ it('rejects reference images over the 20 MB request limit without calling Gemini
 })
 
 it('sends reference images just under the request limit', async () => {
-  const fake = fakeFetch([reply([{ inlineData: { mimeType: 'image/png', data: b64('out') } }])])
+  const fake = fakeFetch([imageReply(file(PNG))])
   const img = { bytes: new Uint8Array(14_900_000), mimeType: 'image/png' } // about 19.9 MB in base64
   await createGemini(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [img] }, signal())
   expect(fake.calls).toHaveLength(1)
 })
 
 it('decodes the returned image', async () => {
-  const fake = fakeFetch([reply([{ text: 'Aqui está' }, { inlineData: { mimeType: 'image/png', data: b64('png-bytes') } }])])
+  const fake = fakeFetch([reply([{ text: 'Aqui está' }, { inlineData: { mimeType: 'image/png', data: encode(file(PNG)) } }])])
   const out = await createGemini(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal())
   expect(out.mimeType).toBe('image/png')
-  expect(new TextDecoder().decode(out.bytes)).toBe('png-bytes')
+  expect(out.bytes).toEqual(file(PNG))
+})
+
+it('takes the image type from its bytes, not from the declared mimeType', async () => {
+  for (const [sig, label, type] of [[JPEG, 'image/png', 'image/jpeg'], [PNG, 'image/webp', 'image/png'], [WEBP, 'image/jpeg', 'image/webp']] as const) {
+    const fake = fakeFetch([imageReply(file([...sig]), label)])
+    const out = await createGemini(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal())
+    expect(out.mimeType).toBe(type)
+  }
+})
+
+it('an image of exactly 25 MiB is accepted', async () => {
+  const fake = fakeFetch([imageReply(file(PNG, 26_214_400))])
+  const out = await createGemini(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal())
+  expect(out.bytes.length).toBe(26_214_400)
+})
+
+it('an image over 25 MiB is invalid_output', async () => {
+  // 26_214_401 bytes: the base64 is not longer than a 25 MiB image's, the decoded file is.
+  // 26_214_403 bytes: the base64 alone is too long, refused before decoding.
+  for (const size of [26_214_401, 26_214_403]) {
+    const err = await generateError({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: encode(file(PNG, size)) } }] } }] })
+    expect(err.code).toBe('invalid_output')
+    expect(err.provider).toBe('gemini')
+  }
 })
 
 it('accepts the snake_case inline_data part too', async () => {
-  const fake = fakeFetch([reply([{ inline_data: { mime_type: 'image/webp', data: b64('webp-bytes') } }])])
+  const fake = fakeFetch([reply([{ inline_data: { mime_type: 'image/webp', data: encode(file(WEBP)) } }])])
   const out = await createGemini(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal())
   expect(out.mimeType).toBe('image/webp')
-  expect(new TextDecoder().decode(out.bytes)).toBe('webp-bytes')
+  expect(out.bytes).toEqual(file(WEBP))
 })
 
 it('skips thought images and returns the final one', async () => {
   const fake = fakeFetch([reply([
-    { inlineData: { mimeType: 'image/png', data: b64('draft') }, thought: true },
-    { inlineData: { mimeType: 'image/jpeg', data: b64('final') } },
+    { inlineData: { mimeType: 'image/png', data: encode(file(PNG)) }, thought: true },
+    { inlineData: { mimeType: 'image/jpeg', data: encode(file(JPEG)) } },
   ])])
   const out = await createGemini(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal())
   expect(out.mimeType).toBe('image/jpeg')
-  expect(new TextDecoder().decode(out.bytes)).toBe('final')
+  expect(out.bytes).toEqual(file(JPEG))
 })
 
 it('no image part becomes provider_error with the model text', async () => {
@@ -125,10 +155,12 @@ it('no-image detail is redacted and cut at 300 characters', async () => {
   expect(err.detail.length).toBeLessThanOrEqual(300)
 })
 
-it('image with an unsupported mimeType is invalid_output', async () => {
-  const err = await generateError({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/gif', data: b64('gif') } }] } }] })
-  expect(err.code).toBe('invalid_output')
-  expect(err.provider).toBe('gemini')
+it('an image that is not PNG, JPEG or WebP is invalid_output, whatever its label says', async () => {
+  for (const [bytes, mimeType] of [[file(GIF), 'image/gif'], [file(GIF), 'image/png'], [new TextEncoder().encode('<html>'), 'image/jpeg']] as const) {
+    const err = await generateError({ candidates: [{ content: { parts: [{ inlineData: { mimeType, data: encode(bytes) } }] } }] })
+    expect(err.code).toBe('invalid_output')
+    expect(err.provider).toBe('gemini')
+  }
 })
 
 it('invalid base64 image data is invalid_output', async () => {
@@ -141,15 +173,47 @@ it('invalid base64 image data is invalid_output', async () => {
 })
 
 it('decodes a multi-megabyte image without overflowing the base64 check', async () => {
-  const big = 'x'.repeat(20 * 1024 * 1024)
-  const fake = fakeFetch([reply([{ inlineData: { mimeType: 'image/png', data: b64(big) } }])])
+  const fake = fakeFetch([imageReply(file(PNG, 20 * 1024 * 1024))])
   const out = await createGemini(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal())
-  expect(out.bytes.length).toBe(big.length)
+  expect(out.bytes.length).toBe(20 * 1024 * 1024)
 })
 
 it('empty image data is invalid_output', async () => {
   const err = await generateError({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: '' } }] } }] })
   expect(err.code).toBe('invalid_output')
+})
+
+it('a network error is never retried: the generation may already be billed', async () => {
+  vi.useFakeTimers()
+  const fake = fakeFetch([{ error: new TypeError(`fetch failed ${KEY}`) }, imageReply(file(PNG))])
+  const pending = createGemini(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, new AbortController().signal).catch((e) => e)
+  await vi.advanceTimersByTimeAsync(2000)
+  const err = await pending
+  expect(fake.calls).toHaveLength(1)
+  expect(err).toBeInstanceOf(ProviderError)
+  expect(err).toMatchObject({ code: 'provider_error', provider: 'gemini', detail: 'fetch failed [chave]' })
+})
+
+it('a connection dropped while reading the reply is never retried', async () => {
+  vi.useFakeTimers()
+  let calls = 0
+  const fn = (async () => {
+    calls++
+    return new Response(new ReadableStream({ start(c) { c.error(new TypeError('terminated')) } }), { status: 200 })
+  }) as typeof fetch
+  const pending = createGemini(fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, new AbortController().signal).catch((e) => e)
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(await pending).toMatchObject({ code: 'provider_error', provider: 'gemini' })
+  expect(calls).toBe(1)
+})
+
+it('a 429 is still retried once', async () => {
+  vi.useFakeTimers()
+  const fake = fakeFetch([{ status: 429, json: { error: { message: 'slow down' } } }, imageReply(file(PNG))])
+  const pending = createGemini(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, new AbortController().signal)
+  await vi.advanceTimersByTimeAsync(2000)
+  expect((await pending).mimeType).toBe('image/png')
+  expect(fake.calls).toHaveLength(2)
 })
 
 it('createProviders registers gemini as an image provider', () => {

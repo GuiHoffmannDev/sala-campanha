@@ -11,6 +11,9 @@ export type ImageProvider = { generateImage(key: string, req: ImageRequest, sign
 
 export type Providers = { text: Partial<Record<Provider, TextProvider>>; image: Partial<Record<Provider, ImageProvider>> }
 
+/** Same limit as the `team-files` bucket (migration 0002): a larger image could never be stored. */
+export const MAX_IMAGE_BYTES = 26_214_400
+
 export type ProviderErrorCode = 'provider_error' | 'timeout' | 'invalid_output'
 
 /** A provider call that failed. `detail` must already be redacted: it can reach logs and chat events. */

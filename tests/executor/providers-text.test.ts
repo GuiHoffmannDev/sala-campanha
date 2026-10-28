@@ -141,6 +141,94 @@ it('retries once when the connection drops while reading the body', async () => 
   expect(calls).toBe(2)
 })
 
+it('text adapters still retry a network error once', async () => {
+  vi.useFakeTimers()
+  const ok = { status: 200, json: { content: [{ type: 'text', text: 'ok' }], output: [{ type: 'message', content: [{ type: 'output_text', text: 'ok' }] }] } }
+  for (const create of [createAnthropic, createOpenAI]) {
+    const fake = fakeFetch([{ error: new TypeError('fetch failed') }, ok])
+    const out = create(fake.fn).generateText(KEY, REQ, new AbortController().signal)
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(await out).toBe('ok')
+    expect(fake.calls).toHaveLength(2)
+  }
+})
+
+/** postJson for a call that is not safe to repeat, as the image adapters make it. */
+const postOnce = (fetchFn: typeof fetch) =>
+  postJson({ provider: 'gemini', url: 'https://x.test', headers: {}, body: {}, key: KEY, signal: new AbortController().signal, fetchFn, idempotent: false }).catch((e) => e)
+
+it('a call that is not idempotent is never retried after a network error', async () => {
+  vi.useFakeTimers()
+  const fake = fakeFetch([{ error: new TypeError(`fetch failed ${KEY}`) }, { status: 200, json: {} }])
+  const pending = postOnce(fake.fn)
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(await pending).toMatchObject({ code: 'provider_error', provider: 'gemini', detail: 'fetch failed [chave]' })
+  expect(fake.calls).toHaveLength(1)
+})
+
+it('a call that is not idempotent is never retried after the connection drops mid-body', async () => {
+  vi.useFakeTimers()
+  let calls = 0
+  const fn = (async () => {
+    calls++
+    return new Response(new ReadableStream({ start(c) { c.error(new TypeError('terminated')) } }), { status: 200 })
+  }) as typeof fetch
+  const pending = postOnce(fn)
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(await pending).toMatchObject({ code: 'provider_error', provider: 'gemini' })
+  expect(calls).toBe(1)
+})
+
+it('a call that is not idempotent is still retried once on 429 and 5xx', async () => {
+  vi.useFakeTimers()
+  for (const status of [429, 503]) {
+    const fake = fakeFetch([{ status, text: '' }, { status: 200, json: { ok: true } }])
+    const pending = postOnce(fake.fn)
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(await pending).toEqual({ ok: true })
+    expect(fake.calls).toHaveLength(2)
+  }
+})
+
+it('a reply whose content-length is over the cap is invalid_output, unread and not retried', async () => {
+  let pulled = false
+  let calls = 0
+  const fn = (async () => {
+    calls++
+    const body = new ReadableStream<Uint8Array>({ pull(c) { pulled = true; c.enqueue(new TextEncoder().encode('{}')); c.close() } }, { highWaterMark: 0 })
+    // A 25 MiB image in base64 plus 1 MB of JSON around it is 35_952_536 bytes.
+    return new Response(body, { status: 200, headers: { 'content-length': String(35_952_537) } })
+  }) as typeof fetch
+  const err = await postError(fn)
+  expect(err).toMatchObject({ code: 'invalid_output', provider: 'openai' })
+  expect(pulled).toBe(false)
+  expect(calls).toBe(1)
+})
+
+it('a reply body that streams past the cap is cut off: invalid_output, not retried', async () => {
+  let sent = 0
+  let calls = 0
+  const chunk = new Uint8Array(1024 * 1024).fill(0x78) // 'x'
+  const fn = (async () => {
+    calls++
+    // Valid JSON of 40 MiB with no content-length: only the running count can stop it.
+    let pulls = 0
+    const body = new ReadableStream<Uint8Array>({
+      start(c) { c.enqueue(new TextEncoder().encode('{"a":"')) },
+      pull(c) {
+        if (++pulls > 40) { c.enqueue(new TextEncoder().encode('"}')); c.close(); return }
+        sent += chunk.length
+        c.enqueue(chunk)
+      },
+    }, { highWaterMark: 0 })
+    return new Response(body, { status: 200 })
+  }) as typeof fetch
+  const err = await postError(fn)
+  expect(err).toMatchObject({ code: 'invalid_output', provider: 'openai' })
+  expect(sent).toBeLessThanOrEqual(35_952_536 + chunk.length)
+  expect(calls).toBe(1)
+})
+
 it('a key fetch would reject as a header fails at once, without a call', async () => {
   for (const bad of ['sk-a\nb', 'sk-a\rb', 'sk-a\0b', 'sk-açãoΩ']) {
     const fake = fakeFetch([])

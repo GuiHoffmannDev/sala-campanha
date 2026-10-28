@@ -2,18 +2,16 @@ import { createFal } from '../../packages/executor/src/providers/fal.ts'
 import { createProviders } from '../../packages/executor/src/providers/index.ts'
 import { ProviderError } from '../../packages/executor/src/providers/types.ts'
 import { fakeFetch } from '../helpers/fake-fetch.ts'
+import { GIF, JPEG, PNG, WEBP, file } from '../helpers/images.ts'
 
 const KEY = 'fal-test-key-abcdef1234567890'
 const MODEL = 'fal-ai/flux-pro/kontext/max/multi'
 const signal = () => AbortSignal.timeout(5000)
 const bytes = (s: string) => new TextEncoder().encode(s)
-const b64 = (s: string) => Buffer.from(s).toString('base64')
-const dataUri = (mime: string, s: string) => `data:${mime};base64,${b64(s)}`
-/** File signatures: the downloaded image's type comes from these, never from `content_type`. */
-const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
-const JPEG = [0xff, 0xd8, 0xff, 0xe0]
-const WEBP = [...bytes('RIFF'), 0, 0, 0, 0, ...bytes('WEBP')]
-const file = (sig: number[], size = 64) => { const b = new Uint8Array(size); b.set(sig); return b }
+const dataUri = (mime: string, b: Uint8Array) => `data:${mime};base64,${Buffer.from(b).toString('base64')}`
+const pngUri = dataUri('image/png', file(PNG))
+
+afterEach(() => { vi.useRealTimers() })
 const result = (url: string, content_type = 'image/png') => ({ status: 200, json: { images: [{ url, content_type }], prompt: 'P' } })
 
 /** Runs one text-to-image generation against scripted replies and returns the thrown error. */
@@ -26,7 +24,7 @@ async function generateError(replies: Parameters<typeof fakeFetch>[0]): Promise<
 }
 
 it('uses the multi endpoint with data URIs when there are references', async () => {
-  const fake = fakeFetch([result(dataUri('image/png', 'out'))])
+  const fake = fakeFetch([result(pngUri)])
   await createFal(fake.fn).generateImage(KEY, {
     model: MODEL,
     prompt: 'Banner de verão',
@@ -40,7 +38,7 @@ it('uses the multi endpoint with data URIs when there are references', async () 
   })
   expect(fake.calls[0]!.body).toEqual({
     prompt: 'Banner de verão',
-    image_urls: [dataUri('image/png', 'img-1'), dataUri('image/jpeg', 'img-2')],
+    image_urls: [dataUri('image/png', bytes('img-1')), dataUri('image/jpeg', bytes('img-2'))],
     sync_mode: true,
     output_format: 'png',
   })
@@ -57,14 +55,14 @@ it('rejects reference images over the 20 MB request limit without calling fal', 
 })
 
 it('sends reference images just under the request limit', async () => {
-  const fake = fakeFetch([result(dataUri('image/png', 'out'))])
+  const fake = fakeFetch([result(pngUri)])
   const img = { bytes: new Uint8Array(14_900_000), mimeType: 'image/png' as const } // about 19.9 MB in base64
   await createFal(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [img] }, signal())
   expect(fake.calls).toHaveLength(1)
 })
 
 it('uses text-to-image without references', async () => {
-  const fake = fakeFetch([result(dataUri('image/png', 'out'))])
+  const fake = fakeFetch([result(pngUri)])
   await createFal(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'Só texto', images: [] }, signal())
   expect(fake.calls[0]!.url).toBe('https://fal.run/fal-ai/flux-pro/kontext/max/text-to-image')
   expect(fake.calls[0]!.headers.authorization).toBe(`Key ${KEY}`)
@@ -72,10 +70,32 @@ it('uses text-to-image without references', async () => {
 })
 
 it('decodes a data URI result', async () => {
-  const fake = fakeFetch([result(dataUri('image/png', 'png-bytes'))])
+  const fake = fakeFetch([result(pngUri)])
   const out = await createFal(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal())
   expect(out.mimeType).toBe('image/png')
-  expect(new TextDecoder().decode(out.bytes)).toBe('png-bytes')
+  expect(out.bytes).toEqual(file(PNG))
+})
+
+it('a data URI result takes its type from its bytes, not from its prefix', async () => {
+  for (const [sig, label, type] of [[JPEG, 'image/png', 'image/jpeg'], [PNG, 'image/webp', 'image/png'], [WEBP, 'image/jpeg', 'image/webp']] as const) {
+    const fake = fakeFetch([result(dataUri(label, file([...sig])))])
+    const out = await createFal(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal())
+    expect(out.mimeType).toBe(type)
+  }
+})
+
+it('a data URI result of exactly 25 MiB is accepted', async () => {
+  const fake = fakeFetch([result(dataUri('image/png', file(PNG, 26_214_400)))])
+  const out = await createFal(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, signal())
+  expect(out.bytes.length).toBe(26_214_400)
+})
+
+it('a data URI result over 25 MiB is invalid_output', async () => {
+  // 26_214_401 bytes: the base64 is not longer than a 25 MiB image's, the decoded file is.
+  // 26_214_403 bytes: the base64 alone is too long, refused before decoding.
+  for (const size of [26_214_401, 26_214_403]) {
+    expect((await generateError([result(dataUri('image/png', file(PNG, size)))])).code).toBe('invalid_output')
+  }
 })
 
 it('downloads an https result without sending the key', async () => {
@@ -164,8 +184,10 @@ it('a result url that is neither https nor a data URI is invalid_output and is n
   }
 })
 
-it('a data URI with an unsupported type or invalid base64 is invalid_output', async () => {
-  expect((await generateError([result(dataUri('image/gif', 'gif'))])).code).toBe('invalid_output')
+it('a data URI that is not PNG, JPEG or WebP, or not valid base64, is invalid_output', async () => {
+  expect((await generateError([result(dataUri('image/gif', file(GIF)))])).code).toBe('invalid_output')
+  // The prefix says png, the bytes are a GIF: the bytes decide.
+  expect((await generateError([result(dataUri('image/png', file(GIF)))])).code).toBe('invalid_output')
   expect((await generateError([result('data:image/png;base64,not base64!!')])).code).toBe('invalid_output')
   expect((await generateError([result('data:image/png;base64,')])).code).toBe('invalid_output')
 })
@@ -205,6 +227,26 @@ it('reports each fal validation error from a detail list, without echoing the in
 it('a detail list with no usable msg falls back to the HTTP status', async () => {
   const err = await generateError([{ status: 422, json: { detail: [{ type: 'x' }, 'text'] } }])
   expect(err.detail).toBe('HTTP 422')
+})
+
+it('a network error is never retried: the generation may already be billed', async () => {
+  vi.useFakeTimers()
+  const fake = fakeFetch([{ error: new TypeError(`fetch failed ${KEY}`) }, result(pngUri)])
+  const pending = createFal(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, new AbortController().signal).catch((e) => e)
+  await vi.advanceTimersByTimeAsync(2000)
+  const err = await pending
+  expect(fake.calls).toHaveLength(1)
+  expect(err).toBeInstanceOf(ProviderError)
+  expect(err).toMatchObject({ code: 'provider_error', provider: 'fal', detail: 'fetch failed [chave]' })
+})
+
+it('a 429 is still retried once', async () => {
+  vi.useFakeTimers()
+  const fake = fakeFetch([{ status: 429, json: { detail: 'slow down' } }, result(pngUri)])
+  const pending = createFal(fake.fn).generateImage(KEY, { model: MODEL, prompt: 'P', images: [] }, new AbortController().signal)
+  await vi.advanceTimersByTimeAsync(2000)
+  expect((await pending).mimeType).toBe('image/png')
+  expect(fake.calls).toHaveLength(2)
 })
 
 it('createProviders registers gemini and fal as image providers', () => {

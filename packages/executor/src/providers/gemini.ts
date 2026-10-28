@@ -1,12 +1,9 @@
-import { isBase64, postJson, redact } from './http.ts'
-import { type GeneratedImage, type ImageProvider, ProviderError } from './types.ts'
+import { MAX_DETAIL, postJson, redact } from './http.ts'
+import { checkRequestSize, decodeImage } from './image.ts'
+import { type ImageProvider, ProviderError } from './types.ts'
 
-const MAX_DETAIL = 300
-/** Gemini's cap on a request with inline data. Decimal megabytes: the stricter reading of "20 MB". */
-const MAX_REQUEST_BYTES = 20_000_000
-const IMAGE_TYPES: readonly string[] = ['image/png', 'image/jpeg', 'image/webp'] satisfies GeneratedImage['mimeType'][]
-
-type InlineData = { mimeType?: string; mime_type?: string; data?: string }
+/** The declared mime type is ignored: decodeImage reads the type from the bytes. */
+type InlineData = { data?: unknown }
 type Part = { text?: string; thought?: boolean; inlineData?: InlineData; inline_data?: InlineData }
 type GenerateContentReply = {
   candidates?: { content?: { parts?: Part[] }; finishReason?: string }[]
@@ -47,12 +44,7 @@ export function createGemini(fetchFn: typeof fetch): ImageProvider {
         },
       }
       // Gemini rejects inline requests over 20 MB with an English 400; fail first, without spending a call.
-      const size = Buffer.byteLength(JSON.stringify(body))
-      if (size > MAX_REQUEST_BYTES) {
-        const mb = (size / 1_000_000).toFixed(1).replace('.', ',')
-        throw new ProviderError('provider_error', 'gemini',
-          `as imagens de referência somam ${mb} MB; o limite do Gemini é 20 MB por pedido. Use menos imagens ou imagens menores.`)
-      }
+      checkRequestSize(body, 'gemini', 'Gemini')
 
       const reply = await postJson({
         provider: 'gemini',
@@ -60,6 +52,8 @@ export function createGemini(fetchFn: typeof fetch): ImageProvider {
         headers: { 'x-goog-api-key': key },
         body,
         key, signal, fetchFn,
+        // A generation lost to a network error may still be billed: never repeat it.
+        idempotent: false,
       }) as GenerateContentReply | null
 
       const candidate = reply?.candidates?.[0]
@@ -73,15 +67,7 @@ export function createGemini(fetchFn: typeof fetch): ImageProvider {
         throw new ProviderError('provider_error', 'gemini', redact(detail, key).slice(0, MAX_DETAIL))
       }
 
-      const inline = (image.inlineData ?? image.inline_data)!
-      const mimeType = inline.mimeType ?? inline.mime_type
-      if (!mimeType || !IMAGE_TYPES.includes(mimeType)) {
-        throw new ProviderError('invalid_output', 'gemini', `unsupported image type: ${redact(String(mimeType), key).slice(0, 100)}`)
-      }
-      if (!inline.data) throw new ProviderError('invalid_output', 'gemini', 'empty image data')
-      if (typeof inline.data !== 'string' || !isBase64(inline.data)) throw new ProviderError('invalid_output', 'gemini', 'invalid base64 image data')
-      const bytes = Buffer.from(inline.data, 'base64')
-      return { bytes: new Uint8Array(bytes), mimeType: mimeType as GeneratedImage['mimeType'] }
+      return decodeImage((image.inlineData ?? image.inline_data)!.data, 'gemini')
     },
   }
 }
