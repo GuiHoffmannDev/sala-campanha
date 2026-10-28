@@ -5,6 +5,8 @@ const RETRY_DELAY_MS = 2000
 /** Longest error detail kept: it reaches logs and the chat. */
 export const MAX_DETAIL = 300
 /** A reply that carries a 25 MiB image in base64, plus 1 MB for the JSON around it. */
+// shortcut: no room for Gemini's up to two draft (`thought`) images next to a near-25 MiB final one;
+// fine while requests use the default 1K size. Raise it before asking for 2K/4K, or if the live test sees thought images.
 const MAX_RESPONSE_BYTES = Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 1_000_000
 /** What fetch rejects in a header value after trimming: NUL, CR, LF, or a character above U+00FF. */
 const INVALID_HEADER_VALUE = /[\0\r\n]|[^\0-\xff]/

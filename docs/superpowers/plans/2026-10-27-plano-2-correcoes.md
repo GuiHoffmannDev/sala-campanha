@@ -172,6 +172,7 @@ Resolve os itens 7, 8 e 10 da revisão e a parte do item 9 que está nos provedo
   - Usam `decodeImage`, `checkRequestSize`, `MAX_DETAIL`, `abortError` e `postJson` com `idempotent: false`.
   - O download `https` da fal usa `readCapped` e `sniffType`.
   - Somem `IMAGE_TYPES`, `checkType` e as constantes duplicadas.
+  - *Revisão da Task C, 2026-10-27:* `imageTooLarge(provider)` em `image.ts` é o único erro de imagem acima de 25 MiB, usado por `decodeImage` e pelo download da fal. O teto da resposta fica como está, porque o pedido usa a resolução padrão de 1K. A doc atual do Gemini não diz se `generateContent` devolve as até duas imagens de rascunho (`thought`) sem `includeThoughts`. A Task E mede isso ao vivo.
 
 - [x] **Step 1: Escrever os testes que falham.**
   - Gemini (`inlineData` com `mimeType: 'image/png'`) e fal (data URI `data:image/png;base64,...`) com bytes JPEG: o resultado tem `mimeType: 'image/jpeg'`.
@@ -246,6 +247,7 @@ Resolve os itens 14 e 15 da revisão.
   - O texto usa `maxOutputTokens: MAX_OUTPUT_TOKENS`.
   - A fal roda com 1 referência (endpoint `multi`) e sem referência (endpoint `text-to-image`).
   - Continua pulando cada provedor sem `LIVE_<PROVIDER>_KEY` e nunca imprime a chave.
+  - Nos casos do Gemini, envolve o `fetch` para ler um clone da resposta. Registra o tamanho dela em bytes e quantas partes `thought` com imagem vieram. Isso confere o teto `MAX_RESPONSE_BYTES` de `http.ts`, que não reserva espaço para as imagens de rascunho *(revisão da Task C, 2026-10-27)*.
 
 - [ ] **Step 1: Ampliar o teste ao vivo.**
 - [ ] **Step 2: Run sem chaves.** Run: `pnpm test tests/live`. Expected: todos os testes pulados, nenhum erro.
@@ -253,6 +255,7 @@ Resolve os itens 14 e 15 da revisão.
 - [ ] **Step 4: Registrar o resultado.**
   - No Plano 2, o Step 3 da Task 10 volta para `[ ]` e ganha uma nota com a data, os provedores que rodaram e o resultado. Se todos os quatro passaram, o Step 3 fica `[x]`.
   - Em `HANDOFF.md`, a pendência "Nada da fal foi testado contra a API real" é atualizada com o que foi coberto. Ficam abertos os provedores sem chave e a lista `detail` do 422 da fal, que não dá para provocar de forma confiável.
+  - Se o Gemini devolveu partes `thought` com imagem, o resultado vira uma pendência no `HANDOFF.md`: subir `MAX_RESPONSE_BYTES` para caber a imagem final mais dois rascunhos, ou pedir `includeThoughts: false`. Sem partes `thought`, o comentário `shortcut:` de `http.ts` continua valendo.
 - [ ] **Step 5: Fechar o Plano 2 no `HANDOFF.md`.** Marcar como resolvidas as pendências fechadas pelas Tasks A–D, se ainda não estiverem. Marcar Implementada e Revisada em cada task desta correção que tenha passado na revisão.
 - [ ] **Step 6: Verificação final.**
   - Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.

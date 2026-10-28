@@ -16,20 +16,23 @@ export function sniffType(b: Uint8Array): GeneratedImage['mimeType'] | undefined
   return undefined
 }
 
+/** The error for a provider image over MAX_IMAGE_BYTES, decoded or downloaded. */
+export const imageTooLarge = (provider: Provider) =>
+  new ProviderError('invalid_output', provider, `image larger than ${MAX_IMAGE_BYTES} bytes`)
+
 /**
  * Decodes an image a provider returned in base64. The type comes from the bytes, never from
  * the label the provider declared, and the file is at most MAX_IMAGE_BYTES. Any failure is invalid_output.
  */
 export function decodeImage(base64: unknown, provider: Provider): GeneratedImage {
   const invalid = (detail: string) => new ProviderError('invalid_output', provider, detail)
-  const tooLarge = () => invalid(`image larger than ${MAX_IMAGE_BYTES} bytes`)
   if (typeof base64 !== 'string') throw invalid('image data is not a string')
   if (!base64) throw invalid('empty image data')
   // Checked before decoding, so an oversized string is never copied into a buffer.
-  if (base64.length > MAX_BASE64_LENGTH) throw tooLarge()
+  if (base64.length > MAX_BASE64_LENGTH) throw imageTooLarge(provider)
   if (!isBase64(base64)) throw invalid('invalid base64 image data')
   const bytes = new Uint8Array(Buffer.from(base64, 'base64'))
-  if (bytes.length > MAX_IMAGE_BYTES) throw tooLarge()
+  if (bytes.length > MAX_IMAGE_BYTES) throw imageTooLarge(provider)
   const mimeType = sniffType(bytes)
   if (!mimeType) throw invalid('image is not a PNG, JPEG or WebP file')
   return { bytes, mimeType }

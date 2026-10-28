@@ -1,5 +1,5 @@
 import { abortError, MAX_DETAIL, postJson, readCapped, redact } from './http.ts'
-import { checkRequestSize, decodeImage, sniffType } from './image.ts'
+import { checkRequestSize, decodeImage, imageTooLarge, sniffType } from './image.ts'
 import { type ImageProvider, MAX_IMAGE_BYTES, ProviderError } from './types.ts'
 
 /** The `multi` endpoint requires `image_urls`, so a request without references goes here instead. */
@@ -65,7 +65,7 @@ async function download(url: string, key: string, signal: AbortSignal, fetchFn: 
     // A redirect could lead to http or an internal host, bypassing the https-only check in generateImage.
     const res = await fetchFn(url, { method: 'GET', redirect: 'error', signal })
     if (!res.ok) throw fail(`image download failed: HTTP ${res.status}`)
-    return await readCapped(res, MAX_IMAGE_BYTES, () => invalid(`image larger than ${MAX_IMAGE_BYTES} bytes`))
+    return await readCapped(res, MAX_IMAGE_BYTES, () => imageTooLarge('fal'))
   } catch (err) {
     if (err instanceof ProviderError) throw err
     if (signal.aborted) throw abortError(signal, 'fal')
