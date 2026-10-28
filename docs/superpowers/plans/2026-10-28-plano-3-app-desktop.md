@@ -98,7 +98,8 @@ docs/instalar-no-mac.md
   - `plugins.deep-link.desktop.schemes` `["sala"]`.
   - `app.security.csp`: `default-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co http://127.0.0.1:55321 ws://127.0.0.1:55321; img-src 'self' data: blob: https://*.supabase.co http://127.0.0.1:55321; style-src 'self' 'unsafe-inline'`.
 - `capabilities/default.json`:
-  - `core:default`, `deep-link:default`, `notification:default`, `clipboard-manager:allow-write-text`.
+  - `core:default`, `deep-link:default`, `clipboard-manager:allow-write-text`.
+  - `notification:allow-is-permission-granted`, `notification:allow-request-permission` e `notification:allow-notify`, os únicos comandos que o shim do plugin usa. `notification:default` liberaria 17 comandos.
   - `opener:allow-open-url`, com escopo `http://127.0.0.1:55321/*`. O host hospedado entra no deploy com o ref exato, `https://<projeto>.supabase.co/*` (ver "Checklist de deploy do app"). Nunca `https://*.supabase.co/*`: no glob do opener, o `*` atravessa `/`, e `https://evil.example/.supabase.co/x` passaria.
 
 - [x] **Step 1: Write the failing tests.**
