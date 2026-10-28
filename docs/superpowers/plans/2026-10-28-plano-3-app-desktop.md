@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Criar o app desktop da Sala da Campanha para macOS. O app tem login por código, campanhas e peças, chat compartilhado com o agente, biblioteca de referências, versões com aprovação, comentários presos à imagem, presença, notificação de menção, chaves e membros do time e link de compartilhamento.
+**Goal:** Criar o app desktop da Sala da Campanha para macOS. Qualquer pessoa baixa, entra com Google, Apple ou um código no e-mail, cria o próprio workspace e cadastra as próprias chaves. O app tem campanhas e peças, chat compartilhado com o agente, biblioteca de referências, versões com aprovação, comentários presos à imagem, presença, notificação de menção, membros e convites do workspace e link de compartilhamento. *(Revisão de 2026-10-28, por decisão do fundador: cadastro aberto e workspace próprio.)*
 
-**Architecture:** É uma casca Tauri 2 mínima (Rust só registra plugins) em volta de uma interface React servida pelo Vite. O app fala com o Supabase só com a anon key e a sessão do usuário. Toda escrita passa pelas RPCs e pela RLS dos Planos 1 e 2, mais uma migration nova (`0010`) e uma Edge Function (`add-member`). A lógica fica em funções puras (`src/lib`) e numa camada de dados (`src/data`) que recebe o `SupabaseClient` por parâmetro. Assim, as duas camadas são testadas sem a janela: a lógica com Vitest, os dados contra o Supabase local. Os componentes (`src/ui`) recebem dados e callbacks por props.
+**Architecture:** É uma casca Tauri 2 mínima (Rust só registra plugins) em volta de uma interface React servida pelo Vite. O app fala com o Supabase só com a anon key e a sessão do usuário. Toda escrita passa pelas RPCs e pela RLS dos Planos 1 e 2, mais uma migration nova (`0010`). Nenhuma parte do app usa a service role. A lógica fica em funções puras (`src/lib`) e numa camada de dados (`src/data`) que recebe o `SupabaseClient` por parâmetro. Assim, as duas camadas são testadas sem a janela: a lógica com Vitest, os dados contra o Supabase local. Os componentes (`src/ui`) recebem dados e callbacks por props.
 
-**Tech Stack:** Tauri 2.12 (plugins `deep-link` 2.6, `notification` 2.8, `clipboard-manager` 2.5, `opener` 2.7), Rust 1.99, React 19.3, Vite 8.3, `@vitejs/plugin-react` 6.1, TypeScript 5.9, Vitest 5, Testing Library (`@testing-library/react` 16.3, `user-event` 14.6), jsdom 30, `@supabase/supabase-js` 2, Zod 4, Supabase CLI 2.121 (Edge Runtime em Deno).
+**Tech Stack:** Tauri 2.12 (plugins `deep-link` 2.6, `notification` 2.8, `clipboard-manager` 2.5, `opener` 2.7), Rust 1.99, React 19.3, Vite 8.3, `@vitejs/plugin-react` 6.1, TypeScript 5.9, Vitest 5, Testing Library (`@testing-library/react` 16.3, `user-event` 14.6), jsdom 30, `@supabase/supabase-js` 2, Zod 4, Supabase CLI 2.121.
 
 **Spec:** `docs/superpowers/specs/2026-10-21-sala-campanha-design.md`
 
@@ -21,11 +21,12 @@
 - O app usa só `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` e a sessão do usuário. A service role nunca entra no pacote `desktop`.
 - Uma chave de provedor só sai do app por `set_provider_key`. Nunca é lida de volta: o app mostra só `...<last4>`. O campo digitado é limpo depois de salvar, e nenhum select pede `vault_secret_id`.
 - Toda escrita usa os inserts e updates que a RLS permite ou as RPCs dos Planos 1 e 2, mais as do Plano 3 (`0010`). Nenhuma migration antiga é editada.
-- Login só por código de 6 dígitos no e-mail (`signInWithOtp` com `shouldCreateUser: false` e `verifyOtp` com `type: 'email'`). A resposta ao pedir o código é a mesma para e-mail cadastrado ou não.
-- Modelos vêm só de `MODEL_CATALOG`. O seletor lista só modelos de provedores com chave no time. O seletor de esforço só aparece quando `efforts` não é vazio. `p_model` segue `ModelChoiceSchema`, e o modelo de texto vai sempre.
+- Cadastro aberto. O login é por Google ou Apple (OAuth com PKCE: `flowType: 'pkce'`, retorno em `sala://auth/callback` e `exchangeCodeForSession`) ou por código de 6 dígitos no e-mail (`signInWithOtp` com `shouldCreateUser: true` e `verifyOtp` com `type: 'email'`).
+- Na interface, o `team` do banco se chama "workspace". No primeiro login, a pessoa cria o próprio workspace, onde é admin. Convites (`team_invites`) são aceitos pelo dono do e-mail verificado.
+- Modelos vêm só de `MODEL_CATALOG`. O seletor lista só modelos de provedores com chave no workspace. O seletor de esforço só aparece quando `efforts` não é vazio. `p_model` segue `ModelChoiceSchema`, e o modelo de texto vai sempre.
 - Arquivos: só `image/png`, `image/jpeg` e `image/webp`, até `26_214_400` bytes. Caminho `<team_id>/<pasta>/<uuid>.<png|jpg|webp>`, em minúsculas. Referências usam a pasta `<campaign_id>`, e versões finais usam `<piece_id>`.
 - Trechos de legenda contam code points (`Array.from(caption)`), nunca unidades UTF-16.
-- Link: `sala://campanha/<campaign_id>` e `sala://campanha/<campaign_id>/peca/<piece_id>`, com uuids em minúsculas.
+- Link: `sala://campanha/<campaign_id>` e `sala://campanha/<campaign_id>/peca/<piece_id>`, com uuids em minúsculas. O retorno do login é `sala://auth/callback`.
 - Toda a interface em português do Brasil, com os rótulos exatos da Task 6 (`labels.ts`) e as mensagens exatas da Task 4 (`errors.ts`).
 - Dependências novas só estas.
   - Runtime de `@sala/desktop`: `react`, `react-dom`, `@tauri-apps/api` e os 4 plugins. Também `@sala/shared`, `@supabase/supabase-js` e `zod`, que já estão no repositório.
@@ -37,7 +38,7 @@
 
 1. **Realtime cai e volta** (Mac dormiu, Wi-Fi caiu): o chat busca `id > último visto` a cada `SUBSCRIBED` e não perde nem duplica evento. Teste na Task 6: `gap fill after resubscribe misses nothing`.
 2. **Presença vaza entre times:** um membro de outro time que conhece o `team_id` não entra no canal de presença. Teste na Task 2: `members of another team cannot join the team presence channel`.
-3. **Botão que o servidor recusa:** aprovar, voltar etapa, enviar final, editar legenda, comentar e conversar seguem a tabela de permissões do spec para cada papel e status. Teste na Task 9: `pieceActions follows the permission table`.
+3. **Convite aceito por quem não é dono do e-mail:** com o cadastro aberto, só quem confirmou o e-mail convidado entra no workspace. Uma conta com o mesmo e-mail ainda não confirmado não entra. Teste na Task 2: `an invite is accepted only by the verified owner of the email`. (Os botões por papel continuam testados na Task 9, em `pieceActions follows the permission table`.)
 4. **Rótulo de destino diferente do roteamento real:** "Para o agente" ou "Para @Nome" bate com o que `post_message` grava em `to_agent`. Teste na Task 8: `post_message routes the same way as messageTarget`.
 5. **Link para peça inexistente ou de outro time:** o app abre sem travar e avisa "Peça não encontrada ou sem acesso.". Teste na Task 5: `a link to another team's piece resolves to no route with a notice`.
 
@@ -54,9 +55,9 @@ packages/desktop/
     main.tsx  app.css  env.ts  native.ts  vite-env.d.ts
     data/   client.ts errors.ts auth.ts team.ts keys.ts campaigns.ts files.ts
             references.ts events.ts versions.ts comments.ts presence.ts
-    lib/    link.ts labels.ts timeline.ts routing.ts models.ts actions.ts
+    lib/    link.ts workspace.ts labels.ts timeline.ts routing.ts models.ts actions.ts
             excerpt.ts presence.ts
-    ui/     App.tsx LoginScreen.tsx Shell.tsx CampaignSidebar.tsx PieceList.tsx
+    ui/     App.tsx LoginScreen.tsx Onboarding.tsx Shell.tsx CampaignSidebar.tsx PieceList.tsx
             PieceHeader.tsx Chat.tsx Timeline.tsx Composer.tsx ModelPicker.tsx
             ReferenceLibrary.tsx VersionViewer.tsx CommentLayer.tsx
             UploadFinalDialog.tsx Settings.tsx
@@ -65,7 +66,6 @@ packages/desktop/
 packages/shared/src/agent.ts   # + checkModelChoice, inheritedModel
 packages/shared/src/events.ts  # tipos e schemas dos eventos da conversa
 supabase/migrations/0010_app_support.sql
-supabase/functions/add-member/index.ts
 supabase/templates/codigo.html
 tests/desktop/*.test.ts(x)  tests/db/members.test.ts  tests/shared/events.test.ts
 scripts/fake-agent.ts          # agente falso local: worker do Plano 2 com provedores falsos
@@ -134,57 +134,63 @@ it('renders the app title', () => {
 
 ---
 
-### Task 2: Backend do app — membros, presença privada, tempo real e código por e-mail
+### Task 2: Backend do app — workspaces, convites, presença privada, tempo real e login aberto
+
+> *Revisão de 2026-10-28, por decisão do fundador:* o cadastro é aberto e cada pessoa cria o próprio workspace (`team`). A Edge Function `add-member` e a `user_id_by_email` saíram. Convites ficam no banco, e nenhuma parte do app usa a service role.
 
 **Files:**
-- Create: `supabase/migrations/0010_app_support.sql`, `supabase/functions/add-member/index.ts`, `supabase/templates/codigo.html`
-- Modify: `supabase/config.toml` (`[auth.email.template.magic_link]` com `subject = "Seu código da Sala da Campanha"` e `content_path = "./supabase/templates/codigo.html"`)
+- Create: `supabase/migrations/0010_app_support.sql`, `supabase/templates/codigo.html`
+- Modify: `supabase/config.toml`:
+  - `[auth] enable_signup = true`.
+  - `additional_redirect_urls` ganha `"sala://auth/callback"`.
+  - `[auth.email.template.magic_link]`, com `subject = "Seu código da Sala da Campanha"` e `content_path = "./supabase/templates/codigo.html"`.
+  - `[auth.external.google]` e `[auth.external.apple]` com `enabled = true`, `client_id = "env(SUPABASE_AUTH_EXTERNAL_<PROVEDOR>_CLIENT_ID)"` e `secret = "env(SUPABASE_AUTH_EXTERNAL_<PROVEDOR>_SECRET)"`, lidos de `supabase/.env` (fora do git). Sem as variáveis, os dois provedores falham com erro e o resto funciona.
 - Test: `tests/db/members.test.ts`
 
 **Interfaces:**
-- Produces (SQL, `0010`):
-  - `private.topic_team(p_topic text) returns uuid`: o uuid de `team:<uuid em minúsculas>`; qualquer outro formato devolve null. `security definer`, `search_path = ''`.
+- Produces (SQL, `0010`). Toda função é `security definer` com `search_path = ''`.
+  - `private.topic_team(p_topic text) returns uuid`: o uuid de `team:<uuid em minúsculas>`; qualquer outro formato devolve null.
   - Policies `select` e `insert` em `realtime.messages` para `authenticated`: `extension = 'presence' and private.team_role_of(private.topic_team(realtime.topic())) is not null`.
-  - `public.set_member_role(p_team uuid, p_user uuid, p_role team_role) returns void` e `public.remove_member(p_team uuid, p_user uuid) returns void`.
-    - `security definer`; travam as linhas do time em `team_members` (`for update`).
-    - Quem chama não é admin: erro `'only team admins can manage members'` (`42501`).
-    - O alvo não é membro: `'user is not a team member'` (`22023`).
-    - O time ficaria sem admin: `'team needs at least one admin'` (`22023`).
-  - `public.user_id_by_email(p_email text) returns uuid`: o `id` de `auth.users` com `lower(email) = lower(trim(p_email))`, ou null. `execute` só para `service_role`.
+  - `public.create_workspace(p_name text, p_display_name text) returns uuid`: cria o `team` e insere quem chama como `admin`. Erros (`22023`):
+    - nome vazio ou com mais de 80 caracteres: `'workspace name must not be empty'`;
+    - `p_display_name` vazio ou com mais de 80: `'display name must not be empty'`.
+  - Tabela `public.team_invites(team_id uuid fk teams on delete cascade, email text not null check (email = lower(email)), role team_role not null, invited_by uuid null default auth.uid() references auth.users on delete set null, created_at timestamptz default now(), primary key (team_id, email))`. Grants e RLS:
+    - `select` para quem é `admin` do time.
+    - Sem `insert`, `update` ou `delete` para `authenticated`; tudo passa pelas RPCs abaixo.
+  - `public.invite_member(p_team uuid, p_email text, p_role team_role) returns void`: apara o e-mail e põe em minúsculas, depois faz upsert do convite (o papel novo vale). Erros:
+    - quem chama não é admin: `'only team admins can invite'` (`42501`);
+    - e-mail sem `@` ou com espaço: `'invalid email'` (`22023`);
+    - o e-mail já é de um membro do time (por `auth.users.email`): `'user is already a team member'` (`22023`).
+  - `public.revoke_invite(p_team uuid, p_email text) returns void`: só admin (`'only team admins can invite'`).
+  - `public.accept_invites(p_display_name text) returns int`:
+    - Lê o e-mail de quem chama em `auth.users`, só se `email_confirmed_at is not null`. Sem e-mail confirmado, devolve 0.
+    - Para cada convite com esse e-mail, insere em `team_members` com o papel do convite e `p_display_name` (`on conflict do nothing`) e apaga o convite.
+    - Devolve quantos aceitou. `p_display_name` vazio: `'display name must not be empty'`.
+  - `public.set_member_role(p_team uuid, p_user uuid, p_role team_role) returns void` e `public.remove_member(p_team uuid, p_user uuid) returns void`. Travam as linhas do time em `team_members` (`for update`). Erros:
+    - quem chama não é admin: `'only team admins can manage members'` (`42501`);
+    - o alvo não é membro: `'user is not a team member'` (`22023`);
+    - o time ficaria sem admin: `'team needs at least one admin'` (`22023`).
   - `alter publication supabase_realtime add table public.campaigns, public.reference_assets`.
-- Produces (Edge Function `add-member`, Deno, `verify_jwt` padrão):
-  - `POST { team_id, email, display_name, role }`. Valida com `npm:zod@4`: e-mail válido, nome aparado com 1 a 80 caracteres, papel em `ROLES`.
-  - Lê o usuário do header `Authorization` e confere, com um client desse usuário, que ele é `admin` do time.
-  - Com a service role (variável `SUPABASE_SERVICE_ROLE_KEY`, que o runtime injeta), cria a conta com `auth.admin.createUser({ email, email_confirm: true })`. Se o e-mail já existe, reaproveita o id de `user_id_by_email`. Depois insere em `team_members`.
-  - Respostas JSON:
-    - `200 { user_id }`, igual para conta nova ou já existente.
-    - `400 { error: 'Confira o e-mail, o nome e o papel.' }`.
-    - `403 { error: 'Só o admin do time adiciona membros.' }`.
-    - `409 { error: 'Essa pessoa já está no time.' }`.
-    - `500 { error: 'Erro interno. Tente de novo.' }`.
-  - O log só leva o código do erro, nunca o token nem a service role.
 - `codigo.html`: "Seu código para entrar na Sala da Campanha é {{ .Token }}. Ele vale por 1 hora."
 
-- [ ] **Step 1: Write the failing tests** em `tests/db/members.test.ts`:
-  - `admin adds a new member who can then sign in with an email code`:
-    - `admin.client.functions.invoke('add-member', { body })` responde `{ user_id }`.
-    - `serviceClient().auth.admin.generateLink({ type: 'magiclink', email })` devolve `properties.email_otp`.
-    - Um client anon faz `verifyOtp({ email, token, type: 'email' })` e vê o time em `teams`.
-  - `adding an existing account reuses it and answers the same way`: um membro do time B é adicionado ao A, a resposta tem a mesma forma, e ele continua no B.
-  - `gestor cannot add members`: o status é 403 e nenhuma linha é criada.
-  - `adding someone already in the team is 409`.
+- [ ] **Step 1: Write the failing tests** em `tests/db/members.test.ts`. Para um usuário novo com e-mail confirmado, usar `serviceClient().auth.admin.createUser({ email, email_confirm: true })`. Para um não confirmado, usar `email_confirm: false`. Depois, o login sai de `generateLink({ type: 'magiclink', email })`, com `verifyOtp`.
+  - `create_workspace makes the caller its admin`: `teams` e `team_members` mostram o workspace com o papel `admin`.
+  - `an invite is accepted only by the verified owner of the email`:
+    - O admin do A convida `x@test.local` como `designer`.
+    - Um usuário com e-mail não confirmado chama `accept_invites` e recebe 0.
+    - O dono confirmado recebe 1, entra no A como `designer`, e o convite some.
+  - `only admins invite`: gestor e espectador recebem `'only team admins can invite'`.
+  - `inviting a current member is refused`.
+  - `members of another team cannot read the invites`.
   - `admin changes a role; the last admin cannot be demoted or removed`: as mensagens SQL são exatas.
   - `members of another team cannot join the team presence channel`:
     - `B.designer.client.channel('team:' + A.teamId, { config: { private: true } })` termina em `CHANNEL_ERROR`.
     - `A.designer` termina em `SUBSCRIBED`.
   - `new campaigns reach other members live`: um insert de A.gestor em `campaigns` chega a A.designer em até 5 s, e não chega a B.
-  - `user_id_by_email is not callable by members`.
 - [ ] **Step 2: Run to verify fail.** Run: `pnpm db:reset && pnpm test tests/db/members.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implementar** a migration, a função e o template.
-  - O `supabase start` serve a função em `http://127.0.0.1:55321/functions/v1/add-member`.
-  - Se ela responder 404, rodar `supabase functions serve` em outro terminal e registrar isso numa nota desta task.
+- [ ] **Step 3: Implementar** a migration, o template e o `config.toml`. Depois de mudar o `config.toml`, rodar `supabase stop && supabase start`.
 - [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test`. Expected: PASS na suíte inteira.
-- [ ] **Step 5: Commit.** `git add -A && git commit -m "feat(db): member management, private team presence, live campaigns and email code login"`
+- [ ] **Step 5: Commit.** `git add -A && git commit -m "feat(db): open sign-up, personal workspaces, invites, private team presence and live campaigns"`
 
 ---
 
@@ -227,16 +233,18 @@ it('renders the app title', () => {
 
 ---
 
-### Task 4: Login por código, sessão e mensagens de erro
+### Task 4: Login, entrada no workspace, sessão e mensagens de erro
+
+> *Revisão de 2026-10-28, por decisão do fundador:* login com Google, Apple e código por e-mail, com cadastro aberto. No primeiro login, a pessoa cria o próprio workspace ou entra pelos convites.
 
 **Files:**
-- Create: `src/data/client.ts`, `src/data/errors.ts`, `src/data/auth.ts`, `src/data/team.ts`, `src/ui/LoginScreen.tsx` (todos em `packages/desktop/`)
+- Create: `src/data/client.ts`, `src/data/errors.ts`, `src/data/auth.ts`, `src/data/team.ts`, `src/lib/link.ts` (só `parseAuthCallback` nesta task), `src/ui/LoginScreen.tsx`, `src/ui/Onboarding.tsx` (todos em `packages/desktop/`)
 - Modify: `src/ui/App.tsx`
-- Test: `tests/desktop/errors.test.ts`, `tests/desktop/auth.test.ts`, `tests/desktop/login-screen.test.tsx`
+- Test: `tests/desktop/errors.test.ts`, `tests/desktop/auth.test.ts`, `tests/desktop/auth-callback.test.ts`, `tests/desktop/login-screen.test.tsx`, `tests/desktop/onboarding.test.tsx`
 
 **Interfaces:**
 - Produces:
-  - `createAppClient(url: string, anonKey: string): SupabaseClient`, com `auth.detectSessionInUrl: false` e a sessão no `localStorage` (padrão).
+  - `createAppClient(url: string, anonKey: string): SupabaseClient`, com `auth.flowType: 'pkce'`, `auth.detectSessionInUrl: false` e a sessão no `localStorage` (padrão).
   - `friendlyError(e: unknown): string` (`errors.ts`). Procura a mensagem do erro nesta tabela (texto exato):
 
     | Mensagem do servidor (contém) | Texto no app |
@@ -250,57 +258,93 @@ it('renders the app title', () => {
     | `final version needs status acabamento or final_em_revisao` | A versão final só pode ser enviada depois da aprovação da base. |
     | `caption can only be edited on a version under review` | Só dá para editar a legenda da versão em revisão. |
     | `approved version cannot be edited` | Uma versão aprovada não pode ser editada. |
-    | `only team admins can set provider keys` / `only team admins can delete provider keys` | Só o admin do time gerencia as chaves. |
+    | `only team admins can set provider keys` / `only team admins can delete provider keys` | Só o admin do workspace gerencia as chaves. |
     | `provider key must have at least 20 characters and no spaces` | A chave precisa ter pelo menos 20 caracteres e nenhum espaço. |
-    | `only team admins can manage members` | Só o admin do time gerencia os membros. |
-    | `team needs at least one admin` | O time precisa de pelo menos um admin. |
+    | `only team admins can manage members` | Só o admin do workspace gerencia os membros. |
+    | `only team admins can invite` | Só o admin do workspace convida pessoas. |
+    | `team needs at least one admin` | O workspace precisa de pelo menos um admin. |
+    | `user is already a team member` | Essa pessoa já está no workspace. |
+    | `invalid email` | Confira o e-mail. |
+    | `workspace name must not be empty` | Dê um nome ao workspace. |
+    | `display name must not be empty` | Escreva seu nome. |
+    | `provider is not enabled` | Esse jeito de entrar ainda não está disponível. |
     | `row-level security` | Você não tem permissão para isso. |
     | `Failed to fetch` / `fetch failed` / `NetworkError` | Sem conexão com o servidor. Tente de novo. |
     | (qualquer outra) | Algo deu errado. Tente de novo. |
 
-  - `sendLoginCode(client, email: string): Promise<void>`: apara e põe o e-mail em minúsculas. Chama `signInWithOtp({ email, options: { shouldCreateUser: false } })`.
-    - Um erro de usuário inexistente ou de cadastro desligado é engolido: a resposta é sempre a mesma.
-    - Rate limit lança `Error('Espere um minuto antes de pedir outro código.')`.
+  - `sendLoginCode(client, email: string): Promise<void>`: apara e põe o e-mail em minúsculas. Chama `signInWithOtp({ email, options: { shouldCreateUser: true } })`. Rate limit lança `Error('Espere um minuto antes de pedir outro código.')`.
   - `verifyLoginCode(client, email: string, code: string): Promise<void>`: chama `verifyOtp({ email, token: code.trim(), type: 'email' })`. Em erro, lança `Error('Código inválido ou vencido. Peça um novo.')`.
+  - `type OAuthProvider = 'google' | 'apple'`.
+  - `oauthUrl(client, provider: OAuthProvider): Promise<string>`: chama `signInWithOAuth({ provider, options: { redirectTo: 'sala://auth/callback', skipBrowserRedirect: true } })` e devolve `data.url`. O `LoginScreen` abre a URL com `openExternal`.
+  - `parseAuthCallback(url: string): { code: string } | { error: string } | null` (`lib/link.ts`).
+    - `sala://auth/callback?code=...` dá `{ code }`.
+    - `?error_description=...` (ou `?error=...`) dá `{ error }`.
+    - Qualquer outra URL dá null e segue para a navegação (Task 5).
+  - `finishOAuth(client, code: string): Promise<void>`: chama `exchangeCodeForSession(code)`. Em erro, lança `Error('Não foi possível entrar. Tente de novo.')`.
   - `signOut(client): Promise<void>`.
-  - `type Membership = { teamId: string; teamName: string; role: Role; displayName: string }`. `loadMyMemberships(client): Promise<Membership[]>` lê `team_members` do usuário com `teams(name)`, ordenado pelo nome do time.
+  - `displayNameOf(user: User): string | null`: `user_metadata.display_name`, ou então `full_name` ou `name` (Google e Apple), aparado; senão null.
+  - `saveDisplayName(client, name: string): Promise<void>`: `auth.updateUser({ data: { display_name } })`.
+  - `acceptInvites(client, displayName: string): Promise<number>` e `createWorkspace(client, name: string, displayName: string): Promise<string>`: as RPCs da Task 2.
+  - `type Membership = { teamId: string; teamName: string; role: Role; displayName: string }`. `loadMyMemberships(client): Promise<Membership[]>` lê `team_members` do usuário com `teams(name)`, ordenado pelo nome do workspace.
   - `type Member = { userId: string; displayName: string; role: Role }`. `loadMembers(client, teamId): Promise<Member[]>`, por nome. As Tasks 5 a 12 usam.
-  - `LoginScreen(props: { sendCode(email: string): Promise<void>; verifyCode(email: string, code: string): Promise<void> })`.
-    - Passo 1: campo de e-mail e o botão "Enviar código".
-    - Passo 2: o texto "Se o e-mail estiver cadastrado, você vai receber um código de 6 dígitos." e o campo do código, com os botões "Entrar" e "Usar outro e-mail".
+- UI:
+  - `LoginScreen(props: { sendCode(email: string): Promise<void>; verifyCode(email: string, code: string): Promise<void>; startOAuth(provider: OAuthProvider): Promise<void> })`.
+    - Os botões "Entrar com Google" e "Entrar com Apple". Depois de clicar, "Continue no navegador…".
+    - Abaixo, "ou entre com um código no e-mail".
+    - Passo 1 do e-mail: o campo e "Enviar código".
+    - Passo 2: "Enviamos um código de 6 dígitos para <email>.", o campo do código, "Entrar" e "Usar outro e-mail".
     - Erros aparecem em `role="alert"`.
-  - `App`:
-    - Sem sessão, mostra `LoginScreen`.
-    - Com sessão e sem time, mostra "Você ainda não está em nenhum time. Peça ao admin para adicionar você." e o botão "Sair".
-    - Com time, mostra o `Shell` (Task 5). Antes da Task 5, um texto com o nome do time.
-    - Usa o primeiro time. Comentário `shortcut:` no código: troca de time só quando alguém estiver em mais de um.
+  - `Onboarding(props: { step: 'name' | 'workspace'; suggestedName: string; onSaveName(name: string): Promise<void>; onCreateWorkspace(name: string): Promise<void> })`.
+    - `name`: "Como você quer aparecer para o time?", com o campo preenchido por `suggestedName` e "Continuar".
+    - `workspace`: "Crie seu workspace", com o campo "Nome do workspace" e "Criar". Sugestão: "Workspace de <primeiro nome>".
+  - `App`, nesta ordem:
+    1. Registra `onDeepLink`. Uma URL que `parseAuthCallback` reconhece vai para `finishOAuth`; o erro aparece na tela de login.
+    2. Sem sessão, mostra `LoginScreen`.
+    3. Com sessão e sem `displayNameOf(user)`, mostra o `Onboarding` no passo `name` e grava com `saveDisplayName`.
+    4. Com nome, chama `acceptInvites(nome)` a cada abertura e login, e depois `loadMyMemberships`.
+    5. Sem nenhum workspace, mostra o `Onboarding` no passo `workspace`, que chama `createWorkspace`.
+    6. Com workspace, mostra o `Shell` (Task 5). Antes da Task 5, um texto com o nome do workspace.
 
 - [ ] **Step 1: Write the failing tests.**
   - `errors.test.ts`: `maps each server message to its Portuguese text` (uma linha da tabela por caso) e `falls back to the generic text`.
+  - `auth-callback.test.ts`:
+    - `reads the code from the auth callback`.
+    - `reads the error description`.
+    - `ignores other links and other schemes`.
   - `auth.test.ts` (Supabase local):
-    - `a member signs in with the emailed code`: usa `generateLink` para obter o código, depois `verifyLoginCode`, e `loadMyMemberships` traz o time e o papel.
-    - `an unknown email gets the same answer as a member`: `sendLoginCode` resolve.
+    - `a new person signs up with an email code and creates a workspace`:
+      - `sendLoginCode` com um e-mail novo resolve.
+      - O código sai de `generateLink({ type: 'magiclink', email })`, e `verifyLoginCode` entra.
+      - `saveDisplayName` grava o nome, e `createWorkspace` cria o workspace.
+      - `loadMyMemberships` traz o workspace com o papel `admin`.
+    - `an invited person joins the inviter's workspace on first login`: o admin do A convida o e-mail como `designer`. A pessoa entra pelo código e `acceptInvites` devolve 1. As memberships trazem o A como `designer`.
     - `a wrong code is refused with a readable message`.
+    - `oauthUrl points to the provider through Supabase`: com o Google desligado no ambiente local, `friendlyError` do erro dá "Esse jeito de entrar ainda não está disponível.". Com o Google ligado (variáveis em `supabase/.env`), a URL contém `/auth/v1/authorize?provider=google` e `redirect_to=sala%3A%2F%2Fauth%2Fcallback`.
   - `login-screen.test.tsx` (jsdom):
     - `asks for the code after sending it`.
     - `shows the friendly error and keeps the email`.
+    - `starts Google and Apple sign-in`.
+  - `onboarding.test.tsx` (jsdom):
+    - `saves the suggested name`.
+    - `creates the workspace with the typed name`.
 - [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop`. Expected: FAIL.
 - [ ] **Step 3: Implementar.**
-- [ ] **Step 4: Run.** Run: `pnpm test && pnpm typecheck`. Expected: PASS.
+- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
 - [ ] **Step 5: Conferir à mão.**
   - Rodar `pnpm app` com `packages/desktop/.env.local` apontando para o Supabase local.
-  - Pedir o código para um usuário de teste e ler o e-mail no Mailpit (`http://127.0.0.1:55324`).
-  - Entrar.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "feat(desktop): email code login, session and readable errors"`
+  - Entrar com um e-mail novo pelo código, que chega no Mailpit (`http://127.0.0.1:55324`).
+  - Dar o nome e criar o workspace.
+  - Google e Apple são conferidos na Task 13, com o app empacotado: o link `sala://` só funciona assim no macOS.
+- [ ] **Step 6: Commit.** `git add -A && git commit -m "feat(desktop): Google, Apple and email code sign-in with workspace onboarding"`
 
 ---
 
 ### Task 5: Campanhas, peças, navegação e link de compartilhamento
 
 **Files:**
-- Create: `src/lib/link.ts`, `src/data/campaigns.ts`, `src/data/files.ts` (só `signedUrls` nesta task), `src/ui/Shell.tsx`, `src/ui/CampaignSidebar.tsx`, `src/ui/PieceList.tsx`, `src/ui/PieceHeader.tsx`
-- Modify: `src/ui/App.tsx`
-- Test: `tests/desktop/link.test.ts`, `tests/desktop/campaigns.test.ts`
+- Create: `src/lib/workspace.ts`, `src/data/campaigns.ts`, `src/data/files.ts` (só `signedUrls` nesta task), `src/ui/Shell.tsx`, `src/ui/CampaignSidebar.tsx`, `src/ui/PieceList.tsx`, `src/ui/PieceHeader.tsx`
+- Modify: `src/lib/link.ts`, `src/ui/App.tsx`
+- Test: `tests/desktop/link.test.ts`, `tests/desktop/workspace.test.ts`, `tests/desktop/campaigns.test.ts`
 
 **Interfaces:**
 - Produces:
@@ -314,17 +358,22 @@ it('renders the app title', () => {
   - `createPiece(client, input: { campaignId: string; teamId: string; title: string; kind: PieceKind }): Promise<Piece>`.
   - `renamePiece(client, pieceId, title): Promise<void>`.
   - `loadThumbnails(client, campaignId): Promise<Record<string, string>>`: `piece_id` para o `image_path` da versão mais nova com imagem.
-  - `resolveRoute(client, route: Route): Promise<{ route: Route; notice: string | null }>`:
-    - Uma campanha ou peça que não carrega vira `{ campaignId: null, pieceId: null }`, com `notice` "Peça não encontrada ou sem acesso.".
+  - `resolveRoute(client, route: Route): Promise<{ route: Route; teamId: string | null; notice: string | null }>`:
+    - Uma campanha ou peça que não carrega vira `{ campaignId: null, pieceId: null }`, com `teamId: null` e `notice` "Peça não encontrada ou sem acesso.".
     - Uma peça de outra campanha corrige `campaignId`.
+    - `teamId` é o workspace da campanha, para o app trocar de workspace quando o link é de outro workspace da pessoa.
+  - `pickWorkspace(memberships: Membership[], stored: string | null): string | null` (`lib/workspace.ts`): o `stored` se a pessoa ainda é membro dele; senão, o primeiro; sem nenhum, null. O app guarda o último workspace em `localStorage` (`sala.workspace`), com `try/catch`. *(Revisão de 2026-10-28: a pessoa pode estar em vários workspaces.)*
   - `subscribeLists(client, teamId, campaignId: string | null, onChange: () => void): () => void`: INSERT em `campaigns` (`team_id=eq.`) e INSERT/UPDATE em `pieces` (`campaign_id=eq.`).
   - `signedUrls(client, paths: string[]): Promise<Record<string, string>>`: URLs assinadas por 1 h, num pedido só.
 - UI (layout da seção 4 do spec):
-  - **`CampaignSidebar` (esquerda):** campanhas, as peças da campanha aberta, o botão "Nova campanha" e, embaixo, o time (nome, papel e o ponto de online, que a Task 11 liga).
+  - **`CampaignSidebar` (esquerda):**
+    - No topo, o seletor de workspace (quando há mais de um) e "Novo workspace", que pede o nome e chama `createWorkspace` (Task 4).
+    - Depois, as campanhas, as peças da campanha aberta e o botão "Nova campanha".
+    - Embaixo, as pessoas do workspace: nome, papel e o ponto de online, que a Task 11 liga.
   - **`PieceList` (direita):** as peças da campanha, com miniatura, título, tipo e status (rótulos da Task 6), e o botão "Nova peça" (título e tipo).
   - **`PieceHeader` (topo):** nome da campanha e da peça (renomear direto, se `can_write`), espaço dos avatares (Task 11) e o botão "Compartilhar", que copia `buildLink` com `copyText` e mostra "Link copiado".
   - **Centro:** "Escolha uma peça" até a Task 6.
-  - **`App`:** registra `onDeepLink`. Um link que chega sem sessão fica guardado e é aberto depois do login. O `notice` aparece num aviso que some ao clicar.
+  - **`App`:** as URLs do `onDeepLink` (Task 4) que não são de login passam por `parseLink` e `resolveRoute`. Um link que chega sem sessão fica guardado e é aberto depois do login. O `notice` aparece num aviso que some ao clicar.
   - **`espectador`:** não vê "Nova campanha" nem "Nova peça".
 
 - [ ] **Step 1: Write the failing tests.**
@@ -332,12 +381,16 @@ it('renders the app title', () => {
     - `builds and parses campaign and piece links`.
     - `lowercases ids and accepts a trailing slash`.
     - `rejects other schemes, paths and non-uuid ids`.
+  - `workspace.test.ts`:
+    - `pickWorkspace keeps the stored workspace while the person is still a member`.
+    - `pickWorkspace falls back to the first workspace, or null without any`.
   - `campaigns.test.ts` (local):
     - `designer creates a campaign and a piece and renames it`.
     - `espectador gets the friendly permission error`: `friendlyError` dá "Você não tem permissão para isso.".
     - `thumbnails use the newest version with an image`: usar `createAgentVersion` duas vezes.
     - `a link to another team's piece resolves to no route with a notice`.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/link.test.ts tests/desktop/campaigns.test.ts`. Expected: FAIL.
+    - `a link to a campaign in another of my workspaces returns that workspace`.
+- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/link.test.ts tests/desktop/workspace.test.ts tests/desktop/campaigns.test.ts`. Expected: FAIL.
 - [ ] **Step 3: Implementar.**
 - [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
 - [ ] **Step 5: Conferir à mão.**
@@ -632,11 +685,11 @@ it('renders the app title', () => {
 
 ---
 
-### Task 12: Configurações do time — chaves e membros
+### Task 12: Configurações do workspace — chaves, membros e convites
 
 **Files:**
 - Create: `src/data/keys.ts`, `src/ui/Settings.tsx`, `scripts/fake-agent.ts`
-- Modify: `src/data/team.ts`, `src/ui/CampaignSidebar.tsx` (botão "Configurações do time", só para `admin`), `tests/helpers/images.ts` (recebe `solidPng`, que sai de `tests/live/providers.live.test.ts`), `package.json` da raiz (script `"fake-agent": "node scripts/fake-agent.ts"`), `tsconfig.json` (`include` ganha `scripts`)
+- Modify: `src/data/team.ts`, `src/ui/CampaignSidebar.tsx` (botão "Configurações do workspace", só para `admin`), `tests/helpers/images.ts` (recebe `solidPng`, que sai de `tests/live/providers.live.test.ts`), `package.json` da raiz (script `"fake-agent": "node scripts/fake-agent.ts"`), `tsconfig.json` (`include` ganha `scripts`)
 - Test: `tests/desktop/keys.test.ts`, `tests/desktop/team.test.ts`, `tests/desktop/settings.test.tsx`, `tests/desktop/fake-agent.test.ts`
 
 **Interfaces:**
@@ -648,7 +701,8 @@ it('renders the app title', () => {
   - `saveKey(client, teamId, provider, key: string): Promise<void>` e `deleteKey(client, teamId, provider): Promise<void>`.
   - `maskKey(last4: string): string`: `...<last4>`.
 - Produces (`team.ts`; `Member` e `loadMembers` vêm da Task 4):
-  - `addMember(client, input: { teamId: string; email: string; displayName: string; role: Role }): Promise<void>`: chama `functions.invoke('add-member')`. Num `FunctionsHttpError`, lança o `error` do JSON da resposta.
+  - `type Invite = { email: string; role: Role; created_at: string }`.
+  - `inviteMember(client, teamId, email: string, role: Role): Promise<void>`, `loadInvites(client, teamId): Promise<Invite[]>` e `revokeInvite(client, teamId, email: string): Promise<void>` (RPCs e tabela da Task 2). *(Revisão de 2026-10-28: convites no banco no lugar da Edge Function `add-member`.)*
   - `setMemberRole(client, teamId, userId, role): Promise<void>` e `removeMember(client, teamId, userId): Promise<void>`.
 - Produces (`scripts/fake-agent.ts`). É o agente falso para conferir o app sem chaves de provedor; ele nunca chama provedor real.
   - `assertLocalUrl(url: string): void`: só aceita `127.0.0.1` ou `localhost`. Em qualquer outro host, lança `Error('fake-agent só roda contra o Supabase local')`.
@@ -657,23 +711,28 @@ it('renders the app title', () => {
     - A imagem devolve `solidPng(512, <cor aleatória>)`, um PNG de verdade, visível no app. Ela espera 3 s, para dar tempo de testar o redirecionamento.
   - O script lê `.env.test`, chama `assertLocalUrl` e roda `runWorker` (Plano 2) com ``(slot) => createExecutorDb(client, `fake-agent#${slot}`)`` e `fakeAgentProviders()`, até `Ctrl+C`.
   - O time precisa de uma chave falsa (20+ caracteres, sem espaço, ex.: `chave-falsa-local-0001`) para `anthropic` e para `gemini`, cadastrada na tela de chaves desta task. Os provedores falsos ignoram a chave.
-- UI: `Settings(props: { teamId; keys: KeyRow[]; members: Member[]; me: string; onSaveKey; onDeleteKey; onAddMember; onSetRole; onRemove })`, com as abas "Chaves" e "Membros".
+- UI: `Settings(props: { teamId; keys: KeyRow[]; members: Member[]; invites: Invite[]; me: string; onSaveKey; onDeleteKey; onInvite; onRevokeInvite; onSetRole; onRemove })`, com as abas "Chaves" e "Membros".
   - **Chaves:** uma linha por `KEY_PROVIDERS`.
     - Mostra `maskKey` e "Atualizada em <data>", ou "Sem chave".
     - Campo `type="password"` com `autoComplete="off"`, e os botões "Salvar" e "Remover" (com confirmação).
     - Depois de salvar, o campo é limpo e a máscara nova aparece.
-  - **Membros:** a lista com o papel editável, "Remover" (com confirmação; a pessoa perde o acesso na hora) e o formulário "Adicionar membro" (e-mail, nome e papel).
+  - **Membros:**
+    - A lista de membros, com o papel editável e "Remover" (com confirmação; a pessoa perde o acesso na hora).
+    - O formulário "Convidar" (e-mail e papel). Depois de convidar, aparece o texto "Convite criado. Avise a pessoa: baixe a Sala da Campanha e entre com <email>." e o botão "Copiar". O app não manda e-mail de convite.
+    - Os convites pendentes, cada um com "Cancelar".
 
 - [ ] **Step 1: Write the failing tests.**
   - `keys.test.ts` (local):
     - `admin saves a key and members load only the mask`: `JSON.stringify(await loadKeys(...))` não contém a chave.
     - `gestor gets the friendly admin-only message`.
   - `team.test.ts` (local):
-    - `addMember surfaces the function's message`: o gestor recebe "Só o admin do time adiciona membros.".
+    - `only the admin invites, with the friendly message`: o gestor recebe "Só o admin do workspace convida pessoas.".
+    - `admin invites, lists and cancels an invite`.
     - `admin changes a role and removes a member`.
   - `settings.test.tsx` (jsdom):
     - `clears the typed key after saving and shows only the mask`.
     - `asks before removing a member`.
+    - `shows the text to send after inviting`.
   - `fake-agent.test.ts`:
     - `refuses a non-local Supabase URL`.
     - `fake providers answer with a plan parsePlan accepts and a real PNG`: `parsePlan` aceita o plano para os 3 tipos de peça, e `sniffType` do PNG dá `image/png`.
@@ -684,7 +743,7 @@ it('renders the app title', () => {
   - Cadastrar chaves falsas para Anthropic e Gemini.
   - Rodar `pnpm fake-agent` em outro terminal e pedir uma peça. A mensagem passa por "o agente está trabalhando" e vira uma versão com imagem colorida.
   - Uma segunda mensagem mandada durante os 3 s da imagem entra na rodada seguinte.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "feat(desktop): team settings for provider keys and members, and a local fake agent"`
+- [ ] **Step 6: Commit.** `git add -A && git commit -m "feat(desktop): workspace settings for keys, members and invites, and a local fake agent"`
 
 ---
 
@@ -701,18 +760,21 @@ it('renders the app title', () => {
   - `docs/instalar-no-mac.md`, em pt-BR, para o time:
     - Abrir o `.dmg` e arrastar para Aplicativos.
     - No primeiro uso, ir em Ajustes do Sistema → Privacidade e Segurança → "Abrir mesmo assim".
-    - Entrar com o código do e-mail.
+    - Entrar com Google, Apple ou o código do e-mail, e criar o workspace.
 
 - [ ] **Step 1: Suíte.** Run: `pnpm db:reset && pnpm test && pnpm typecheck && cargo check --manifest-path packages/desktop/src-tauri/Cargo.toml`. Expected: PASS.
 - [ ] **Step 2: Build.** Run: `pnpm --filter @sala/desktop tauri build`, com `.env.local` do Supabase local. Expected: o `.app` e o `.dmg` são gerados.
 - [ ] **Step 3: Conferir à mão** (instalar o `.app` em `/Applications`, com o Supabase local):
-  - [ ] Entrar com o código do Mailpit; fechar e abrir o app mantém a sessão.
+  - [ ] Entrar com um e-mail novo pelo código do Mailpit, dar o nome e criar o workspace; fechar e abrir o app mantém a sessão.
+  - [ ] Google: com um cliente OAuth do tipo Web (redirect `http://127.0.0.1:55321/auth/v1/callback`) e as variáveis em `supabase/.env`, "Entrar com Google" abre o navegador e volta ao app por `sala://auth/callback`, já logado.
+  - [ ] Apple: o mesmo, com o Services ID e a chave da conta Apple Developer. Sem a conta, o item fica pendente no `HANDOFF.md`.
+  - [ ] Um convite para o e-mail de uma segunda conta: no login dela, o workspace aparece com o papel convidado.
   - [ ] Criar campanha e peça; subir 2 referências; um PDF é recusado com a mensagem.
   - [ ] `open 'sala://campanha/<id>/peca/<id>'` abre a peça, com o app aberto e com o app fechado.
   - [ ] Sem o `fake-agent`, a mensagem ao agente fica "na fila"; `@Nome` notifica a outra pessoa, que está no navegador.
   - [ ] Com `pnpm fake-agent` rodando e chaves falsas cadastradas, pedir uma peça e receber a versão; aprovar, enviar a final, comentar no ponto e no trecho, e aprovar a final.
   - [ ] Como espectador, nenhum botão de escrita aparece.
-  - [ ] As configurações (só admin) salvam a chave e mostram só `...last4`; adicionar membro funciona.
+  - [ ] As configurações (só admin) salvam a chave e mostram só `...last4`; convidar e cancelar convite funcionam.
   - [ ] `grep -r` por um trecho da chave salva no diretório de dados do app (`~/Library/WebKit/app.salacampanha.desktop`, `~/Library/Application Support/app.salacampanha.desktop`) não acha nada.
 - [ ] **Step 4: Registrar.**
   - Preencher "Verificado" neste plano.
@@ -725,21 +787,27 @@ it('renders the app title', () => {
 
 | Tema | Decisão |
 |---|---|
-| Login | Código de 6 dígitos no e-mail, sem senha (decisão do fundador, 2026-10-28). O template local tem `{{ .Token }}`. No projeto hospedado, precisa de SMTP próprio |
-| Novos membros | O admin adiciona no app (e-mail, nome e papel) pela Edge Function `add-member`, que cria a conta com a service role no servidor (decisão do fundador, 2026-10-28). Trocar papel e remover são RPCs. O time nunca fica sem admin |
-| Distribuição | `.dmg` sem assinatura para o teste, com um guia de instalação (decisão do fundador, 2026-10-28). Assinatura, notarização e atualização automática ficam para depois |
+| Cadastro e login | Cadastro aberto com Google, Apple e código de 6 dígitos no e-mail, sem senha (decisões do fundador, 2026-10-28). OAuth com PKCE, voltando ao app por `sala://auth/callback`. O template local tem `{{ .Token }}`. No projeto hospedado, precisa de SMTP próprio |
+| Workspace | No primeiro login, a pessoa cria o próprio workspace (`create_workspace`) e é admin dele. Pode estar em vários e trocar pela lateral |
+| Convites | O admin convida por e-mail e papel (`invite_member`). O convite é aceito no login pelo dono do e-mail verificado (`accept_invites`). O app não manda e-mail: mostra o texto para a pessoa copiar. Trocar papel e remover são RPCs. O workspace nunca fica sem admin. Substitui a Edge Function `add-member` (revisão de 2026-10-28) |
+| Login com assinatura | Fora: a Anthropic não permite que apps de terceiros ofereçam login com a conta do Claude sem aprovação. O modo local estilo Conductor é uma ideia guardada (spec, seção 11a) |
+| Distribuição | `.dmg` sem assinatura para os testes, com um guia de instalação (decisão do fundador, 2026-10-28). Assinatura e notarização são obrigatórias antes de abrir o download ao público. A atualização automática fica para depois |
 | Navegação | Estado React com `Route`, sem roteador. O link `sala://` vira `Route` |
 | Estado | Hooks e props, sem biblioteca de estado. A camada de dados recebe o client por parâmetro |
 | Tempo real | Um canal por peça (`piece:<id>`) e um por time (presença, menções e listas). A cada `SUBSCRIBED`, o app busca o que perdeu |
 | Presença | Canal privado `team:<id>`, autorizado por policy em `realtime.messages`. Um membro de outro time não entra |
 | Escolha de modelo | O app sempre manda uma escolha explícita. O valor inicial do seletor segue a mesma herança por capacidade do executor (`inheritedModel` no shared) |
 | Imagens | URLs assinadas de 1 h. Baixar abre uma URL assinada com `download` no navegador padrão |
-| Múltiplos times | Usa o primeiro time (comentário `shortcut:`). A troca de time fica para quando alguém estiver em mais de um |
+| Vários workspaces | Seletor na lateral; o último workspace usado fica no `localStorage`; um link de outro workspace da pessoa troca para ele (revisão de 2026-10-28: antes, usava o primeiro time) |
 | Teste sem chaves | `pnpm fake-agent` roda o worker do Plano 2 com provedores falsos, só contra o Supabase local. O fluxo inteiro do app pode ser testado antes de existir chave de provedor |
 
 ## Fora deste plano
 
-- Assinatura Apple, notarização e atualização automática.
+- Atualização automática. (Assinatura e notarização ficam no checklist de deploy, antes do download público.)
+- Modo local estilo Conductor, com o Claude Code ou o Codex da pessoa (spec, seção 11a). Depende de aprovação da Anthropic.
+- E-mail de convite enviado pelo app.
+- Limites contra abuso do cadastro aberto (por exemplo, quantos workspaces uma pessoa pode criar).
+- Quem entra com Apple usando e-mail privado (relay) não casa com um convite para o e-mail real: nesse caso, a pessoa entra com Google ou com o código no e-mail.
 - Windows e Linux.
 - Notificações no Microsoft Teams e registro de uso por pessoa.
 - Krea (depende da designer; ver `HANDOFF.md`).
@@ -748,11 +816,14 @@ it('renders the app title', () => {
 ## Checklist de deploy do app
 
 - [ ] Aplicar a migration `0010_app_support.sql` no projeto hospedado.
-- [ ] `supabase functions deploy add-member`.
 - [ ] Auth no projeto hospedado:
+  - Ligar o cadastro público ("Allow new users to sign up").
   - Configurar SMTP próprio (ex.: Resend).
   - Usar o template "Magic Link" com `{{ .Token }}` (conteúdo de `supabase/templates/codigo.html`).
-  - Manter o cadastro público desligado.
+  - Pôr `sala://auth/callback` em Redirect URLs.
+  - Google: um cliente OAuth no Google Cloud, com o redirect `https://<projeto>.supabase.co/auth/v1/callback`.
+  - Apple: um Services ID e uma chave na conta Apple Developer.
+- [ ] Antes de abrir o download ao público, assinar e notarizar o app com a conta Apple Developer.
 - [ ] Gerar o build com `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` do projeto hospedado. Nunca usar a service role no build.
 - [ ] Executor do Plano 2 rodando, com as pendências do teste ao vivo resolvidas.
 - [ ] Distribuir o `.dmg` com `docs/instalar-no-mac.md`.

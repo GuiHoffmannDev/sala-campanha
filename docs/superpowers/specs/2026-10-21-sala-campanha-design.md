@@ -25,6 +25,7 @@ Agentes já executam tarefas longas e de qualidade, e times de marketing já pag
 
 ## 2. Usuários
 
+- **Quem usa:** qualquer pessoa ou time que baixar o app. Cada pessoa cria a própria conta, trabalha no próprio workspace com as próprias chaves e pode convidar outras pessoas. *(Revisão de 2026-10-28, por decisão do fundador: antes, a primeira versão era fechada ao time de teste.)*
 - **Primeiro time de teste:** o time de marketing interno onde trabalha a namorada do fundador (designer). A designer usa Windows no dia a dia, mas tem um Mac disponível para o teste; o resto do time (incluindo o gestor) usa macOS. Por isso a primeira versão pode ser só para macOS. O time se comunica pelo Microsoft Teams, usa Krea para imagem e pode instalar programas por conta própria.
 - **Papéis dentro do time:**
   - **Gestor:** pede peças, redireciona e aprova.
@@ -43,12 +44,13 @@ O time de teste usar o app **numa campanha real**, do pedido à peça aprovada, 
 1. Campanhas compartilhadas entre membros do time, com presença (quem está online e quem está em cada peça).
 2. Um chat por peça, compartilhado entre pessoas e agente, onde cada mensagem mostra quem a enviou.
 3. Geração de **texto e imagem** no mesmo chat, com escolha de modelo e provedor por pedido e, quando o modelo permite, do esforço (quanto ele raciocina). *(Esforço incluído em 2026-10-27, por decisão do fundador.)*
-4. **Chaves do time** (traga suas próprias chaves): o admin cadastra uma vez as chaves de OpenAI, Anthropic, Krea e outros provedores suportados, e todo o time usa.
+4. **Chaves do workspace** (traga suas próprias chaves): o admin do workspace cadastra uma vez as chaves de OpenAI, Anthropic, Krea e outros provedores suportados, e todos do workspace usam. No workspace próprio, o admin é a própria pessoa.
 5. **Fotos do produto como referência:** uma biblioteca por campanha. As fotos podem ser anexadas como referência em qualquer geração de imagem.
 6. **Redirecionar durante a geração:** alguém pode mandar mensagem enquanto o agente trabalha, e o pedido é incorporado sem recomeçar a conversa.
 7. **Ciclo de vida da peça** com versões, comentários presos a um ponto da imagem e aprovação pelo gestor (seção 5).
 8. **Upload da versão final** feita fora do app (Photoshop), para revisão e aprovação dentro da peça.
 9. Link de compartilhamento do workspace, que abre o app direto na campanha ou peça.
+10. **Cadastro aberto:** qualquer pessoa entra com Google, Apple ou um código enviado por e-mail. No primeiro login, ela cria o próprio workspace, onde é admin. Convites por e-mail trazem outras pessoas, e o convite é aceito quando a pessoa entra com aquele e-mail. *(Revisão de 2026-10-28, por decisão do fundador.)*
 
 ### Não-objetivos (fora da primeira versão)
 
@@ -59,6 +61,7 @@ O time de teste usar o app **numa campanha real**, do pedido à peça aprovada, 
 - Outros verticais (jurídico, vendas). O jurídico fica guardado como ideia 2.
 - Windows e Linux. A primeira versão é só para macOS.
 - Créditos próprios ou revenda de uso de IA. O time paga direto aos provedores com as próprias chaves.
+- Login com a assinatura do Claude, do ChatGPT ou de outra IA no lugar da chave de API. Fica como ideia guardada (seção 11a). *(Revisão de 2026-10-28, por decisão do fundador.)*
 
 ### Anti-objetivos (fracasso mesmo que funcione)
 
@@ -132,7 +135,8 @@ Uma versão é um pacote: imagem e legenda juntas, aprovadas juntas. A legenda p
 ## 6. Modelos e chaves (decidido)
 
 - **Traga suas próprias chaves:** o time usa as próprias contas de provedores de IA.
-- **Chave do time inteiro:** o admin cadastra cada chave uma vez, e todos os membros usam. Não há chave pessoal por membro na primeira versão.
+- **Chave do workspace inteiro:** o admin do workspace cadastra cada chave uma vez, e todos os membros usam. Quem trabalha sozinho é o admin do próprio workspace, então cadastra as próprias chaves. Não há chave pessoal por membro dentro de um workspace compartilhado. *(Revisão de 2026-10-28.)*
+- **Sem login com assinatura:** a autenticação com os provedores é só por chave de API. A Anthropic não permite que apps de terceiros ofereçam login com a conta do Claude sem aprovação prévia (documentação do Claude Agent SDK). *(Revisão de 2026-10-28, por decisão do fundador; ver seção 11a.)*
 - **Provedores da primeira versão** *(escolha do autor, a confirmar com o time)*:
   - Texto: OpenAI e Anthropic.
   - Imagem com referência: o primeiro adaptador é um modelo que aceita várias imagens de referência, como Gemini (Nano Banana) ou Flux Kontext. O Krea entra como segundo adaptador, se a API dele cobrir o uso do time.
@@ -154,7 +158,7 @@ Uma versão é um pacote: imagem e legenda juntas, aprovadas juntas. A legenda p
 
 - **App desktop:** **Tauri** (Rust + WebKit do sistema), como o Conductor, **somente para macOS na primeira versão**. *(Decisão do fundador.)* A interface é web (React), empacotada no Tauri. A parte em Rust deve ficar mínima (janela, protocolo de link, notificações), porque o agente roda no servidor. Windows fica para uma versão posterior; o Tauri usa WebView2 no Windows, então diferenças visuais entre os motores precisarão ser testadas nessa etapa. O link de compartilhamento usa um protocolo próprio (ex.: `sala://campanha/<id>/peca/<id>`), registrado na instalação.
 - **Backend:** Supabase. *(Escolha do autor, alinhada aos projetos existentes do fundador em Next.js.)*
-  - Auth: login e convite de membros para o time.
+  - Auth: cadastro aberto com Google, Apple e código por e-mail. O workspace é criado no primeiro login, e o convite por e-mail é aceito quando a pessoa entra com aquele e-mail verificado. *(Revisão de 2026-10-28.)*
   - Postgres: dados (seção 8), com Row Level Security por time.
   - Realtime: presença e novas mensagens e eventos chegando ao vivo para todos.
   - Storage: fotos de referência, imagens geradas e versões finais.
@@ -207,7 +211,7 @@ Análise feita no app instalado (v0.91.2), limitada a estrutura, esquema do banc
 
 *(Escolhas do autor.)*
 
-- **Primeira versão só para o time de teste.** O time e os membros são criados manualmente, sem cadastro aberto ao público nem onboarding automático.
+- **Cadastro aberto, teste com o time de marketing.** Qualquer pessoa pode criar conta e workspace (seção 3, objetivo 10), mas o teste real continua com o time de marketing. O `.dmg` dos testes não tem assinatura da Apple. O download público só abre depois da assinatura e da notarização. *(Revisão de 2026-10-28, por decisão do fundador: antes, o time e os membros eram criados manualmente, sem cadastro aberto.)*
 - **Obrigatórios para o teste:**
   - chat compartilhado com autor por mensagem;
   - presença;
@@ -234,3 +238,16 @@ Análise feita no app instalado (v0.91.2), limitada a estrutura, esquema do banc
 ## 11. Ideia guardada: jurídico
 
 Mesmo padrão aplicado a escritórios de advocacia: estagiário redige com IA, advogada revisa, e a correção dela hoje se perde. Usuários de teste disponíveis: o sócio advogado e a chefe do fundador num escritório. Fica para depois da validação em marketing.
+
+## 11a. Ideia guardada: modo local estilo Conductor
+
+*(Registrada em 2026-10-28, por decisão do fundador.)*
+
+O fundador quer que a pessoa possa usar a assinatura que já paga (Claude, ChatGPT) em vez de uma chave de API. O Conductor faz isso sem oferecer login próprio: ele roda o Claude Code e o Codex que a pessoa instalou e logou no próprio Mac.
+
+- **Como seria aqui:** um modo em que o agente de texto roda no Mac da pessoa, pelo Claude Code ou pelo Codex instalados, e grava o resultado no servidor como hoje.
+- **Trade-offs:**
+  - O agente para quando a pessoa fecha o notebook. Isso vai contra o princípio central da seção 7: quem pediu fica sem resposta.
+  - Gerar imagem continua exigindo chave de API, porque as assinaturas não cobrem as APIs de imagem.
+- **Bloqueio:** a documentação do Claude Agent SDK diz: *"Unless previously approved, Anthropic does not allow third party developers to offer claude.ai login or rate limits for their products, including agents built on the Claude Agent SDK."* Antes de qualquer trabalho, é preciso pedir aprovação à Anthropic e conferir as regras da OpenAI para o Codex.
+- Vira um plano próprio (Plano 4 ou depois), só depois da aprovação.

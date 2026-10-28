@@ -464,6 +464,7 @@ A revisão final do plano contra o spec gerou estas regras, já refletidas nas i
 | Offsets de trecho | Code points Unicode (`Array.from(caption)` no cliente) |
 | Chave colada | Aparada nas pontas; espaço interno rejeitado |
 | Limites do bucket | PNG, JPEG e WebP, até 25 MB |
+| Cadastro | *(Revisão de 2026-10-28, por decisão do fundador.)* O Global Constraint "não há cadastro público; times são criados com service role" foi substituído: o cadastro é aberto (Google, Apple e código por e-mail), e cada pessoa cria o próprio workspace (`team`) no primeiro login. O `enable_signup` e as RPCs de workspace e convite entram na Task 2 do Plano 3 |
 | DELETE no Realtime | Não passa por RLS: o service role, ao apagar em cascata, expõe só as chaves primárias a outros assinantes. Aceito: deleção é rara e manual |
 
 ## Checklist de deploy

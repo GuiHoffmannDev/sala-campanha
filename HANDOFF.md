@@ -407,6 +407,10 @@ Pré-requisitos:
 
 Nenhuma chave real de provedor é necessária: a partir da Tarefa 12, `pnpm fake-agent` responde no lugar do agente, só no Supabase local. Para ver o app, use `pnpm app`. Os códigos de login chegam no Mailpit (`http://127.0.0.1:55324`).
 
+*Revisão de 2026-10-28:* o app ficou aberto ao público, como o Conductor. Qualquer pessoa entra com Google, Apple ou código no e-mail, cria o próprio workspace, cadastra as próprias chaves e convida outras pessoas. Detalhes no topo do plano e no spec (objetivo 10 e seção 11a).
+- Para testar Google e Apple de ponta a ponta (Tarefa 13), é preciso o app empacotado (`pnpm --filter @sala/desktop tauri build --debug`) e as credenciais OAuth em `supabase/.env`, que nunca vai para o git.
+- O login com Apple precisa de uma conta Apple Developer. Ela também é necessária para assinar o app antes do download público.
+
 ### Tarefa 1 — Pacote do app: Tauri, React e testes de interface
 - [ ] Implementada
 - [ ] Revisada
@@ -420,7 +424,7 @@ cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia do
 cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 1 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 1, Global Constraints e Review Focus. Foque em a parte Rust só registrar plugins, na CSP e nas capabilities mínimas, em nenhuma service role no pacote desktop e no Docker do executor ainda buildando. Só reporte problemas, com arquivo:linha. Não edite nada."
 ```
 
-### Tarefa 2 — Backend do app: membros, presença privada, tempo real e código por e-mail
+### Tarefa 2 — Backend do app: workspaces, convites, presença privada, tempo real e login aberto
 - [ ] Implementada
 - [ ] Revisada
 
@@ -430,7 +434,7 @@ cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia do
 ```
 **Revisar:**
 ```
-cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 2 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 2, Global Constraints e Review Focus. Foque na policy de presença (outro time não entra no canal), em set_member_role e remove_member nunca deixarem o time sem admin, em funções security definer com search_path vazio e na Edge Function add-member sem vazar token ou service role e respondendo igual para conta nova ou existente. Só reporte problemas, com arquivo:linha. Não edite nada."
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 2 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 2, Global Constraints e Review Focus. Foque em accept_invites só aceitar convite do dono do e-mail confirmado, em invite_member e team_invites só para admin, na policy de presença (outro time não entra no canal), em set_member_role e remove_member nunca deixarem o workspace sem admin, em funções security definer com search_path vazio e em nenhuma service role fora do servidor. Só reporte problemas, com arquivo:linha. Não edite nada."
 ```
 
 ### Tarefa 3 — Contrato compartilhado: escolha de modelo e eventos da conversa
@@ -446,7 +450,7 @@ cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia do
 cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 3 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 3, Global Constraints e Review Focus. Foque em checkModelChoice e inheritedModel manterem o comportamento do executor, nos schemas de evento baterem com as migrations e em parseEvent nunca quebrar com uma linha ruim. Só reporte problemas, com arquivo:linha. Não edite nada."
 ```
 
-### Tarefa 4 — Login por código, sessão e mensagens de erro
+### Tarefa 4 — Login com Google, Apple e código por e-mail, entrada no workspace e mensagens de erro
 - [ ] Implementada
 - [ ] Revisada
 
@@ -456,7 +460,7 @@ cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia do
 ```
 **Revisar:**
 ```
-cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 4 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 4, Global Constraints e Review Focus. Foque na resposta igual para e-mail cadastrado ou não, nos textos exatos de errors.ts e em nenhum segredo além da anon key no app. Só reporte problemas, com arquivo:linha. Não edite nada."
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 4 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 4, Global Constraints e Review Focus. Foque no OAuth com PKCE voltando por sala://auth/callback (parseAuthCallback e finishOAuth), no onboarding (nome, accept_invites a cada login e create_workspace), nos textos exatos de errors.ts e em nenhum segredo além da anon key no app. Só reporte problemas, com arquivo:linha. Não edite nada."
 ```
 
 ### Tarefa 5 — Campanhas, peças, navegação e link de compartilhamento
@@ -469,7 +473,7 @@ cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia do
 ```
 **Revisar:**
 ```
-cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 5 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 5, Global Constraints e Review Focus. Foque em parseLink recusar entradas inválidas, no link para peça de outro time ou inexistente e no espectador sem botões de criação. Só reporte problemas, com arquivo:linha. Não edite nada."
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 5 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 5, Global Constraints e Review Focus. Foque em parseLink recusar entradas inválidas, no link para peça de outro time ou inexistente, no seletor de workspace (pickWorkspace e link de outro workspace da pessoa) e no espectador sem botões de criação. Só reporte problemas, com arquivo:linha. Não edite nada."
 ```
 
 ### Tarefa 6 — Conversa ao vivo
@@ -550,7 +554,7 @@ cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia do
 cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 11 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 11, Global Constraints e Review Focus. Foque no canal privado de presença, em notificar só menções a mim feitas por outra pessoa e em nenhum dado de outro time. Só reporte problemas, com arquivo:linha. Não edite nada."
 ```
 
-### Tarefa 12 — Configurações do time: chaves e membros
+### Tarefa 12 — Configurações do workspace: chaves, membros e convites
 - [ ] Implementada
 - [ ] Revisada
 
@@ -560,7 +564,7 @@ cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia do
 ```
 **Revisar:**
 ```
-cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 12 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 12, Global Constraints e Review Focus. Foque em a chave nunca voltar ao app (só ...last4 e o campo limpo depois de salvar), nas telas só para admin e no fake-agent recusar um Supabase que não seja local. Só reporte problemas, com arquivo:linha. Não edite nada."
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 12 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 12, Global Constraints e Review Focus. Foque em a chave nunca voltar ao app (só ...last4 e o campo limpo depois de salvar), nos convites (convidar, listar e cancelar só pelo admin), nas telas só para admin e no fake-agent recusar um Supabase que não seja local. Só reporte problemas, com arquivo:linha. Não edite nada."
 ```
 
 ### Tarefa 13 — Build, DMG e verificação final
@@ -569,7 +573,7 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 12 do plan
 
 **Implementar:**
 ```
-cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 13. O checklist manual do Step 3 eu faço junto: me diga cada item e espere minha resposta. Ao terminar: suite passando, checkboxes da Task 13 marcados no plano, commit feito."
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 13. O checklist manual do Step 3 eu faço junto: me diga cada item e espere minha resposta. Google e Apple precisam das credenciais OAuth em supabase/.env; sem elas, registre como pendência. Ao terminar: suite passando, checkboxes da Task 13 marcados no plano, commit feito."
 ```
 **Revisar (revisão final do Plano 3 inteiro):**
 ```
