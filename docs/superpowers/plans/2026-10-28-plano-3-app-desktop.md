@@ -6,7 +6,7 @@
 
 **Architecture:** É uma casca Tauri 2 mínima (Rust só registra plugins) em volta de uma interface React servida pelo Vite. O app fala com o Supabase só com a anon key e a sessão do usuário. Toda escrita passa pelas RPCs e pela RLS dos Planos 1 e 2, mais uma migration nova (`0010`). Nenhuma parte do app usa a service role. A lógica fica em funções puras (`src/lib`) e numa camada de dados (`src/data`) que recebe o `SupabaseClient` por parâmetro. Assim, as duas camadas são testadas sem a janela: a lógica com Vitest, os dados contra o Supabase local. Os componentes (`src/ui`) recebem dados e callbacks por props.
 
-**Tech Stack:** Tauri 2.12 (plugins `deep-link` 2.6, `notification` 2.8, `clipboard-manager` 2.5, `opener` 2.7), Rust 1.99, React 19.3, Vite 8.3, `@vitejs/plugin-react` 6.1, TypeScript 5.9, Vitest 5, Testing Library (`@testing-library/react` 16.3, `user-event` 14.6), jsdom 30, `@supabase/supabase-js` 2, Zod 4, Supabase CLI 2.121.
+**Tech Stack:** Tauri 2.12 (plugins `deep-link` 2.6, `notification` 2.7, `clipboard-manager` 2.5, `opener` 2.7), Rust 1.99, React 19.3, Vite 8.3, `@vitejs/plugin-react` 6.1, TypeScript 5.9, Vitest 5, Testing Library (`@testing-library/react` 16.3, `user-event` 14.6), jsdom 30, `@supabase/supabase-js` 2, Zod 4, Supabase CLI 2.121. O `notification` fica na 2.7 no npm e no Cargo: a 2.8 do npm saiu em 2026-10-28, e a política de idade mínima de release do pnpm a recusa. Os dois sobem juntos.
 
 **Spec:** `docs/superpowers/specs/2026-10-21-sala-campanha-design.md`
 
