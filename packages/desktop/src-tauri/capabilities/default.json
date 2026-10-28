@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions of the main window: deep links, notifications, writing to the clipboard and opening Supabase file links.",
+  "description": "Permissions of the main window: deep links, notifications, writing to the clipboard and opening links on the local Supabase.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -10,7 +10,7 @@
     "clipboard-manager:allow-write-text",
     {
       "identifier": "opener:allow-open-url",
-      "allow": [{ "url": "https://*.supabase.co/*" }, { "url": "http://127.0.0.1:55321/*" }]
+      "allow": [{ "url": "http://127.0.0.1:55321/*" }]
     }
   ]
 }

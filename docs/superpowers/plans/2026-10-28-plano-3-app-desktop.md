@@ -99,7 +99,7 @@ docs/instalar-no-mac.md
   - `app.security.csp`: `default-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co http://127.0.0.1:55321 ws://127.0.0.1:55321; img-src 'self' data: blob: https://*.supabase.co http://127.0.0.1:55321; style-src 'self' 'unsafe-inline'`.
 - `capabilities/default.json`:
   - `core:default`, `deep-link:default`, `notification:default`, `clipboard-manager:allow-write-text`.
-  - `opener:allow-open-url`, com escopo `https://*.supabase.co/*` e `http://127.0.0.1:55321/*`.
+  - `opener:allow-open-url`, com escopo `http://127.0.0.1:55321/*`. O host hospedado entra no deploy com o ref exato, `https://<projeto>.supabase.co/*` (ver "Checklist de deploy do app"). Nunca `https://*.supabase.co/*`: no glob do opener, o `*` atravessa `/`, e `https://evil.example/.supabase.co/x` passaria.
 
 - [x] **Step 1: Write the failing tests.**
 
@@ -824,6 +824,7 @@ it('renders the app title', () => {
   - Google: um cliente OAuth no Google Cloud, com o redirect `https://<projeto>.supabase.co/auth/v1/callback`.
   - Apple: um Services ID e uma chave na conta Apple Developer.
 - [ ] Antes de abrir o download ao público, assinar e notarizar o app com a conta Apple Developer.
+- [ ] Em `packages/desktop/src-tauri/capabilities/default.json`, adicionar `https://<projeto>.supabase.co/*` ao escopo de `opener:allow-open-url`, com o ref exato do projeto hospedado. Nunca `https://*.supabase.co/*`: no glob do opener, o `*` atravessa `/` e libera qualquer site. Sem esse item, o login com Google ou Apple e o "Baixar" não abrem o navegador.
 - [ ] Gerar o build com `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` do projeto hospedado. Nunca usar a service role no build.
 - [ ] Executor do Plano 2 rodando, com as pendências do teste ao vivo resolvidas.
 - [ ] Distribuir o `.dmg` com `docs/instalar-no-mac.md`.
