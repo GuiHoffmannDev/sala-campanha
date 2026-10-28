@@ -7,14 +7,14 @@ it('applies defaults', () => {
   expect(c).toMatchObject({
     supabaseUrl: 'http://127.0.0.1:55321', serviceRoleKey: 'x',
     concurrency: 4, pollIntervalMs: 1000, touchIntervalMs: 30000, staleAfterSeconds: 300,
-    sweepIntervalMs: 60000, textTimeoutMs: 240000, imageTimeoutMs: 300000, shutdownGraceMs: 120000,
+    sweepIntervalMs: 60000, textTimeoutMs: 240000, imageTimeoutMs: 300000, shutdownGraceMs: 600000,
   })
   expect(c.executorId).toMatch(new RegExp(`-${process.pid}$`))
 })
 
 it('reads overrides from the environment', () => {
-  const c = loadConfig({ ...BASE, EXECUTOR_ID: 'exec-1', EXECUTOR_CONCURRENCY: '8', SHUTDOWN_GRACE_MS: '0' })
-  expect(c).toMatchObject({ executorId: 'exec-1', concurrency: 8, shutdownGraceMs: 0 })
+  const c = loadConfig({ ...BASE, EXECUTOR_ID: 'exec-1', EXECUTOR_CONCURRENCY: '8', SHUTDOWN_GRACE_MS: '700000' })
+  expect(c).toMatchObject({ executorId: 'exec-1', concurrency: 8, shutdownGraceMs: 700000 })
 })
 
 it('names missing variables without echoing values', () => {
@@ -33,11 +33,20 @@ it('caps provider timeouts at the 300 s fetch header limit without echoing value
   const bad = { ...BASE, TEXT_TIMEOUT_MS: '300001', IMAGE_TIMEOUT_MS: '300001' }
   expect(() => loadConfig(bad)).toThrow(/TEXT_TIMEOUT_MS.*IMAGE_TIMEOUT_MS/)
   try { loadConfig(bad) } catch (e) { expect(String(e)).not.toContain('300001') }
-  expect(loadConfig({ ...BASE, TEXT_TIMEOUT_MS: '300000', IMAGE_TIMEOUT_MS: '300000' }))
+  expect(loadConfig({ ...BASE, TEXT_TIMEOUT_MS: '300000', IMAGE_TIMEOUT_MS: '300000', SHUTDOWN_GRACE_MS: '660000' }))
     .toMatchObject({ textTimeoutMs: 300000, imageTimeoutMs: 300000 })
 })
 
 it('rejects touch interval too close to stale threshold', () => {
   expect(() => loadConfig({ ...BASE, TOUCH_INTERVAL_MS: '200000' })).toThrow(/TOUCH_INTERVAL_MS/)
   expect(loadConfig({ ...BASE, TOUCH_INTERVAL_MS: '100000' }).touchIntervalMs).toBe(100000)
+})
+
+it('requires a shutdown grace that fits a whole round, without echoing values', () => {
+  expect(() => loadConfig({ ...BASE, SHUTDOWN_GRACE_MS: '0' })).toThrow(/SHUTDOWN_GRACE_MS/)
+  const short = { ...BASE, TEXT_TIMEOUT_MS: '100000', IMAGE_TIMEOUT_MS: '200000', SHUTDOWN_GRACE_MS: '359999' }
+  expect(() => loadConfig(short)).toThrow(/SHUTDOWN_GRACE_MS/)
+  try { loadConfig(short) } catch (e) { expect(String(e)).not.toMatch(/359999|100000|200000/) }
+  // Exactly TEXT + IMAGE + 60000 is enough.
+  expect(loadConfig({ ...short, SHUTDOWN_GRACE_MS: '360000' }).shutdownGraceMs).toBe(360000)
 })

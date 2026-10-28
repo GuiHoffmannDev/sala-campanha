@@ -211,7 +211,7 @@ it('error messages match the fixed copy', () => {
   |---|---|---|---|
   | `SUPABASE_URL` | `supabaseUrl` | — | URL obrigatória |
   | `SUPABASE_SERVICE_ROLE_KEY` | `serviceRoleKey` | — | obrigatória |
-  | `EXECUTOR_ID` | `executorId` | `${os.hostname()}-${process.pid}` | não vazio |
+  | `EXECUTOR_ID` | `executorId` | `${os.hostname()}-${process.pid}` | não vazio. Cada slot do worker usa `<EXECUTOR_ID>#<n>` como `claimed_by` *(correção D, 2026-10-27)* |
   | `EXECUTOR_CONCURRENCY` | `concurrency` | `4` | inteiro 1..32 |
   | `POLL_INTERVAL_MS` | `pollIntervalMs` | `1000` | inteiro ≥ 100 |
   | `TOUCH_INTERVAL_MS` | `touchIntervalMs` | `30000` | inteiro ≥ 1000 |
@@ -219,14 +219,15 @@ it('error messages match the fixed copy', () => {
   | `SWEEP_INTERVAL_MS` | `sweepIntervalMs` | `60000` | inteiro ≥ 1000 |
   | `TEXT_TIMEOUT_MS` | `textTimeoutMs` | `240000` | inteiro 1000..300000 |
   | `IMAGE_TIMEOUT_MS` | `imageTimeoutMs` | `300000` | inteiro 1000..300000 |
-  | `SHUTDOWN_GRACE_MS` | `shutdownGraceMs` | `120000` | inteiro ≥ 0 |
+  | `SHUTDOWN_GRACE_MS` | `shutdownGraceMs` | `600000` | inteiro ≥ `TEXT_TIMEOUT_MS + IMAGE_TIMEOUT_MS + 60000`, para a rodada em andamento caber (60 s de margem para banco e Storage). O erro cita só o nome. Era `120000`, menor que uma rodada *(correção D, 2026-10-27)* |
 
-- Produces (`log.ts`): `type Logger = { info(msg: string, fields?: Record<string, unknown>): void; warn(...); error(...) }`; `createLogger(write?: (line: string) => void): Logger`. Uma linha JSON por chamada: `{ level, msg, time, ...fields }`. Padrão `write` = `process.stdout.write(line + '\n')`.
+- Produces (`log.ts`): `type Logger = { info(msg: string, fields?: Record<string, unknown>): void; warn(...); error(...) }`; `createLogger(write?: (line: string) => void): Logger`. Uma linha JSON por chamada: `{ level, msg, time, ...fields }`. Padrão `write` = `process.stdout.write(line + '\n')`. Exporta também `errorText(e: unknown): string` (a mensagem de um erro), usado em `job.ts`, `worker.ts` e `main.ts` *(correção D, 2026-10-27)*.
 - Produces (`db.ts`):
   - `type InboxMessage = { id: number; piece_id: string; team_id: string; author_id: string | null; body: { text: string; model: unknown; reference_asset_ids: string[] } }`
   - `type HistoryMessage = { id: number; author: string; text: string; reference_asset_ids: string[] }` (sem `model`: a escolha vem de `modelChoices`) *(correção B, revisão de 2026-10-27)*
   - `type PieceContext = { piece: { id: string; team_id: string; campaign_id: string; title: string; kind: PieceKind; status: PieceStatus }; campaignName: string; history: HistoryMessage[]; modelChoices: unknown[]; latestVersion: { id: string; number: number; image_path: string | null; caption: string | null } | null; lastImagePrompt: string | null; keyedProviders: Provider[]; memberNames: Record<string, string> }`
   - `class ClaimLostError extends Error` (lançada quando a RPC responde `42501`)
+  - `NO_AUTHOR = 'Alguém'`, usado também em `orchestrator.ts` *(correção D, 2026-10-27)*
   - `createExecutorDb(client: SupabaseClient, executorId: string): ExecutorDb`, com:
     - `claimNext(): Promise<InboxMessage | null>`
     - `absorbPending(pieceId: string): Promise<InboxMessage[]>`
@@ -237,6 +238,7 @@ it('error messages match the fixed copy', () => {
     - `addAgentVersion(pieceId: string, imagePath: string | null, caption: string | null, sourceEvent: number): Promise<{ id: string; number: number }>`
     - `getProviderKey(teamId: string, provider: Provider): Promise<string | null>`
     - `loadPieceContext(pieceId: string): Promise<PieceContext>`
+    - `pieceStatus(pieceId: string): Promise<PieceStatus>` (só o status, para o caminho de erro de `addAgentVersion`) *(correção D, 2026-10-27)*
     - `loadReferencePaths(teamId: string, campaignId: string, ids: string[]): Promise<{ id: string; storage_path: string }[]>` (filtra por time e campanha, mantém a ordem de `ids`)
     - `downloadFile(path: string): Promise<{ bytes: Uint8Array; mimeType: string }>`
     - `uploadFile(path: string, bytes: Uint8Array, mimeType: string): Promise<void>` (`upsert: false`)
@@ -245,7 +247,7 @@ it('error messages match the fixed copy', () => {
   - Regras de `loadPieceContext`:
     - `history`: mensagens `user_message` da peça com `to_agent = true` e `delivery in ('claimed','done','failed')`, as 30 mais recentes, em ordem crescente de `id`. `author` = `team_members.display_name`, ou `'Alguém'` sem autor.
     - `modelChoices`: o `body.model` das 30 mensagens mais recentes com os mesmos filtros do `history` e `body->>model` não nulo, em ordem crescente de `id`. É uma consulta à parte, para uma escolha antiga não sair junto com a janela do `history` *(correção B, revisão de 2026-10-27)*.
-    - `latestVersion`: versão de maior `number`.
+    - `latestVersion`: versão de maior `number` com `phase = 'base'`. A versão final (feita no Photoshop) nunca é editada pelo agente. Antes era a de maior `number` de qualquer fase *(correção D, 2026-10-27)*.
     - `lastImagePrompt`: `body.image_prompt` do `agent_result` mais recente.
     - `keyedProviders`: `provider_keys.provider` do time.
     - `memberNames`: `user_id` → `display_name` de todos os membros do time (nomes dos autores do lote atual).
@@ -528,13 +530,13 @@ finally: desliga o timer
    - O esforço vai para `planRound`, para `generateImage` e para `agent_started.models` (o `ModelRef` ganha `effort` só quando há).
    - Erro: `agent_error` → `'failed'`.
 4. `getProviderKey` para cada provedor escolhido. Null (chave removida depois do cadastro): `missing_key` → `'failed'`.
-5. Imagens de entrada (só com modelo de imagem): primeiro a imagem de `ctx.latestVersion` (se tiver `image_path`); depois as referências do batch (união, ordem de chegada). Se o batch não tem referência, usar as da mensagem mais recente do `history` que tenha. Cortar em `maxReferenceImages`; os ids cortados vão em `dropped_reference_ids`. Baixar com `downloadFile`.
+5. Imagens de entrada (só com modelo de imagem): primeiro a imagem de `ctx.latestVersion` (se tiver `image_path`); depois as referências do batch (união, ordem de chegada). Se o batch não tem referência, usar as da mensagem mais recente do `history` que tenha. Cortar em `maxReferenceImages`; os ids cortados vão em `dropped_reference_ids`. Baixar com `downloadFile`, todas ao mesmo tempo (`Promise.all`), mantendo a ordem: imagem atual primeiro, depois as referências *(correção D, 2026-10-27)*.
 6. `addAgentEvent(sourceId, 'agent_started', { message_ids, round, models, reference_count, dropped_reference_ids })`.
 7. `planRound` com `AbortSignal.timeout(textTimeoutMs)`.
 8. Com imagem: `generateImage` com `AbortSignal.timeout(imageTimeoutMs)`; `uploadFile(`${team}/${piece}/${randomUUID()}.${png|jpg|webp}`)`.
 9. `addAgentVersion(piece, path | null, plan.caption, sourceId)`.
    - `ClaimLostError`: `removeFile(path)`, log `warn` → `'claim_lost'`, sem evento.
-   - Outro erro: primeiro `answeredMessages(piece, [sourceId])`, porque um erro de rede pode esconder um commit. Se a versão foi gravada, manter o arquivo, log `warn` → `'ok'` (sem `agent_result`). Se essa checagem falhar, o arquivo fica (órfão é melhor que versão sem imagem) e a rodada vira `internal`. Senão, `removeFile(path)` e recarregar o status. Se saiu de `gerando`/`base_em_revisao` (alguém aprovou ou voltou a etapa durante a geração), `agent_error` `wrong_status`; senão, `internal`. Nos dois casos → `'failed'`.
+   - Outro erro: primeiro `answeredMessages(piece, [sourceId])`, porque um erro de rede pode esconder um commit. Se a versão foi gravada, manter o arquivo, log `warn` → `'ok'` (sem `agent_result`). Se essa checagem falhar, o arquivo fica (órfão é melhor que versão sem imagem) e a rodada vira `internal`. Senão, `removeFile(path)` e ler o status com `pieceStatus` (antes, `loadPieceContext` inteiro *(correção D, 2026-10-27)*). Se saiu de `gerando`/`base_em_revisao` (alguém aprovou ou voltou a etapa durante a geração), `agent_error` `wrong_status`; senão, `internal`. Nos dois casos → `'failed'`.
 10. `addAgentEvent(sourceId, 'agent_result', { message_ids, round, version_id, version_number, image_prompt })` → `'ok'`.
 
 Erros em qualquer passo: `ProviderError` vira `agent_error` com `code` e `message` de `agentErrorMessage` (o `detail` já vem redigido; redigir de novo com todas as chaves da rodada) e `image_prompt` quando já existe → `'failed'`. `ClaimLostError` em `addAgentEvent` → `'claim_lost'`. Outro erro: log `error` com a mensagem redigida e `agent_error` `internal` → `'failed'`.
@@ -596,12 +598,13 @@ it('touches the claim while generating', async () => { /* touchIntervalMs 50; im
 - Consumes: `processClaim`, `JobDeps` (Task 8); `ExecutorDb`; `loadConfig`, `createLogger`; `createProviders`.
 - Produces (`worker.ts`):
   - `type WorkerOptions = { concurrency: number; pollIntervalMs: number; staleAfterSeconds: number; sweepIntervalMs: number }`
-  - `runWorker(deps: JobDeps, opts: WorkerOptions, signal: AbortSignal): Promise<void>`
+  - `runWorker(deps: Omit<JobDeps, 'db'> & { db: (slot: number) => ExecutorDb }, opts: WorkerOptions, signal: AbortSignal): Promise<void>` *(correção D, 2026-10-27)*
+    - O slot `n` (de 1 a `concurrency`) usa `deps.db(n)` para o claim e para a rodada inteira; a varredura usa `deps.db(1)`. `main.ts` passa ``(slot) => createExecutorDb(client, `${config.executorId}#${slot}`)``, para cada slot ter seu próprio `claimed_by`. Com um id só por processo, um slot que perdeu o claim para outro slot do mesmo processo ainda gravava versão e eventos.
     - `concurrency` slots. Cada slot repete: se `signal` abortado, sai; `claimNext()`; com mensagem, `processClaim`; sem mensagem, espera `pollIntervalMs` (a espera termina cedo no abort).
     - Erro em `claimNext` (rede, banco): log `error` e espera `pollIntervalMs`; o slot não morre.
     - Varredura: `releaseStale(staleAfterSeconds)` ao iniciar e a cada `sweepIntervalMs`; erro só vai para o log.
     - Resolve quando todos os slots saíram. No abort, a rodada em andamento termina normalmente.
-- Produces (`main.ts`): lê `loadConfig(process.env)`, cria o client service role (`persistSession: false`, `autoRefreshToken: false`), `createExecutorDb`, `createProviders()`, `createLogger()`. Loga `executor started` com `executorId` e `concurrency` (sem segredos). `SIGTERM`/`SIGINT` abortam o worker; se os slots não saírem em `shutdownGraceMs`, `process.exit(1)` (as mensagens voltam à fila por `release_stale_claims`). Sai com 0 depois de um desligamento limpo.
+- Produces (`main.ts`): lê `loadConfig(process.env)`, cria o client service role (`persistSession: false`, `autoRefreshToken: false`), uma fábrica de `createExecutorDb` por slot, `createProviders()`, `createLogger()`. Loga `executor started` com `executorId` e `concurrency` (sem segredos). `SIGTERM`/`SIGINT` abortam o worker; se os slots não saírem em `shutdownGraceMs`, `process.exit(1)` (as mensagens voltam à fila por `release_stale_claims`). Sai com 0 depois de um desligamento limpo.
 
 - [x] **Step 1: Write the failing tests** em `tests/executor/worker.test.ts`
 
@@ -664,7 +667,7 @@ it('main exits on missing config without printing secrets', async () => {
 | Falha na rodada | Conclui o lote como `failed` e para; as mensagens na fila ficam para o próximo claim |
 | Modelo padrão | O primeiro de `MODEL_CATALOG` com chave cadastrada, por capacidade, no esforço padrão do provedor. A escolha vale até alguém mudar: uma mensagem sem modelo herda a última escolha **válida** da peça (correção B, 2026-10-27: antes herdava a última, mesmo inválida, e a peça ficava presa em `invalid_model`). A escolha vem de uma consulta própria e sobrevive além das 30 mensagens do histórico (revisão da correção B, 2026-10-27) |
 | Orquestrador | Sempre o modelo de texto; devolve JSON `{image_prompt, caption}` conforme o tipo da peça |
-| Imagem atual | A imagem da versão mais recente entra como primeira referência, para "fundo mais claro" editar o que existe |
+| Imagem atual | A imagem da última versão **base** entra como primeira referência, para "fundo mais claro" editar o que existe. A versão final (feita no Photoshop) nunca é editada pelo agente (correção D, 2026-10-27: antes era a versão mais recente de qualquer fase) |
 | Referências | As do lote; sem nenhuma no lote, as da última mensagem que tinha; cortadas em `maxReferenceImages` |
 | Prompt visível | `agent_result.image_prompt` e `agent_error.image_prompt` (o Plano 3 mostra recolhido) |
 | Toda mensagem gera | Na V1, toda mensagem ao agente gera uma versão; o agente não responde só com conversa |
@@ -675,9 +678,9 @@ it('main exits on missing config without printing secrets', async () => {
 ## Checklist de deploy do executor
 
 - Variáveis no provedor de hospedagem: `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` como segredo; o resto usa os padrões da Task 3.
-- `EXECUTOR_ID` único por instância (o padrão `hostname-pid` serve).
+- `EXECUTOR_ID` único por instância (o padrão `hostname-pid` serve). Cada slot faz o claim como `<EXECUTOR_ID>#<n>` *(correção D, 2026-10-27)*.
 - Logs do provedor de hospedagem sem captura de variáveis de ambiente nem de headers HTTP de saída.
-- Grace period de desligamento da plataforma ≥ `SHUTDOWN_GRACE_MS` (120 s), para a rodada em andamento terminar.
+- Grace period da plataforma ≥ `SHUTDOWN_GRACE_MS` (600 s), para a rodada em andamento terminar *(correção D, 2026-10-27)*: 240 s de texto, 300 s de imagem e 60 s de banco e Storage.
 - A migration `0009_agent_events.sql` aplicada no projeto hospedado antes de subir o executor.
 - Os itens do "Checklist de deploy" do Plano 1 continuam valendo (logs do Postgres sem parâmetros de `set_provider_key`).
 

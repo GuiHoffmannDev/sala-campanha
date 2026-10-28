@@ -33,11 +33,15 @@ const EnvSchema = z.object({
   SWEEP_INTERVAL_MS: int(60000, 1000),
   TEXT_TIMEOUT_MS: int(240000, 1000, MAX_CALL_MS),
   IMAGE_TIMEOUT_MS: int(300000, 1000, MAX_CALL_MS),
-  SHUTDOWN_GRACE_MS: int(120000, 0),
+  SHUTDOWN_GRACE_MS: int(600000, 0),
 }).check((ctx) => {
   // The claim must be touched at least three times before it counts as stale.
   if (ctx.value.TOUCH_INTERVAL_MS * 3 > ctx.value.STALE_AFTER_SECONDS * 1000) {
     ctx.issues.push({ code: 'custom', path: ['TOUCH_INTERVAL_MS'], message: 'too close to STALE_AFTER_SECONDS', input: ctx.value })
+  }
+  // A round in progress at shutdown must finish: one text call, one image call and 60 s for the database and Storage.
+  if (ctx.value.SHUTDOWN_GRACE_MS < ctx.value.TEXT_TIMEOUT_MS + ctx.value.IMAGE_TIMEOUT_MS + 60_000) {
+    ctx.issues.push({ code: 'custom', path: ['SHUTDOWN_GRACE_MS'], message: 'shorter than a round', input: ctx.value })
   }
 })
 

@@ -488,8 +488,14 @@ it('approval during generation: wrong_status, file removed', async () => {
     },
   })
 
+  const loadPieceContext = vi.spyOn(s.db, 'loadPieceContext')
+  const pieceStatus = vi.spyOn(s.db, 'pieceStatus')
+
   await processClaim(s.deps(p), await loadEvent(id))
 
+  // Someone stepped back or approved while the image was generating: only the status is read again.
+  expect(loadPieceContext).toHaveBeenCalledTimes(1)
+  expect(pieceStatus).toHaveBeenCalledWith(s.f.pieceId)
   expect(await versions(s.f)).toHaveLength(1)
   expect(await folderFiles(s.f)).toEqual(before)
   const error = (await eventsAfter(s.f, id)).find((e) => e.kind === 'agent_error')!

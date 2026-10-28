@@ -216,7 +216,7 @@ Resolve os itens 1, 5, 6 e 13 da revisão e o resto do item 9.
   - Nova regra: `SHUTDOWN_GRACE_MS ≥ TEXT_TIMEOUT_MS + IMAGE_TIMEOUT_MS + 60000`, com 60 s de margem para banco e Storage.
   - Um valor fora da regra dá erro citando `SHUTDOWN_GRACE_MS`, nunca o valor.
 
-- [ ] **Step 1: Escrever os testes que falham.**
+- [x] **Step 1: Escrever os testes que falham.**
   - `worker.test.ts`: com `concurrency: 2` e duas peças com mensagem na fila, os `claimed_by` vistos no banco são `<id>#1` e `<id>#2`. O helper `start()` passa a usar uma fábrica.
   - `db.test.ts`: numa peça com base v1 (agente) e final v2 (upload), `latestVersion` é v1. `pieceStatus` devolve o status.
   - `job.test.ts`: o caminho "someone stepped back while the image was generating" continua dando `wrong_status`.
@@ -224,11 +224,11 @@ Resolve os itens 1, 5, 6 e 13 da revisão e o resto do item 9.
     - O padrão de `shutdownGraceMs` é `600000`.
     - `SHUTDOWN_GRACE_MS: '0'` falha citando `SHUTDOWN_GRACE_MS`.
     - Um grace igual a `TEXT + IMAGE + 60000` é aceito.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/worker.test.ts tests/executor/db.test.ts tests/executor/job.test.ts tests/executor/config.test.ts`. Expected: FAIL nos casos novos.
-- [ ] **Step 3: Implementar.**
-- [ ] **Step 4: Atualizar os documentos** do Plano 2 listados em Files. No checklist de deploy: "Grace period da plataforma ≥ `SHUTDOWN_GRACE_MS` (600 s)", e cada slot usa `<EXECUTOR_ID>#<n>`.
-- [ ] **Step 5: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`, 3 vezes seguidas. Expected: PASS nas 3.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "fix(executor): per-slot claim ids, latest base version, parallel downloads and a shutdown grace that fits a round"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/executor/worker.test.ts tests/executor/db.test.ts tests/executor/job.test.ts tests/executor/config.test.ts`. Expected: FAIL nos casos novos.
+- [x] **Step 3: Implementar.**
+- [x] **Step 4: Atualizar os documentos** do Plano 2 listados em Files. No checklist de deploy: "Grace period da plataforma ≥ `SHUTDOWN_GRACE_MS` (600 s)", e cada slot usa `<EXECUTOR_ID>#<n>`.
+- [x] **Step 5: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`, 3 vezes seguidas. Expected: PASS nas 3.
+- [x] **Step 6: Commit.** `git add -A && git commit -m "fix(executor): per-slot claim ids, latest base version, parallel downloads and a shutdown grace that fits a round"`
 
 ---
 

@@ -2,9 +2,8 @@ import { spawn } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import type { Provider } from '../../packages/shared/src/domain'
 import { createExecutorDb, type ExecutorDb, type InboxMessage } from '../../packages/executor/src/db.ts'
-import type { JobDeps } from '../../packages/executor/src/job.ts'
 import { createLogger } from '../../packages/executor/src/log.ts'
-import { runWorker, type WorkerOptions } from '../../packages/executor/src/worker.ts'
+import { runWorker, type WorkerDeps, type WorkerOptions } from '../../packages/executor/src/worker.ts'
 import { FAKE_IMAGE, fakeProviders } from '../helpers/fake-providers'
 import { createPieceFixture, serviceClient, type PieceFixture } from '../helpers/supabase'
 
@@ -61,10 +60,11 @@ async function waitFor(check: () => Promise<boolean>, timeoutMs = 10_000): Promi
   }
 }
 
-function start(p: ReturnType<typeof fakeProviders>, o: { db?: ExecutorDb; opts?: Partial<WorkerOptions> } = {}) {
+/** Starts a worker. `db` builds the slot's ExecutorDb; by default each slot claims as `<WORKER_EXECUTOR>#<slot>`. */
+function start(p: ReturnType<typeof fakeProviders>, o: { db?: (slot: number) => ExecutorDb; opts?: Partial<WorkerOptions> } = {}) {
   const lines: string[] = []
-  const deps: JobDeps = {
-    db: o.db ?? createExecutorDb(serviceClient(), WORKER_EXECUTOR),
+  const deps: WorkerDeps = {
+    db: o.db ?? ((slot) => createExecutorDb(serviceClient(), `${WORKER_EXECUTOR}#${slot}`)),
     providers: p.providers, log: createLogger((line) => lines.push(line)),
     touchIntervalMs: 60_000, textTimeoutMs: 5_000, imageTimeoutMs: 5_000,
   }
@@ -108,6 +108,78 @@ it('two pieces are served in parallel', async () => {
   // In series the second image would start after the first ended.
   expect(spans).toHaveLength(2)
   expect(Math.max(...spans.map((s) => s.start))).toBeLessThan(Math.min(...spans.map((s) => s.end)))
+})
+
+it('each slot claims with its own executor id', async () => {
+  const a = await keyedPiece()
+  const b = await keyedPiece(a)
+  // Both images wait until both slots hold a claim, so neither slot can serve both pieces.
+  let arrived = 0
+  let release!: () => void
+  const bothClaimed = new Promise<void>((resolve) => { release = resolve })
+  const p = fakeProviders({
+    image: async () => {
+      if (++arrived === 2) release()
+      await bothClaimed
+      return FAKE_IMAGE
+    },
+  })
+  const ids = [await post(a), await post(b)]
+  const w = start(p)
+  try {
+    await waitFor(async () => (await Promise.all(ids.map(delivery))).every((d) => d === 'done'))
+  } finally {
+    await w.stop()
+  }
+  const { data, error } = await serviceClient().from('session_events').select('claimed_by').in('id', ids)
+  expect(error).toBeNull()
+  expect(data!.map((r) => r.claimed_by).sort()).toEqual([`${WORKER_EXECUTOR}#1`, `${WORKER_EXECUTOR}#2`])
+})
+
+it('a claim taken over by another slot of the same process is lost for the old slot', async () => {
+  const f = await keyedPiece()
+  const lines: string[] = []
+  let message: InboxMessage | null = null
+  const p = fakeProviders({
+    image: async () => {
+      // release_stale_claims requeued the message and slot 2 took it while slot 1 was generating.
+      expect((await serviceClient().from('session_events')
+        .update({ claimed_by: `${WORKER_EXECUTOR}#2` }).eq('id', message!.id)).error).toBeNull()
+      return FAKE_IMAGE
+    },
+  })
+  const slot1 = createExecutorDb(serviceClient(), `${WORKER_EXECUTOR}#1`)
+  const id = await post(f)
+  let claims = 0
+  const db = (slot: number): ExecutorDb => ({
+    ...createExecutorDb(serviceClient(), `${WORKER_EXECUTOR}#${slot}`),
+    // Only slot 1 claims, and only once.
+    claimNext: async () => {
+      if (slot !== 1 || claims++ > 0) return null
+      message = await slot1.claimNext()
+      return message
+    },
+    releaseStale: async () => 0,
+  })
+  const controller = new AbortController()
+  const done = runWorker(
+    { db, providers: p.providers, log: createLogger((line) => lines.push(line)), touchIntervalMs: 60_000, textTimeoutMs: 5_000, imageTimeoutMs: 5_000 },
+    OPTS, controller.signal,
+  )
+  try {
+    await waitFor(async () => lines.some((l) => l.includes('"msg":"claim lost"')))
+  } finally {
+    controller.abort()
+    await done
+  }
+  expect(message!.id).toBe(id)
+  expect(await versionCount(f)).toBe(0)
+  const { data, error } = await serviceClient().from('session_events').select('kind').eq('piece_id', f.pieceId).neq('kind', 'user_message')
+  expect(error).toBeNull()
+  expect(data!.map((e) => e.kind)).toEqual(['agent_started'])
+  expect(await delivery(id)).toBe('claimed')
+  // Leave nothing claimed for later tests.
+  expect((await serviceClient().from('session_events').update({ delivery: 'failed' }).eq('id', id)).error).toBeNull()
 })
 
 it('worker keeps serving after a failed job', async () => {
@@ -156,7 +228,7 @@ it('claimNext error does not kill the slot', async () => {
       return real.claimNext()
     },
   }
-  const w = start(fakeProviders(), { db, opts: { concurrency: 1 } })
+  const w = start(fakeProviders(), { db: () => db, opts: { concurrency: 1 } })
   try {
     const id = await post(f)
     await waitFor(async () => (await delivery(id)) === 'done')
@@ -176,7 +248,7 @@ it('sweeps stale claims at start and on the interval; sweep errors are only logg
       throw new Error('db down')
     },
   } as unknown as ExecutorDb
-  const w = start(fakeProviders(), { db, opts: { sweepIntervalMs: 50 } })
+  const w = start(fakeProviders(), { db: () => db, opts: { sweepIntervalMs: 50 } })
   await sleep(10)
   expect(sweeps).toBe(1)
   await sleep(200)
@@ -187,7 +259,7 @@ it('sweeps stale claims at start and on the interval; sweep errors are only logg
 
 it('abort ends idle slots without waiting for the poll interval', async () => {
   const db = { claimNext: async () => null, releaseStale: async () => 0 } as unknown as ExecutorDb
-  const w = start(fakeProviders(), { db, opts: { pollIntervalMs: 60_000 } })
+  const w = start(fakeProviders(), { db: () => db, opts: { pollIntervalMs: 60_000 } })
   await sleep(20)
   const t = Date.now()
   await w.stop()
@@ -239,7 +311,7 @@ it('an error escaping processClaim does not kill the slot', async () => {
   })
   const controller = new AbortController()
   const done = runWorker(
-    { db, providers: fakeProviders().providers, log, touchIntervalMs: 60_000, textTimeoutMs: 5_000, imageTimeoutMs: 5_000 },
+    { db: () => db, providers: fakeProviders().providers, log, touchIntervalMs: 60_000, textTimeoutMs: 5_000, imageTimeoutMs: 5_000 },
     { ...OPTS, concurrency: 1 },
     controller.signal,
   )

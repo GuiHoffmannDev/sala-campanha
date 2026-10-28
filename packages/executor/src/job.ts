@@ -4,7 +4,7 @@ import {
   agentErrorMessage, findModel, MODEL_CATALOG, ModelChoiceSchema, type AgentErrorInput, type CatalogModel, type ModelCapability,
 } from '@sala/shared/agent'
 import { ClaimLostError, type ExecutorDb, type InboxMessage } from './db.ts'
-import type { Logger } from './log.ts'
+import { errorText, type Logger } from './log.ts'
 import { planRound, type Plan } from './orchestrator.ts'
 import { redact } from './providers/http.ts'
 import { ProviderError, type GeneratedImage, type InputImage, type Providers } from './providers/types.ts'
@@ -20,7 +20,6 @@ type Choice = Partial<Record<ModelCapability, ChosenModel>>
 const AGENT_STATUSES: readonly PieceStatus[] = ['gerando', 'base_em_revisao']
 const EXTENSIONS: Record<GeneratedImage['mimeType'], string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }
 
-const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e))
 const redactAll = (text: string, keys: string[]) => keys.reduce(redact, text)
 
 /**
@@ -125,18 +124,19 @@ async function runRound(deps: JobDeps, batch: InboxMessage[], round: number): Pr
     if (models.image && !imageKey) return await fail({ code: 'missing_key', provider: models.image.provider })
 
     // Input images: current version first, then the batch references (or the latest ones in the history).
-    const images: InputImage[] = []
+    let images: InputImage[] = []
     let referenceCount = 0
     let dropped: string[] = []
     const hasCurrentImage = !!(models.image && ctx.latestVersion?.image_path)
     if (models.image) {
-      if (hasCurrentImage) images.push(await db.downloadFile(ctx.latestVersion!.image_path!))
       let refIds = [...new Set(batch.flatMap((m) => m.body.reference_asset_ids))]
       if (refIds.length === 0) refIds = ctx.history.findLast((m) => m.reference_asset_ids.length > 0)?.reference_asset_ids ?? []
       const refs = await db.loadReferencePaths(ctx.piece.team_id, ctx.piece.campaign_id, refIds)
-      const room = Math.max(0, models.image.maxReferenceImages - images.length)
+      const room = Math.max(0, models.image.maxReferenceImages - (hasCurrentImage ? 1 : 0))
       dropped = refs.slice(room).map((r) => r.id)
-      for (const r of refs.slice(0, room)) images.push(await db.downloadFile(r.storage_path))
+      const paths = [...(hasCurrentImage ? [ctx.latestVersion!.image_path!] : []), ...refs.slice(0, room).map((r) => r.storage_path)]
+      // Promise.all keeps the order of `paths`.
+      images = await Promise.all(paths.map((p) => db.downloadFile(p)))
       referenceCount = Math.min(refs.length, room)
     }
 
@@ -185,7 +185,7 @@ async function runRound(deps: JobDeps, batch: InboxMessage[], round: number): Pr
       }
       await removeUploaded()
       // Someone approved or stepped back while the image was generating.
-      const { status } = (await db.loadPieceContext(ctx.piece.id)).piece
+      const status = await db.pieceStatus(ctx.piece.id)
       if (!AGENT_STATUSES.includes(status)) return await fail({ code: 'wrong_status', status })
       throw e
     }

@@ -1,6 +1,6 @@
 import type { PieceKind, Provider } from '@sala/shared'
 import { z } from 'zod'
-import type { InboxMessage, PieceContext } from './db.ts'
+import { NO_AUTHOR, type InboxMessage, type PieceContext } from './db.ts'
 import { ProviderError, type TextProvider } from './providers/types.ts'
 
 export type Plan = { imagePrompt: string | null; caption: string | null }
@@ -13,7 +13,6 @@ export const ORCHESTRATOR_SYSTEM = [
   'O pedido atual tem prioridade sobre o histórico. Mensagens do pedido atual ajustam o pedido anterior; não começam uma peça nova.',
 ].join('\n')
 
-const NO_AUTHOR = 'Alguém'
 // Reasoning tokens count toward this cap on OpenAI and Anthropic, so it leaves room for a high effort.
 export const MAX_OUTPUT_TOKENS = 32000
 

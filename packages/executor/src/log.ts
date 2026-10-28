@@ -3,6 +3,9 @@ type LogFn = (msg: string, fields?: Fields) => void
 
 export type Logger = { info: LogFn; warn: LogFn; error: LogFn }
 
+/** The message of a thrown value, for a log field. */
+export const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
 /** JSON-lines logger. Fields never overwrite `level`, `msg` or `time`. */
 export function createLogger(write: (line: string) => void = (line) => process.stdout.write(line + '\n')): Logger {
   const at = (level: 'info' | 'warn' | 'error'): LogFn => (msg, fields) =>

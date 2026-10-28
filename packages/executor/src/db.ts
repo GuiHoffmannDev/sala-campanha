@@ -35,6 +35,7 @@ export type ExecutorDb = {
   addAgentVersion(pieceId: string, imagePath: string | null, caption: string | null, sourceEvent: number): Promise<{ id: string; number: number }>
   getProviderKey(teamId: string, provider: Provider): Promise<string | null>
   loadPieceContext(pieceId: string): Promise<PieceContext>
+  pieceStatus(pieceId: string): Promise<PieceStatus>
   loadReferencePaths(teamId: string, campaignId: string, ids: string[]): Promise<{ id: string; storage_path: string }[]>
   downloadFile(path: string): Promise<{ bytes: Uint8Array; mimeType: string }>
   uploadFile(path: string, bytes: Uint8Array, mimeType: string): Promise<void>
@@ -52,7 +53,8 @@ export class ClaimLostError extends Error {
 
 const BUCKET = 'team-files'
 const HISTORY_LIMIT = 30
-const NO_AUTHOR = 'Alguém'
+/** Author name for a message whose author account is gone. */
+export const NO_AUTHOR = 'Alguém'
 const INBOX_COLUMNS = 'id, piece_id, team_id, author_id, body'
 
 type SupabaseError = { message: string; code?: string } | null
@@ -132,8 +134,9 @@ export function createExecutorDb(client: SupabaseClient, executorId: string): Ex
         agentMessages(INBOX_COLUMNS),
         // ->> turns a JSON null model into SQL null, so messages without a choice drop out.
         agentMessages('model:body->model').not('body->>model', 'is', null),
+        // Only base versions: the agent never edits the final one, made outside the app.
         client.from('piece_versions').select('id, number, image_path, caption')
-          .eq('piece_id', pieceId).order('number', { ascending: false }).limit(1).maybeSingle(),
+          .eq('piece_id', pieceId).eq('phase', 'base').order('number', { ascending: false }).limit(1).maybeSingle(),
         // Latest result that carried an image prompt: text-only rounds keep the previous one.
         client.from('session_events').select('body')
           .eq('piece_id', pieceId).eq('kind', 'agent_result').not('body->>image_prompt', 'is', null)
@@ -162,6 +165,11 @@ export function createExecutorDb(client: SupabaseClient, executorId: string): Ex
         keyedProviders: (check(op, keys) as { provider: Provider }[]).map((k) => k.provider),
         memberNames,
       }
+    },
+
+    async pieceStatus(pieceId) {
+      const piece = check('pieceStatus', await client.from('pieces').select('status').eq('id', pieceId).single()) as { status: PieceStatus }
+      return piece.status
     },
 
     async loadReferencePaths(teamId, campaignId, ids) {

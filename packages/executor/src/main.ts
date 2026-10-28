@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { loadConfig, type Config } from './config.ts'
 import { createExecutorDb } from './db.ts'
-import { createLogger } from './log.ts'
+import { createLogger, errorText } from './log.ts'
 import { createProviders } from './providers/index.ts'
 import { runWorker } from './worker.ts'
 
@@ -34,7 +34,8 @@ async function main(config: Config): Promise<void> {
   try {
     await runWorker(
       {
-        db: createExecutorDb(client, config.executorId),
+        // Each slot claims as `<executorId>#<slot>`.
+        db: (slot) => createExecutorDb(client, `${config.executorId}#${slot}`),
         providers: createProviders(),
         log,
         touchIntervalMs: config.touchIntervalMs,
@@ -57,7 +58,7 @@ try {
   config = loadConfig(process.env)
 } catch (e) {
   // loadConfig names the invalid variables, never their values.
-  process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`)
+  process.stderr.write(`${errorText(e)}\n`)
   process.exitCode = 1
 }
 
@@ -66,7 +67,7 @@ if (config) {
     await main(config)
     process.exitCode = 0
   } catch (e) {
-    log.error('executor crashed', { error: e instanceof Error ? e.message : String(e) })
+    log.error('executor crashed', { error: errorText(e) })
     process.exitCode = 1
   }
 }

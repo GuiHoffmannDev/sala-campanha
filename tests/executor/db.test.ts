@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { ClaimLostError, createExecutorDb } from '../../packages/executor/src/db.ts'
 import {
   createAgentVersion, createClaimedMessage, createPieceFixture, loadEvent, serviceClient, TEST_EXECUTOR,
-  uploadTeamFile, type PieceFixture,
+  uploadPieceImage, uploadTeamFile, type PieceFixture,
 } from '../helpers/supabase'
 
 const KEY = 'sk-executor-db-1234567890abcd'
@@ -55,6 +55,28 @@ it('loadPieceContext returns history with author names, keyed providers and late
   expect(ctx.history.map((h) => h.id)).toEqual([...ctx.history.map((h) => h.id)].sort((a, b) => a - b))
   // The JSON null model of 'Sem autor' is not a choice.
   expect(ctx.modelChoices).toEqual([{ text: { provider: 'anthropic', model: 'm' } }])
+})
+
+it('latestVersion is the newest base version, never the final one', async () => {
+  const f = await createPieceFixture()
+  const base = await createAgentVersion(f, { caption: 'Base' })
+  expect((await f.t.members.gestor.client.rpc('approve_version', { p_piece: f.pieceId, p_version: base.id })).error).toBeNull()
+  const { data: final, error } = await f.t.members.designer.client.rpc('upload_final_version', {
+    p_piece: f.pieceId, p_image_path: await uploadPieceImage(f), p_caption: 'Final',
+  })
+  expect(error).toBeNull()
+  expect(final.number).toBe(2)
+
+  const ctx = await db().loadPieceContext(f.pieceId)
+  expect(ctx.latestVersion).toEqual({ id: base.id, number: 1, image_path: base.image_path, caption: 'Base' })
+})
+
+it('pieceStatus returns the piece status', async () => {
+  const f = await createPieceFixture()
+  expect(await db().pieceStatus(f.pieceId)).toBe('gerando')
+  await createAgentVersion(f)
+  expect(await db().pieceStatus(f.pieceId)).toBe('base_em_revisao')
+  await expect(db().pieceStatus(randomUUID())).rejects.toThrow(/pieceStatus/)
 })
 
 it('history keeps only the 30 most recent agent messages', async () => {
