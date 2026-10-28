@@ -19,7 +19,7 @@
 | Esforço do modelo | O usuário escolhe o esforço junto do modelo. A escolha de modelo ganha `effort` opcional, que o executor repassa ao provedor. Sem esforço escolhido, vale o padrão do provedor. O teto de saída do modelo de texto sobe de 2000 para 32000 tokens |
 | Esforço em modelos de imagem | Vale onde o modelo aceita. Hoje só o Nano Banana 2.1 (`minimal`, `medium`, `high`). Nos modelos sem controle de esforço, um `effort` é recusado |
 | Catálogo de modelos | Continua fixo em `MODEL_CATALOG`. Cada time usa a própria chave de API. Sem login com conta Claude |
-| Escolha herdada | Mensagem sem modelo herda a última escolha **válida** do histórico: passa no schema, todos os modelos existem no catálogo e todo esforço é aceito pelo modelo. Sem nenhuma válida, usa o padrão. Uma escolha inválida no próprio lote continua dando `invalid_model` |
+| Escolha herdada | Cada capacidade (texto e imagem) que a mensagem não escolhe herda a última escolha **válida** do histórico que a escolheu. Válida: passa no schema, todos os modelos existem no catálogo e todo esforço é aceito pelo modelo. Uma escolha inválida é pulada inteira. Sem nenhuma válida, usa o padrão. Uma escolha inválida no próprio lote continua dando `invalid_model`. *(Revisão final das correções, 2026-10-28: era a escolha inteira, e um `{}` ou uma escolha só de imagem apagava o modelo de texto.)* |
 | Imagem atual | É a imagem da última versão **base**. A versão final (feita no Photoshop) nunca é editada pelo agente |
 | Nova tentativa em imagem | Chamadas de imagem não repetem depois de erro de rede (a geração pode ter sido cobrada). Continuam repetindo uma vez em 429 e 5xx |
 | Referências do Gemini | `maxReferenceImages`: Nano Banana 2.1 = 10 e Nano Banana Pro = 6. São as vagas de objeto em alta fidelidade da doc atual (2.1: 10 objetos + 4 personagens; Pro: 6 objetos + 5 personagens + 3 de estilo) |
@@ -114,7 +114,7 @@ Resolve os itens 2, 3 e 4 da revisão.
   - `PlanSchema` usa `z.string().nullish()` nas duas chaves: `null` numa chave que o tipo da peça descarta não é erro.
 - `resolveModels(kind, batch, history, keyed)`:
   - Escolha do lote: a última `model` não nula do lote. Se ela falha no schema, se um modelo não está no catálogo para a capacidade, ou se um esforço não está em `model.efforts`, retorna `invalid_model`, como hoje.
-  - Escolha do histórico, usada só quando o lote não tem nenhuma: a última que passa nas mesmas três checagens. Escolhas inválidas são puladas. Sem nenhuma válida, cada capacidade usa o padrão (o primeiro do catálogo com chave).
+  - Escolha do histórico, por capacidade: cada capacidade que a escolha do lote não nomeia usa a última escolha do histórico que passa nas mesmas três checagens e nomeia essa capacidade. Escolhas inválidas são puladas inteiras. Sem nenhuma válida, cada capacidade usa o padrão (o primeiro do catálogo com chave). *(Revisão final das correções, 2026-10-28: era a escolha inteira, usada só quando o lote não tinha nenhuma. `modelChoices` deixa de fora o `{}`.)*
   - Esforço inválido retorna `{ code: 'invalid_model', model: '<id> com esforço <effort>', capability }`. A mensagem do chat fica "O modelo gpt-6-astra com esforço turbo não está disponível para texto.", sem código de erro novo.
   - O resultado leva o esforço de cada capacidade (`effort: string | null`). Ele vai para `planRound`, para `generateImage` e para `agent_started.models` (o `ModelRef` ganha `effort` quando houver).
 

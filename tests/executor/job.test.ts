@@ -542,6 +542,23 @@ describe('resolveModels', () => {
     expect(resolveModels('texto', [msg(null)], [opus, astra], ['anthropic', 'openai'])).toMatchObject({ text: { model: 'gpt-6-astra' } })
   })
 
+  it('inherits each capability from the latest valid choice that names it', () => {
+    const fal = { image: { provider: 'fal', model: 'fal-ai/flux-pro/kontext/max/multi' } }
+    const keyed: Provider[] = ['anthropic', 'gemini', 'fal']
+    // An empty choice names no model: the text model is still inherited.
+    expect(resolveModels('texto', [msg({})], [opus], ['anthropic'])).toMatchObject({ text: { model: 'claude-opus-5-5' } })
+    // A later image-only choice keeps the earlier text model, in the history and in the batch.
+    expect(resolveModels('imagem_texto', [msg(null)], [opus, fal], keyed))
+      .toMatchObject({ text: { model: 'claude-opus-5-5' }, image: { model: 'fal-ai/flux-pro/kontext/max/multi' } })
+    expect(resolveModels('imagem_texto', [msg(fal)], [opus], keyed))
+      .toMatchObject({ text: { model: 'claude-opus-5-5' }, image: { model: 'fal-ai/flux-pro/kontext/max/multi' } })
+  })
+
+  it('skips an invalid history choice whole, even its valid capability', () => {
+    const halfInvalid = { text: { provider: 'anthropic', model: 'claude-opus-5-5' }, image: { provider: 'gemini', model: 'nope' } }
+    expect(resolveModels('texto', [msg(null)], [astra, halfInvalid], ['anthropic', 'openai'])).toMatchObject({ text: { model: 'gpt-6-astra' } })
+  })
+
   it('skips a history choice with an effort the model does not accept', () => {
     const refused = { text: { provider: 'openai', model: 'gpt-6-astra', effort: 'turbo' } }
     expect(resolveModels('texto', [msg(null)], [opus, refused], ['anthropic', 'openai']))

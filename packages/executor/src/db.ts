@@ -132,8 +132,8 @@ export function createExecutorDb(client: SupabaseClient, executorId: string): Ex
       const [members, messages, choices, version, result, keys] = await Promise.all([
         client.from('team_members').select('user_id, display_name').eq('team_id', piece.team_id),
         agentMessages(INBOX_COLUMNS),
-        // ->> turns a JSON null model into SQL null, so messages without a choice drop out.
-        agentMessages('model:body->model').not('body->>model', 'is', null),
+        // ->> turns a JSON null model into SQL null, so messages without a choice drop out; `{}` names no model either.
+        agentMessages('model:body->model').not('body->>model', 'is', null).neq('body->>model', '{}'),
         // Only base versions: the agent never edits the final one, made outside the app.
         client.from('piece_versions').select('id, number, image_path, caption')
           .eq('piece_id', pieceId).eq('phase', 'base').order('number', { ascending: false }).limit(1).maybeSingle(),

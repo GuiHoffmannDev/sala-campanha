@@ -99,6 +99,8 @@ it('modelChoices keeps a choice older than the 30-message history', async () => 
   const choice = { text: { provider: 'openai', model: 'gpt-6-astra', effort: 'low' } }
   const rows = [
     row(choice, 'done'),
+    // An empty choice names no model: it never takes a place in the window.
+    ...Array.from({ length: 30 }, () => row({}, 'done')),
     ...Array.from({ length: 31 }, () => row(null, 'done')),
     // Still in the queue: not part of the piece's past choices.
     row({ text: { provider: 'anthropic', model: 'claude-opus-5-5' } }, 'queued'),

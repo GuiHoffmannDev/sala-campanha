@@ -48,25 +48,25 @@ function checkChoice(choice: unknown): Choice | AgentErrorInput {
 
 /**
  * Picks the text model (always) and the image model (imagem and imagem_texto pieces), each with its effort.
- * The choice is the latest non-null `model` of the batch; an invalid one fails the round.
- * Without one, the latest valid one of `choices` (the piece's past choices, oldest first): invalid ones
- * are skipped, so an old mistake or a model since removed from the catalog never locks the piece.
+ * The batch choice is its latest non-null `model`; an invalid one fails the round.
+ * Each capability the batch choice does not name comes from the latest valid one of `choices` (the piece's
+ * past choices, oldest first) that names it, so `{}` or an image-only choice keeps the text model. Invalid
+ * choices are skipped whole, so an old mistake or a model since removed from the catalog never locks the piece.
  * Without a choice for a capability, the first catalog model whose provider has a key, at the provider's default effort.
  */
 export function resolveModels(kind: PieceKind, batch: InboxMessage[], choices: unknown[], keyed: Provider[]): Models | AgentErrorInput {
   const isError = (c: Choice | AgentErrorInput): c is AgentErrorInput => 'code' in c
   const fromBatch = batch.map((m) => m.body.model).findLast((v) => v != null)
-  let choice: Choice
+  let batchChoice: Choice = {}
   if (fromBatch != null) {
     const checked = checkChoice(fromBatch)
     if (isError(checked)) return checked
-    choice = checked
-  } else {
-    choice = choices.map(checkChoice).findLast((c): c is Choice => !isError(c)) ?? {}
+    batchChoice = checked
   }
+  const inherited = choices.map(checkChoice).filter((c): c is Choice => !isError(c))
 
   const pick = (capability: ModelCapability): ChosenModel | AgentErrorInput => {
-    const model = choice[capability]
+    const model = batchChoice[capability] ?? inherited.findLast((c) => c[capability])?.[capability]
     if (model) return keyed.includes(model.provider) ? model : { code: 'missing_key', provider: model.provider }
     const fallback = MODEL_CATALOG.find((m) => m.capability === capability && keyed.includes(m.provider))
     return fallback ? { ...fallback, effort: null } : { code: 'missing_key', capability }
