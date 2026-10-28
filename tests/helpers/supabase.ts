@@ -32,6 +32,11 @@ export function serviceClient(): SupabaseClient {
   return createClient(env.url, env.serviceRoleKey, clientOptions)
 }
 
+/** A client with only the anon key, as the app has before sign-in. */
+export function anonClient(): SupabaseClient {
+  return createClient(env.url, env.anonKey, clientOptions)
+}
+
 /** Opens a direct connection to the local DB as `postgres`. The caller must `end()` it. */
 export async function dbClient(): Promise<pg.Client> {
   const client = new pg.Client({ connectionString: env.dbUrl })
@@ -54,14 +59,14 @@ export type TestTeam = { teamId: string; members: Record<Role, TestMember> }
 
 async function createSignedInUser(role: Role): Promise<TestMember> {
   const email = `${role}-${randomUUID()}@test.local`
-  const { data, error } = await serviceClient().auth.admin.createUser({
-    email,
-    password: TEST_PASSWORD,
-    email_confirm: true,
-  })
+  const admin = serviceClient()
+  const { data, error } = await admin.auth.admin.createUser({ email, email_confirm: true })
   if (error || !data.user) throw new Error(`createUser(${role}) failed: ${error?.message}`)
+  // Migration 0010 drops any password set before the email is confirmed, so it is set afterwards.
+  const { error: passwordError } = await admin.auth.admin.updateUserById(data.user.id, { password: TEST_PASSWORD })
+  if (passwordError) throw new Error(`set password(${role}) failed: ${passwordError.message}`)
 
-  const client = createClient(env.url, env.anonKey, clientOptions)
+  const client = anonClient()
   const { error: signInError } = await client.auth.signInWithPassword({ email, password: TEST_PASSWORD })
   if (signInError) throw new Error(`signIn(${role}) failed: ${signInError.message}`)
 

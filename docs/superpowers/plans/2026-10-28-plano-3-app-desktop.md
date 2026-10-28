@@ -146,6 +146,7 @@ it('renders the app title', () => {
   - `additional_redirect_urls` ganha `"sala://auth/callback"`.
   - `[auth.email.template.magic_link]`, com `subject = "Seu código da Sala da Campanha"` e `content_path = "./supabase/templates/codigo.html"`.
   - `[auth.external.google]` e `[auth.external.apple]` com `enabled = true`, `client_id = "env(SUPABASE_AUTH_EXTERNAL_<PROVEDOR>_CLIENT_ID)"` e `secret = "env(SUPABASE_AUTH_EXTERNAL_<PROVEDOR>_SECRET)"`, lidos de `supabase/.env` (fora do git). Sem as variáveis, os dois provedores falham com erro e o resto funciona.
+  - `[auth.email] enable_confirmations = true` e `[auth.email.template.confirmation]` com o mesmo assunto e `codigo.html`. *(Acrescentado na execução: com o cadastro aberto, a API também aceita e-mail e senha, e sem confirmação essa conta teria sessão e aceitaria convites de um e-mail que não provou. Com a confirmação ligada, o primeiro código de uma pessoa nova chega no e-mail de confirmação. Pelo mesmo motivo, a `0010` tem o trigger `drop_unproven_password` em `auth.users`: a senha definida antes da confirmação do e-mail é apagada quando o e-mail é confirmado, porque senão quem criou a conta com o e-mail de outra pessoa entraria com ela depois que a dona confirmasse pelo código. O app nunca entra por senha.)*
 - Test: `tests/db/members.test.ts`
 
 **Interfaces:**
@@ -174,7 +175,7 @@ it('renders the app title', () => {
   - `alter publication supabase_realtime add table public.campaigns, public.reference_assets`.
 - `codigo.html`: "Seu código para entrar na Sala da Campanha é {{ .Token }}. Ele vale por 1 hora."
 
-- [ ] **Step 1: Write the failing tests** em `tests/db/members.test.ts`. Para um usuário novo com e-mail confirmado, usar `serviceClient().auth.admin.createUser({ email, email_confirm: true })`. Para um não confirmado, usar `email_confirm: false`. Depois, o login sai de `generateLink({ type: 'magiclink', email })`, com `verifyOtp`.
+- [x] **Step 1: Write the failing tests** em `tests/db/members.test.ts`. Para um usuário novo com e-mail confirmado, usar `serviceClient().auth.admin.createUser({ email, email_confirm: true })`. Para um não confirmado, usar `email_confirm: false`. Depois, o login sai de `generateLink({ type: 'magiclink', email })`, com `verifyOtp`.
   - `create_workspace makes the caller its admin`: `teams` e `team_members` mostram o workspace com o papel `admin`.
   - `an invite is accepted only by the verified owner of the email`:
     - O admin do A convida `x@test.local` como `designer`.
@@ -188,10 +189,10 @@ it('renders the app title', () => {
     - `B.designer.client.channel('team:' + A.teamId, { config: { private: true } })` termina em `CHANNEL_ERROR`.
     - `A.designer` termina em `SUBSCRIBED`.
   - `new campaigns reach other members live`: um insert de A.gestor em `campaigns` chega a A.designer em até 5 s, e não chega a B.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm db:reset && pnpm test tests/db/members.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implementar** a migration, o template e o `config.toml`. Depois de mudar o `config.toml`, rodar `supabase stop && supabase start`.
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test`. Expected: PASS na suíte inteira.
-- [ ] **Step 5: Commit.** `git add -A && git commit -m "feat(db): open sign-up, personal workspaces, invites, private team presence and live campaigns"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm db:reset && pnpm test tests/db/members.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implementar** a migration, o template e o `config.toml`. Depois de mudar o `config.toml`, rodar `supabase stop && supabase start`.
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test`. Expected: PASS na suíte inteira.
+- [x] **Step 5: Commit.** `git add -A && git commit -m "feat(db): open sign-up, personal workspaces, invites, private team presence and live campaigns"`
 
 ---
 
@@ -821,6 +822,7 @@ it('renders the app title', () => {
   - Ligar o cadastro público ("Allow new users to sign up").
   - Configurar SMTP próprio (ex.: Resend).
   - Usar o template "Magic Link" com `{{ .Token }}` (conteúdo de `supabase/templates/codigo.html`).
+  - Manter "Confirm email" ligado e usar o mesmo conteúdo no template "Confirm signup": o primeiro código de uma pessoa nova chega nele. Sem a confirmação, uma conta criada com e-mail e senha pela API aceitaria convites de um e-mail que não provou.
   - Pôr `sala://auth/callback` em Redirect URLs.
   - Google: um cliente OAuth no Google Cloud, com o redirect `https://<projeto>.supabase.co/auth/v1/callback`.
   - Apple: um Services ID e uma chave na conta Apple Developer.
