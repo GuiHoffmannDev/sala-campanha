@@ -259,6 +259,7 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 6 do plano
 - [x] **Imagem em data URI sem limite próprio de 25 MiB** (`packages/executor/src/providers/fal.ts:68` e `packages/executor/src/providers/gemini.ts:79`). Os bytes decodificados não são comparados com o limite do bucket `team-files`. Além disso, o `postJson` (`packages/executor/src/providers/http.ts`) lê a resposta JSON inteira para a memória, sem teto. Decidir o limite da resposta e recusar uma imagem decodificada acima de 25 MiB com `invalid_output`.
   - **Resolvida na Correção C (2026-10-27):** `decodeImage` recusa base64 longo demais antes de decodificar e bytes acima de `MAX_IMAGE_BYTES` depois. `postJson` lê a resposta com `readCapped`, com teto de uma imagem de 25 MiB em base64 mais 1 MB; acima dele, `invalid_output` sem nova tentativa.
 - [ ] **Nada da fal foi testado contra a API real.** Ainda não foram confirmados no serviço: data URI nas referências, `sync_mode`, o formato da lista `detail` nos erros 422 e o limite real do corpo do pedido (o Context7 não informa). Cobrir em `tests/live/providers.live.test.ts` (Task 10).
+  - **Atualizada na Correção E (2026-10-28):** o teste ao vivo rodou sem chave da fal, então nada foi coberto. Quando rodar com `LIVE_FAL_KEY`, ele confere a data URI na referência e `sync_mode` no endpoint `multi` (1 referência) e no `text-to-image` (sem referência). A lista `detail` do 422 e o limite real do corpo continuam abertos: não dá para provocar os dois de forma confiável.
 
 ### Tarefa 7 — Orquestrador (monta o prompt)
 - [x] Implementada
@@ -321,8 +322,8 @@ cd ~/Documents/sala-campanha && claude "Faça a revisão final de todo o Plano 2
 A revisão final do Plano 2 (2026-10-27) encontrou 15 problemas. As decisões tomadas com você estão no topo de `docs/superpowers/plans/2026-10-27-plano-2-correcoes.md`. Rode as tarefas na ordem A → B → C → D → E, no mesmo ciclo de sempre: um terminal para implementar e outro para revisar.
 
 ### Correção A — Contrato: esforço, schema estrito e limites do Gemini
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
@@ -334,8 +335,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task A de docs/
 ```
 
 ### Correção B — Escolha de modelo e esforço no executor
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
@@ -347,8 +348,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task B de docs/
 ```
 
 ### Correção C — Imagem devolvida pelo provedor e HTTP
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
@@ -360,8 +361,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task C de docs/
 ```
 
 ### Correção D — Rodada, worker e desligamento
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
@@ -373,10 +374,17 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task D de docs/
 ```
 
 ### Correção E — Teste ao vivo e fechamento do Plano 2
-- [ ] Implementada
+- [x] Implementada
 - [ ] Revisada
 
 No Step 3, rode o teste ao vivo você mesmo, num terminal comum, com as chaves só na linha de comando (ex.: `LIVE_GEMINI_KEY=... pnpm test tests/live`). Depois cole para o Claude só o resultado, nunca a chave.
+
+**Pendências do teste ao vivo (2026-10-28).** Em 2026-10-28 o teste rodou só com a chave da OpenAI, e a conta estava sem créditos. Nenhum provedor foi confirmado contra a API real. Resolver antes do primeiro deploy, rodando `LIVE_<PROVEDOR>_KEY=... pnpm test tests/live` e colando o resultado para o Claude registrar:
+- [ ] **OpenAI (GPT-6 Astra):** a chave foi aceita, mas a resposta foi `You have no credits remaining`. Falta confirmar `reasoning.effort`, `max_output_tokens: 32000` e o formato da resposta. Rodar de novo depois de pôr créditos.
+- [ ] **Anthropic (Claude Sonnet 5.5 e Claude Opus 5.5):** sem chave, não rodou. Falta confirmar `output_config.effort` e o formato da resposta.
+- [ ] **Gemini (Nano Banana 2.1 e Nano Banana Pro):** sem chave, não rodou. Falta confirmar o endpoint `v1`, `thinkingLevel` em maiúsculas (`MINIMAL`) e a imagem em `inlineData`. Ler também a linha `<modelo>: HTTP ..., N bytes, N thought image part(s)`. Com alguma parte `thought`, `MAX_RESPONSE_BYTES` (`packages/executor/src/providers/http.ts`) não reserva espaço para os rascunhos. Nesse caso, subir o teto para caber a imagem final mais dois rascunhos, ou pedir `includeThoughts: false`. Sem partes `thought`, o comentário `shortcut:` de `http.ts` continua valendo.
+- [ ] **fal (Flux Kontext Max):** sem chave, não rodou. Ver a pendência da Tarefa 6 do Plano 2.
+- Quando os quatro passarem, marcar o Step 3 da Task 10 do Plano 2.
 
 **Implementar:**
 ```

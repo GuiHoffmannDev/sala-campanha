@@ -249,19 +249,19 @@ Resolve os itens 14 e 15 da revisão.
   - Continua pulando cada provedor sem `LIVE_<PROVIDER>_KEY` e nunca imprime a chave.
   - Nos casos do Gemini, envolve o `fetch` para ler um clone da resposta. Registra o tamanho dela em bytes e quantas partes `thought` com imagem vieram. Isso confere o teto `MAX_RESPONSE_BYTES` de `http.ts`, que não reserva espaço para as imagens de rascunho *(revisão da Task C, 2026-10-27)*.
 
-- [ ] **Step 1: Ampliar o teste ao vivo.**
-- [ ] **Step 2: Run sem chaves.** Run: `pnpm test tests/live`. Expected: todos os testes pulados, nenhum erro.
-- [ ] **Step 3: Run com as chaves que o fundador fornecer.** Ele passa as chaves só na linha de comando (`LIVE_GEMINI_KEY=... pnpm test tests/live`), nunca num arquivo. Expected: PASS nos provedores com chave. Se algum formato de API divergir, corrigir o adaptador e o teste unitário dele juntos.
-- [ ] **Step 4: Registrar o resultado.**
+- [x] **Step 1: Ampliar o teste ao vivo.**
+- [x] **Step 2: Run sem chaves.** Run: `pnpm test tests/live`. Expected: todos os testes pulados, nenhum erro.
+- [x] **Step 3: Run com as chaves que o fundador fornecer.** Ele passa as chaves só na linha de comando (`LIVE_GEMINI_KEY=... pnpm test tests/live`), nunca num arquivo. Expected: PASS nos provedores com chave. Se algum formato de API divergir, corrigir o adaptador e o teste unitário dele juntos. _2026-10-28: rodou só com a chave da OpenAI. A conta estava sem créditos (`You have no credits remaining`), e os outros três provedores foram pulados. Nenhum formato de API foi confirmado e nenhum adaptador mudou. Os quatro provedores ficaram como pendência no `HANDOFF.md`._
+- [x] **Step 4: Registrar o resultado.**
   - No Plano 2, o Step 3 da Task 10 volta para `[ ]` e ganha uma nota com a data, os provedores que rodaram e o resultado. Se todos os quatro passaram, o Step 3 fica `[x]`.
   - Em `HANDOFF.md`, a pendência "Nada da fal foi testado contra a API real" é atualizada com o que foi coberto. Ficam abertos os provedores sem chave e a lista `detail` do 422 da fal, que não dá para provocar de forma confiável.
   - Se o Gemini devolveu partes `thought` com imagem, o resultado vira uma pendência no `HANDOFF.md`: subir `MAX_RESPONSE_BYTES` para caber a imagem final mais dois rascunhos, ou pedir `includeThoughts: false`. Sem partes `thought`, o comentário `shortcut:` de `http.ts` continua valendo.
-- [ ] **Step 5: Fechar o Plano 2 no `HANDOFF.md`.** Marcar como resolvidas as pendências fechadas pelas Tasks A–D, se ainda não estiverem. Marcar Implementada e Revisada em cada task desta correção que tenha passado na revisão.
-- [ ] **Step 6: Verificação final.**
+- [x] **Step 5: Fechar o Plano 2 no `HANDOFF.md`.** Marcar como resolvidas as pendências fechadas pelas Tasks A–D, se ainda não estiverem. Marcar Implementada e Revisada em cada task desta correção que tenha passado na revisão.
+- [x] **Step 6: Verificação final.**
   - Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
   - Run: `docker build -f packages/executor/Dockerfile -t sala-executor . && docker run --rm sala-executor`. Expected: a imagem builda e o container sai com erro de configuração citando `SUPABASE_URL`.
   - Run: `docker run --rm --entrypoint sh sala-executor -c 'find / -name ".env*" 2>/dev/null'`. Expected: nenhum arquivo.
-- [ ] **Step 7: Commit.** `git add -A && git commit -m "test(executor): live smoke test for every catalog model and Plan 2 close-out"`
+- [x] **Step 7: Commit.** `git add -A && git commit -m "test(executor): live smoke test for every catalog model and Plan 2 close-out"`
 
 ---
 
