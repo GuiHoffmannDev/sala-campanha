@@ -10,7 +10,7 @@ Guia para executar o projeto tarefa por tarefa. Cada tarefa roda num **terminal 
 | Plano 1 — Fundação do backend (Supabase) | `docs/superpowers/plans/2026-10-21-plano-1-fundacao-backend.md` |
 | Plano 2 — Executor do agente | `docs/superpowers/plans/2026-10-25-plano-2-executor-agente.md` |
 | Plano 2 — Correções da revisão final | `docs/superpowers/plans/2026-10-27-plano-2-correcoes.md` |
-| Plano 3 — App Tauri para macOS | ainda não escrito |
+| Plano 3 — App Tauri para macOS | `docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md` |
 
 O progresso oficial fica nas caixinhas `- [ ]` dentro do plano. Este handoff tem uma lista resumida para você acompanhar.
 
@@ -379,6 +379,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task D de docs/
 
 No Step 3, rode o teste ao vivo você mesmo, num terminal comum, com as chaves só na linha de comando (ex.: `LIVE_GEMINI_KEY=... pnpm test tests/live`). Depois cole para o Claude só o resultado, nunca a chave.
 
+**Revisão adiada (2026-10-28).** O fundador ainda não tem as chaves dos provedores. A revisão da Correção E e as pendências abaixo ficam para quando houver chaves para testar. O Plano 3 segue antes.
+
 **Pendências do teste ao vivo (2026-10-28).** Em 2026-10-28 o teste rodou só com a chave da OpenAI, e a conta estava sem créditos. Nenhum provedor foi confirmado contra a API real. Resolver antes do primeiro deploy, rodando `LIVE_<PROVEDOR>_KEY=... pnpm test tests/live` e colando o resultado para o Claude registrar:
 - [ ] **OpenAI (GPT-6 Astra):** a chave foi aceita, mas a resposta foi `You have no credits remaining`. Falta confirmar `reasoning.effort`, `max_output_tokens: 32000` e o formato da resposta. Rodar de novo depois de pôr créditos.
 - [ ] **Anthropic (Claude Sonnet 5.5 e Claude Opus 5.5):** sem chave, não rodou. Falta confirmar `output_config.effort` e o formato da resposta.
@@ -397,12 +399,191 @@ cd ~/Documents/sala-campanha && claude "Faça a revisão final das correções d
 
 ---
 
+## Plano 3 — App Tauri para macOS
+
+Pré-requisitos:
+- Supabase local rodando (`supabase start`) e Rust instalado.
+- A partir da Tarefa 4, o arquivo `packages/desktop/.env.local`, com `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (os valores `API_URL` e `ANON_KEY` de `supabase status -o env`). Ele nunca vai para o git.
+
+Nenhuma chave real de provedor é necessária: a partir da Tarefa 12, `pnpm fake-agent` responde no lugar do agente, só no Supabase local. Para ver o app, use `pnpm app`. Os códigos de login chegam no Mailpit (`http://127.0.0.1:55324`).
+
+### Tarefa 1 — Pacote do app: Tauri, React e testes de interface
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 1, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 1 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 1 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 1, Global Constraints e Review Focus. Foque em a parte Rust só registrar plugins, na CSP e nas capabilities mínimas, em nenhuma service role no pacote desktop e no Docker do executor ainda buildando. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 2 — Backend do app: membros, presença privada, tempo real e código por e-mail
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 2, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 2 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 2 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 2, Global Constraints e Review Focus. Foque na policy de presença (outro time não entra no canal), em set_member_role e remove_member nunca deixarem o time sem admin, em funções security definer com search_path vazio e na Edge Function add-member sem vazar token ou service role e respondendo igual para conta nova ou existente. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 3 — Contrato compartilhado: escolha de modelo e eventos da conversa
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 3, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 3 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 3 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 3, Global Constraints e Review Focus. Foque em checkModelChoice e inheritedModel manterem o comportamento do executor, nos schemas de evento baterem com as migrations e em parseEvent nunca quebrar com uma linha ruim. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 4 — Login por código, sessão e mensagens de erro
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 4, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 4 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 4 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 4, Global Constraints e Review Focus. Foque na resposta igual para e-mail cadastrado ou não, nos textos exatos de errors.ts e em nenhum segredo além da anon key no app. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 5 — Campanhas, peças, navegação e link de compartilhamento
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 5, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 5 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 5 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 5, Global Constraints e Review Focus. Foque em parseLink recusar entradas inválidas, no link para peça de outro time ou inexistente e no espectador sem botões de criação. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 6 — Conversa ao vivo
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 6, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 6 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 6 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 6, Global Constraints e Review Focus. Foque em buscar o que faltou a cada SUBSCRIBED sem perder nem duplicar evento, nos textos exatos de labels.ts e timelineItems e no prompt recolhido por padrão. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 7 — Biblioteca de referências e envio de arquivos
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 7, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 7 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 7 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 7, Global Constraints e Review Focus. Foque na checagem de tipo e tamanho antes do upload, no caminho em minúsculas dentro da pasta do time e no isolamento entre times. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 8 — Campo de mensagem: destino, menções, modelo e esforço
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 8, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 8 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 8 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 8, Global Constraints e Review Focus. Foque em messageTarget espelhar o roteamento de post_message, no seletor listar só modelos com chave, no esforço só onde o modelo aceita e no payload exato de p_model. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 9 — Versões e ciclo de vida da peça
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 9, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 9 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 9 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 9, Global Constraints e Review Focus. Foque em pieceActions seguir a tabela de permissões do spec, no envio da versão final por tipo de peça e nas mensagens de erro. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 10 — Comentários na imagem e na legenda
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 10, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 10 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 10 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 10, Global Constraints e Review Focus. Foque nos offsets em code points, nas coordenadas entre 0 e 1 e nos fios de um nível só. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 11 — Presença e notificação de menção
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 11, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 11 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 11 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 11, Global Constraints e Review Focus. Foque no canal privado de presença, em notificar só menções a mim feitas por outra pessoa e em nenhum dado de outro time. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 12 — Configurações do time: chaves e membros
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 12, seguindo os passos com TDD. Respeite Global Constraints e Review Focus. Ao terminar: suite passando, checkboxes da Task 12 marcados no plano, commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 12 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 12, Global Constraints e Review Focus. Foque em a chave nunca voltar ao app (só ...last4 e o campo limpo depois de salvar), nas telas só para admin e no fake-agent recusar um Supabase que não seja local. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 13 — Build, DMG e verificação final
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 13. O checklist manual do Step 3 eu faço junto: me diga cada item e espere minha resposta. Ao terminar: suite passando, checkboxes da Task 13 marcados no plano, commit feito."
+```
+**Revisar (revisão final do Plano 3 inteiro):**
+```
+cd ~/Documents/sala-campanha && claude "Faça a revisão final de todo o Plano 3 (docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra o spec docs/superpowers/specs/2026-10-21-sala-campanha-design.md e as interfaces dos Planos 1 e 2. Confira cobertura de cada task, os 5 itens de Review Focus, o checklist manual da Task 13, e que nenhuma chave de provedor ou service role aparece no app, no build ou no diretório de dados do app. Rode pnpm db:reset && pnpm test && pnpm typecheck. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+---
+
 ## Depois do Plano 1
 
 - [x] **Escrever o Plano 2 (executor do agente).** Num terminal novo:
   ```
   cd ~/Documents/sala-campanha && claude "Use superpowers:writing-plans. Escreva o Plano 2 (executor do agente) a partir do spec docs/superpowers/specs/2026-10-21-sala-campanha-design.md, usando as interfaces já construídas no Plano 1 (docs/superpowers/plans/2026-10-21-plano-1-fundacao-backend.md). Salve em docs/superpowers/plans/ e atualize HANDOFF.md com as tarefas do Plano 2 no mesmo formato."
   ```
-- [ ] **Instalar o Rust** (necessário para o Plano 3): `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh` e depois `xcode-select --install`.
-- [ ] **Escrever o Plano 3 (app Tauri para macOS),** do mesmo jeito do Plano 2.
+- [x] **Instalar o Rust** (necessário para o Plano 3): `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh` e depois `xcode-select --install`. *(2026-10-28: Rust 1.99.1; as Command Line Tools já estavam instaladas.)*
+- [x] **Escrever o Plano 3 (app Tauri para macOS),** do mesmo jeito do Plano 2. *(2026-10-28: `docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md`.)*
 - [ ] **Confirmar com a designer** se ela aceita um gerador de imagem diferente do Krea (Gemini ou Flux Kontext), e se depende de algum recurso do Krea que pode não existir na API.
