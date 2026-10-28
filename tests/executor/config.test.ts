@@ -31,7 +31,7 @@ it('rejects invalid numbers without echoing values', () => {
 
 it('caps provider timeouts at the 300 s fetch header limit without echoing values', () => {
   const bad = { ...BASE, TEXT_TIMEOUT_MS: '300001', IMAGE_TIMEOUT_MS: '300001' }
-  expect(() => loadConfig(bad)).toThrow(/TEXT_TIMEOUT_MS.*IMAGE_TIMEOUT_MS/)
+  expect(() => loadConfig(bad)).toThrow(/configuration: TEXT_TIMEOUT_MS, IMAGE_TIMEOUT_MS$/)
   try { loadConfig(bad) } catch (e) { expect(String(e)).not.toContain('300001') }
   expect(loadConfig({ ...BASE, TEXT_TIMEOUT_MS: '300000', IMAGE_TIMEOUT_MS: '300000', SHUTDOWN_GRACE_MS: '660000' }))
     .toMatchObject({ textTimeoutMs: 300000, imageTimeoutMs: 300000 })
@@ -49,4 +49,10 @@ it('requires a shutdown grace that fits a whole round, without echoing values', 
   try { loadConfig(short) } catch (e) { expect(String(e)).not.toMatch(/359999|100000|200000/) }
   // Exactly TEXT + IMAGE + 60000 is enough.
   expect(loadConfig({ ...short, SHUTDOWN_GRACE_MS: '360000' }).shutdownGraceMs).toBe(360000)
+})
+
+it('cross-field rules never name a valid variable when a field is out of range', () => {
+  // Out-of-range values still reach the cross-field rules; they must not blame the other variable.
+  expect(() => loadConfig({ ...BASE, TEXT_TIMEOUT_MS: '300001' })).toThrow(/configuration: TEXT_TIMEOUT_MS$/)
+  expect(() => loadConfig({ ...BASE, STALE_AFTER_SECONDS: '0' })).toThrow(/configuration: STALE_AFTER_SECONDS$/)
 })

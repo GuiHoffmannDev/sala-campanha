@@ -35,6 +35,8 @@ const EnvSchema = z.object({
   IMAGE_TIMEOUT_MS: int(300000, 1000, MAX_CALL_MS),
   SHUTDOWN_GRACE_MS: int(600000, 0),
 }).check((ctx) => {
+  // Cross-field rules need every field valid; otherwise they would name a variable that is fine.
+  if (ctx.issues.length > 0) return
   // The claim must be touched at least three times before it counts as stale.
   if (ctx.value.TOUCH_INTERVAL_MS * 3 > ctx.value.STALE_AFTER_SECONDS * 1000) {
     ctx.issues.push({ code: 'custom', path: ['TOUCH_INTERVAL_MS'], message: 'too close to STALE_AFTER_SECONDS', input: ctx.value })
