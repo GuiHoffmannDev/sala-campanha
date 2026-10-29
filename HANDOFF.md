@@ -425,8 +425,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 1 do plano
 ```
 
 ### Tarefa 2 — Backend do app: workspaces, convites, presença privada, tempo real e login aberto
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
