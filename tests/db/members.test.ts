@@ -253,6 +253,45 @@ it("a member of another team cannot lock the team's member rows", async () => {
   }
 })
 
+it.each([
+  { action: 'set_member_role', sql: "select public.set_member_role($1, $2, 'gestor')", secondAfter: 'gestor' },
+  { action: 'remove_member', sql: 'select public.remove_member($1, $2)', secondAfter: null },
+])('two admins acting on each other at the same time leave one admin ($action)', async ({ sql, secondAfter }) => {
+  // Forces the race: c1 acts on the second admin and keeps its transaction
+  // open; c2 (the second admin) acts on the first one and must block on the
+  // lock, then be refused once c1 commits. Without the lock both would pass.
+  const a = await createTestTeam()
+  const first = a.members.admin
+  const second = a.members.designer
+  expect((await first.client.rpc('set_member_role', { p_team: a.teamId, p_user: second.userId, p_role: 'admin' })).error).toBeNull()
+
+  const c1 = await dbClient()
+  const c2 = await dbClient()
+  try {
+    await beginAs(c1, first.userId)
+    await c1.query(sql, [a.teamId, second.userId])
+    await beginAs(c2, second.userId)
+    const pid = (await c2.query<{ pid: number }>('select pg_backend_pid() as pid')).rows[0]!.pid
+    const race = c2.query(sql, [a.teamId, first.userId]).then(() => null, (e: unknown) => e)
+
+    // Wait until c2 is blocked on c1's lock before committing c1.
+    for (let i = 0; ; i++) {
+      const [row] = await dbQuery<{ wait: string | null }>('select wait_event_type as wait from pg_stat_activity where pid = $1', [pid])
+      if (row?.wait === 'Lock') break
+      if (i > 100) throw new Error('c2 never blocked on the team_members rows')
+      await new Promise((r) => setTimeout(r, 20))
+    }
+    await c1.query('commit')
+
+    expect(await race).toMatchObject({ code: '42501', message: 'only team admins can manage members' })
+    expect(await roleOf(a.teamId, first.userId)).toBe('admin')
+    expect(await roleOf(a.teamId, second.userId)).toBe(secondAfter)
+  } finally {
+    await Promise.all([c1, c2].map((c) => c.query('rollback').catch(() => undefined)))
+    await Promise.all([c1.end(), c2.end()])
+  }
+})
+
 it('members of another team cannot join the team presence channel', async () => {
   const a = await createTestTeam()
   const b = await createTestTeam()
