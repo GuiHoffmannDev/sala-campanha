@@ -168,14 +168,14 @@ it('renders the app title', () => {
     - Lê o e-mail de quem chama em `auth.users`, só se `email_confirmed_at is not null`. Sem e-mail confirmado, devolve 0.
     - Para cada convite com esse e-mail, insere em `team_members` com o papel do convite e `p_display_name` (`on conflict do nothing`) e apaga o convite.
     - Devolve quantos aceitou. `p_display_name` vazio: `'display name must not be empty'`.
-  - `public.set_member_role(p_team uuid, p_user uuid, p_role team_role) returns void` e `public.remove_member(p_team uuid, p_user uuid) returns void`. Travam as linhas do time em `team_members` (`for update`). Erros:
+  - `public.set_member_role(p_team uuid, p_user uuid, p_role team_role) returns void` e `public.remove_member(p_team uuid, p_user uuid) returns void`. Checam se quem chama é admin, travam as linhas do time em `team_members` (`for update`) e checam de novo, porque outra chamada pode ter rebaixado ou removido quem chama enquanto esperava a trava. Assim, quem não é admin nunca trava as linhas de outro time. Erros:
     - quem chama não é admin: `'only team admins can manage members'` (`42501`);
     - o alvo não é membro: `'user is not a team member'` (`22023`);
     - o time ficaria sem admin: `'team needs at least one admin'` (`22023`).
   - `alter publication supabase_realtime add table public.campaigns, public.reference_assets`.
 - `codigo.html`: "Seu código para entrar na Sala da Campanha é {{ .Token }}. Ele vale por 1 hora."
 
-- [x] **Step 1: Write the failing tests** em `tests/db/members.test.ts`. Para um usuário novo com e-mail confirmado, usar `serviceClient().auth.admin.createUser({ email, email_confirm: true })`. Para um não confirmado, usar `email_confirm: false`. Depois, o login sai de `generateLink({ type: 'magiclink', email })`, com `verifyOtp`.
+- [x] **Step 1: Write the failing tests** em `tests/db/members.test.ts`. Para um usuário novo com e-mail confirmado, usar `serviceClient().auth.admin.createUser({ email, email_confirm: true })`. Depois, o login sai de `generateLink({ type: 'magiclink', email })`, com `verifyOtp`. Para um não confirmado, o teste entra do mesmo jeito e depois apaga `email_confirmed_at` com `dbQuery`. *(Ajustado na revisão: o `verifyOtp` confirma o e-mail, então criar o usuário com `email_confirm: false` não deixa uma conta com sessão e e-mail não confirmado.)*
   - `create_workspace makes the caller its admin`: `teams` e `team_members` mostram o workspace com o papel `admin`.
   - `an invite is accepted only by the verified owner of the email`:
     - O admin do A convida `x@test.local` como `designer`.
@@ -185,6 +185,8 @@ it('renders the app title', () => {
   - `inviting a current member is refused`.
   - `members of another team cannot read the invites`.
   - `admin changes a role; the last admin cannot be demoted or removed`: as mensagens SQL são exatas.
+  - `a member of another team cannot lock the team's member rows`: com as linhas de A travadas por uma transação aberta, o admin do B recebe `'only team admins can manage members'` em vez de esperar a trava. *(Acrescentado na revisão.)*
+  - `two admins acting on each other at the same time leave one admin`, para `set_member_role` e `remove_member`: com duas conexões, o segundo admin espera a trava do primeiro e é recusado quando o primeiro confirma. O time fica com um admin. *(Acrescentado na revisão.)*
   - `members of another team cannot join the team presence channel`:
     - `B.designer.client.channel('team:' + A.teamId, { config: { private: true } })` termina em `CHANNEL_ERROR`.
     - `A.designer` termina em `SUBSCRIBED`.
