@@ -438,8 +438,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 2 do plano
 ```
 
 ### Tarefa 3 — Contrato compartilhado: escolha de modelo e eventos da conversa
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
