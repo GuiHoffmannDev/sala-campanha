@@ -273,16 +273,18 @@ it('renders the app title', () => {
     | `display name must not be empty` | Escreva seu nome. |
     | `provider is not enabled` | Esse jeito de entrar ainda não está disponível. |
     | `row-level security` | Você não tem permissão para isso. |
-    | `Failed to fetch` / `fetch failed` / `NetworkError` | Sem conexão com o servidor. Tente de novo. |
+    | `Failed to fetch` / `fetch failed` / `NetworkError` / `Load failed` | Sem conexão com o servidor. Tente de novo. |
     | (qualquer outra) | Algo deu errado. Tente de novo. |
 
+    *(Acrescentado na execução: `Load failed` é como o WebKit, o motor do app no macOS, descreve a falta de rede. `UserFacingError extends Error` marca um erro cuja mensagem já é o texto em português, e `friendlyError` o devolve como está. As funções desta task e as próximas que "lançam o texto", como `checkImageFile` na Task 7, usam `UserFacingError`.)*
+
   - `sendLoginCode(client, email: string): Promise<void>`: apara e põe o e-mail em minúsculas. Chama `signInWithOtp({ email, options: { shouldCreateUser: true } })`. Rate limit lança `Error('Espere um minuto antes de pedir outro código.')`.
-  - `verifyLoginCode(client, email: string, code: string): Promise<void>`: chama `verifyOtp({ email, token: code.trim(), type: 'email' })`. Em erro, lança `Error('Código inválido ou vencido. Peça um novo.')`.
+  - `verifyLoginCode(client, email: string, code: string): Promise<void>`: chama `verifyOtp({ email, token: code.trim(), type: 'email' })`, com o e-mail normalizado como em `sendLoginCode`. Em erro, lança `Error('Código inválido ou vencido. Peça um novo.')`. *(Acrescentado na execução: uma falha de rede segue como está, para `friendlyError` dizer "Sem conexão". O mesmo vale para `finishOAuth`.)*
   - `type OAuthProvider = 'google' | 'apple'`.
-  - `oauthUrl(client, provider: OAuthProvider): Promise<string>`: chama `signInWithOAuth({ provider, options: { redirectTo: 'sala://auth/callback', skipBrowserRedirect: true } })` e devolve `data.url`. O `LoginScreen` abre a URL com `openExternal`.
+  - `oauthUrl(client, provider: OAuthProvider): Promise<string>`: chama `signInWithOAuth({ provider, options: { redirectTo: 'sala://auth/callback', skipBrowserRedirect: true } })` e devolve `data.url`. O `LoginScreen` abre a URL com `openExternal`. *(Acrescentado na execução: o `signInWithOAuth` só monta a URL, sem falar com o servidor. Por isso, `oauthUrl` faz um `GET` nela com `redirect: 'manual'`. Um provedor desligado responde 400 com `Unsupported provider: provider is not enabled`, que vira o texto da tabela no app, em vez de uma página de erro no navegador.)*
   - `parseAuthCallback(url: string): { code: string } | { error: string } | null` (`lib/link.ts`).
     - `sala://auth/callback?code=...` dá `{ code }`.
-    - `?error_description=...` (ou `?error=...`) dá `{ error }`.
+    - `?error_description=...` (ou `?error=...`) dá `{ error }`. O fragmento (`#error=...`) também vale, porque o Supabase põe alguns erros nele.
     - Qualquer outra URL dá null e segue para a navegação (Task 5).
   - `finishOAuth(client, code: string): Promise<void>`: chama `exchangeCodeForSession(code)`. Em erro, lança `Error('Não foi possível entrar. Tente de novo.')`.
   - `signOut(client): Promise<void>`.
@@ -292,7 +294,7 @@ it('renders the app title', () => {
   - `type Membership = { teamId: string; teamName: string; role: Role; displayName: string }`. `loadMyMemberships(client): Promise<Membership[]>` lê `team_members` do usuário com `teams(name)`, ordenado pelo nome do workspace.
   - `type Member = { userId: string; displayName: string; role: Role }`. `loadMembers(client, teamId): Promise<Member[]>`, por nome. As Tasks 5 a 12 usam.
 - UI:
-  - `LoginScreen(props: { sendCode(email: string): Promise<void>; verifyCode(email: string, code: string): Promise<void>; startOAuth(provider: OAuthProvider): Promise<void> })`.
+  - `LoginScreen(props: { sendCode(email: string): Promise<void>; verifyCode(email: string, code: string): Promise<void>; startOAuth(provider: OAuthProvider): Promise<void>; error?: string | null })`. *(Acrescentado na execução: `error` é o erro que volta do navegador por `sala://auth/callback`; o `App` mostra "Não foi possível entrar. Tente de novo.".)*
     - Os botões "Entrar com Google" e "Entrar com Apple". Depois de clicar, "Continue no navegador…".
     - Abaixo, "ou entre com um código no e-mail".
     - Passo 1 do e-mail: o campo e "Enviar código".
@@ -301,15 +303,15 @@ it('renders the app title', () => {
   - `Onboarding(props: { step: 'name' | 'workspace'; suggestedName: string; onSaveName(name: string): Promise<void>; onCreateWorkspace(name: string): Promise<void> })`.
     - `name`: "Como você quer aparecer para o time?", com o campo preenchido por `suggestedName` e "Continuar".
     - `workspace`: "Crie seu workspace", com o campo "Nome do workspace" e "Criar". Sugestão: "Workspace de <primeiro nome>".
-  - `App`, nesta ordem:
+  - `App(props: { client: SupabaseClient })`. O `main.tsx` cria o cliente com `readEnv` e `createAppClient`. Sem as variáveis, mostra a mensagem do `readEnv` em vez de uma janela vazia. Nesta ordem:
     1. Registra `onDeepLink`. Uma URL que `parseAuthCallback` reconhece vai para `finishOAuth`; o erro aparece na tela de login.
     2. Sem sessão, mostra `LoginScreen`.
     3. Com sessão e sem `displayNameOf(user)`, mostra o `Onboarding` no passo `name` e grava com `saveDisplayName`.
-    4. Com nome, chama `acceptInvites(nome)` a cada abertura e login, e depois `loadMyMemberships`.
+    4. Com nome, chama `acceptInvites(nome)` a cada abertura e login, e depois `loadMyMemberships`. Se falhar, mostra o erro e "Tentar de novo".
     5. Sem nenhum workspace, mostra o `Onboarding` no passo `workspace`, que chama `createWorkspace`.
     6. Com workspace, mostra o `Shell` (Task 5). Antes da Task 5, um texto com o nome do workspace.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `errors.test.ts`: `maps each server message to its Portuguese text` (uma linha da tabela por caso) e `falls back to the generic text`.
   - `auth-callback.test.ts`:
     - `reads the code from the auth callback`.
@@ -323,7 +325,7 @@ it('renders the app title', () => {
       - `loadMyMemberships` traz o workspace com o papel `admin`.
     - `an invited person joins the inviter's workspace on first login`: o admin do A convida o e-mail como `designer`. A pessoa entra pelo código e `acceptInvites` devolve 1. As memberships trazem o A como `designer`.
     - `a wrong code is refused with a readable message`.
-    - `oauthUrl points to the provider through Supabase`: com o Google desligado no ambiente local, `friendlyError` do erro dá "Esse jeito de entrar ainda não está disponível.". Com o Google ligado (variáveis em `supabase/.env`), a URL contém `/auth/v1/authorize?provider=google` e `redirect_to=sala%3A%2F%2Fauth%2Fcallback`.
+    - `oauthUrl points to the provider through Supabase`: com o Google desligado no ambiente local, `friendlyError` do erro dá "Esse jeito de entrar ainda não está disponível.". Com o Google ligado (variáveis em `supabase/.env`), a URL contém `/auth/v1/authorize?provider=google` e `redirect_to=sala%3A%2F%2Fauth%2Fcallback`. *(Ajustado na execução: sem `supabase/.env`, a CLI deixa o `client_id` literal como `env(...)`, e o GoTrue local diz que Google e Apple estão ligados. O teste escolhe o caminho por `/auth/v1/settings`. O caminho desligado é testado sempre com o GitHub, desligado no `config.toml`: `a sign-in provider that is off in Supabase gives the friendly text`.)*
   - `login-screen.test.tsx` (jsdom):
     - `asks for the code after sending it`.
     - `shows the friendly error and keeps the email`.
@@ -331,15 +333,16 @@ it('renders the app title', () => {
   - `onboarding.test.tsx` (jsdom):
     - `saves the suggested name`.
     - `creates the workspace with the typed name`.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop`. Expected: FAIL.
-- [ ] **Step 3: Implementar.**
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 5: Conferir à mão.**
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop`. Expected: FAIL.
+- [x] **Step 3: Implementar.**
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
+- [x] **Step 5: Conferir à mão.**
   - Rodar `pnpm app` com `packages/desktop/.env.local` apontando para o Supabase local.
   - Entrar com um e-mail novo pelo código, que chega no Mailpit (`http://127.0.0.1:55324`).
   - Dar o nome e criar o workspace.
   - Google e Apple são conferidos na Task 13, com o app empacotado: o link `sala://` só funciona assim no macOS.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "feat(desktop): Google, Apple and email code sign-in with workspace onboarding"`
+  - *(Na execução: `pnpm app` abriu a janela, e o e-mail real do código chegou no Mailpit. O caminho do código até o workspace roda em `tests/desktop/app.test.tsx`, em jsdom contra o Supabase local. O clique na janela fica para o fundador conferir, porque a sessão do agente não vê a tela.)*
+- [x] **Step 6: Commit.** `git add -A && git commit -m "feat(desktop): Google, Apple and email code sign-in with workspace onboarding"`
 
 ---
 

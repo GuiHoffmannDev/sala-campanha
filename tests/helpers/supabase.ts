@@ -23,13 +23,20 @@ function loadEnv() {
   return { url, anonKey, serviceRoleKey, dbUrl }
 }
 
-const env = loadEnv()
+export const env = loadEnv()
 
 // Tests run in Node: no session storage and no background token refresh.
 const clientOptions = { auth: { persistSession: false, autoRefreshToken: false } }
 
 export function serviceClient(): SupabaseClient {
   return createClient(env.url, env.serviceRoleKey, clientOptions)
+}
+
+/** The 6-digit email code for `email`, made by the service role instead of read from Mailpit. */
+export async function loginCode(email: string): Promise<string> {
+  const { data, error } = await serviceClient().auth.admin.generateLink({ type: 'magiclink', email })
+  if (error || !data) throw new Error(`generateLink failed: ${error?.message}`)
+  return data.properties.email_otp
 }
 
 /** A client with only the anon key, as the app has before sign-in. */
