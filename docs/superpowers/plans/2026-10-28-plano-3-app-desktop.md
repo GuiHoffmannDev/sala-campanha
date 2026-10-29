@@ -248,7 +248,7 @@ it('renders the app title', () => {
 
 **Interfaces:**
 - Produces:
-  - `createAppClient(url: string, anonKey: string): SupabaseClient`, com `auth.flowType: 'pkce'`, `auth.detectSessionInUrl: false` e a sessão no `localStorage` (padrão).
+  - `createAppClient(url: string, anonKey: string): SupabaseClient`, com `auth.flowType: 'pkce'`, `auth.detectSessionInUrl: false` e a sessão no `localStorage` (padrão). *(Acrescentado na revisão: também `auth.experimental.appendPkceFlowIdToRedirects: true`. Cada login iniciado guarda o próprio verificador PKCE: Google, Apple e também o `signInWithOtp` do código. Sem o ID do login no link de volta, `exchangeCodeForSession` usa o verificador do login mais recente. Com a opção, o link volta como `sala://auth/callback?sb_flow_id=<id>&code=...`. Por isso, `supabase/config.toml` e as Redirect URLs do projeto hospedado têm também `sala://auth/callback?sb_flow_id=*`.)*
   - `friendlyError(e: unknown): string` (`errors.ts`). Procura a mensagem do erro nesta tabela (texto exato):
 
     | Mensagem do servidor (contém) | Texto no app |
@@ -282,13 +282,13 @@ it('renders the app title', () => {
   - `verifyLoginCode(client, email: string, code: string): Promise<void>`: chama `verifyOtp({ email, token: code.trim(), type: 'email' })`, com o e-mail normalizado como em `sendLoginCode`. Em erro, lança `Error('Código inválido ou vencido. Peça um novo.')`. *(Acrescentado na execução: uma falha de rede segue como está, para `friendlyError` dizer "Sem conexão". O mesmo vale para `finishOAuth`.)*
   - `type OAuthProvider = 'google' | 'apple'`.
   - `oauthUrl(client, provider: OAuthProvider): Promise<string>`: chama `signInWithOAuth({ provider, options: { redirectTo: 'sala://auth/callback', skipBrowserRedirect: true } })` e devolve `data.url`. O `LoginScreen` abre a URL com `openExternal`. *(Acrescentado na execução: o `signInWithOAuth` só monta a URL, sem falar com o servidor. Por isso, `oauthUrl` faz um `GET` nela com `redirect: 'manual'`. Um provedor desligado responde 400 com `Unsupported provider: provider is not enabled`, que vira o texto da tabela no app, em vez de uma página de erro no navegador.)*
-  - `parseAuthCallback(url: string): { code: string } | { error: string } | null` (`lib/link.ts`).
-    - `sala://auth/callback?code=...` dá `{ code }`.
+  - `parseAuthCallback(url: string): { code: string; flowId?: string } | { error: string } | null` (`lib/link.ts`).
+    - `sala://auth/callback?code=...` dá `{ code }`. *(Acrescentado na revisão: com `sb_flow_id` no link, dá `{ code, flowId }`.)*
     - `?error_description=...` (ou `?error=...`) dá `{ error }`. O fragmento (`#error=...`) também vale, porque o Supabase põe alguns erros nele.
     - Qualquer outra URL dá null e segue para a navegação (Task 5).
-  - `finishOAuth(client, code: string): Promise<void>`: chama `exchangeCodeForSession(code)`. Em erro, lança `Error('Não foi possível entrar. Tente de novo.')`.
+  - `finishOAuth(client, code: string, flowId?: string): Promise<void>`: chama `exchangeCodeForSession(code, flowId ? { flowId } : undefined)`. Em erro, lança `Error('Não foi possível entrar. Tente de novo.')`. *(Acrescentado na revisão: o `flowId` de `parseAuthCallback`.)*
   - `signOut(client): Promise<void>`.
-  - `displayNameOf(user: User): string | null`: `user_metadata.display_name`, ou então `full_name` ou `name` (Google e Apple), aparado; senão null.
+  - `displayNameOf(user: User): string | null`: `user_metadata.display_name`, ou então `full_name` ou `name` (Google e Apple), aparado; senão null. *(Acrescentado na revisão: cortado em 80 code points. `accept_invites` e `create_workspace` recusam nomes maiores, e um nome longo do Google ou da Apple travava a entrada.)*
   - `saveDisplayName(client, name: string): Promise<void>`: `auth.updateUser({ data: { display_name } })`.
   - `acceptInvites(client, displayName: string): Promise<number>` e `createWorkspace(client, name: string, displayName: string): Promise<string>`: as RPCs da Task 2.
   - `type Membership = { teamId: string; teamName: string; role: Role; displayName: string }`. `loadMyMemberships(client): Promise<Membership[]>` lê `team_members` do usuário com `teams(name)`, ordenado pelo nome do workspace.
@@ -304,7 +304,7 @@ it('renders the app title', () => {
     - `name`: "Como você quer aparecer para o time?", com o campo preenchido por `suggestedName` e "Continuar".
     - `workspace`: "Crie seu workspace", com o campo "Nome do workspace" e "Criar". Sugestão: "Workspace de <primeiro nome>".
   - `App(props: { client: SupabaseClient })`. O `main.tsx` cria o cliente com `readEnv` e `createAppClient`. Sem as variáveis, mostra a mensagem do `readEnv` em vez de uma janela vazia. Nesta ordem:
-    1. Registra `onDeepLink`. Uma URL que `parseAuthCallback` reconhece vai para `finishOAuth`; o erro aparece na tela de login.
+    1. Registra `onDeepLink`. Uma URL que `parseAuthCallback` reconhece vai para `finishOAuth`; o erro aparece na tela de login. *(Acrescentado na revisão: o erro some quando a pessoa tenta entrar de novo, por qualquer caminho, e quando a sessão começa. Assim ele não volta depois de sair da conta.)*
     2. Sem sessão, mostra `LoginScreen`.
     3. Com sessão e sem `displayNameOf(user)`, mostra o `Onboarding` no passo `name` e grava com `saveDisplayName`.
     4. Com nome, chama `acceptInvites(nome)` a cada abertura e login, e depois `loadMyMemberships`. Se falhar, mostra o erro e "Tentar de novo".
@@ -773,7 +773,7 @@ it('renders the app title', () => {
 - [ ] **Step 2: Build.** Run: `pnpm --filter @sala/desktop tauri build`, com `.env.local` do Supabase local. Expected: o `.app` e o `.dmg` são gerados.
 - [ ] **Step 3: Conferir à mão** (instalar o `.app` em `/Applications`, com o Supabase local):
   - [ ] Entrar com um e-mail novo pelo código do Mailpit, dar o nome e criar o workspace; fechar e abrir o app mantém a sessão.
-  - [ ] Google: com um cliente OAuth do tipo Web (redirect `http://127.0.0.1:55321/auth/v1/callback`) e as variáveis em `supabase/.env`, "Entrar com Google" abre o navegador e volta ao app por `sala://auth/callback`, já logado.
+  - [ ] Google: com um cliente OAuth do tipo Web (redirect `http://127.0.0.1:55321/auth/v1/callback`) e as variáveis em `supabase/.env`, "Entrar com Google" abre o navegador e volta ao app por `sala://auth/callback`, já logado. Também com outro login iniciado no meio: clicar "Entrar com Google", pedir um código por e-mail no app e só então terminar o Google no navegador. O app entra pelo Google.
   - [ ] Apple: o mesmo, com o Services ID e a chave da conta Apple Developer. Sem a conta, o item fica pendente no `HANDOFF.md`.
   - [ ] Um convite para o e-mail de uma segunda conta: no login dela, o workspace aparece com o papel convidado.
   - [ ] Criar campanha e peça; subir 2 referências; um PDF é recusado com a mensagem.
@@ -828,7 +828,7 @@ it('renders the app title', () => {
   - Configurar SMTP próprio (ex.: Resend).
   - Usar o template "Magic Link" com `{{ .Token }}` (conteúdo de `supabase/templates/codigo.html`).
   - Manter "Confirm email" ligado e usar o mesmo conteúdo no template "Confirm signup": o primeiro código de uma pessoa nova chega nele. Sem a confirmação, uma conta criada com e-mail e senha pela API aceitaria convites de um e-mail que não provou.
-  - Pôr `sala://auth/callback` em Redirect URLs.
+  - Pôr `sala://auth/callback` e `sala://auth/callback?sb_flow_id=*` em Redirect URLs. Sem a segunda, o login com Google ou Apple volta para o Site URL em vez do app.
   - Google: um cliente OAuth no Google Cloud, com o redirect `https://<projeto>.supabase.co/auth/v1/callback`.
   - Apple: um Services ID e uma chave na conta Apple Developer.
 - [ ] Antes de abrir o download ao público, assinar e notarizar o app com a conta Apple Developer.

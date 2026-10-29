@@ -161,8 +161,9 @@ site_url = "http://127.0.0.1:3000"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-# `sala://auth/callback` is where Google and Apple sign-in return to the desktop app.
-additional_redirect_urls = ["https://127.0.0.1:3000", "sala://auth/callback"]
+# `sala://auth/callback` is where Google and Apple sign-in return to the desktop app. The app's
+# client adds the id of the sign-in (`?sb_flow_id=<hex>`), which the second entry allows.
+additional_redirect_urls = ["https://127.0.0.1:3000", "sala://auth/callback", "sala://auth/callback?sb_flow_id=*"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.

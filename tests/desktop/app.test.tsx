@@ -1,11 +1,21 @@
 // @vitest-environment jsdom
 import { randomUUID } from 'node:crypto'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createAppClient } from '../../packages/desktop/src/data/client.ts'
 import { saveDisplayName, sendLoginCode, verifyLoginCode } from '../../packages/desktop/src/data/auth.ts'
 import { App } from '../../packages/desktop/src/ui/App.tsx'
 import { createTestTeam, env, loginCode, serviceClient } from '../helpers/supabase'
+
+// Outside Tauri there are no sala:// links, so the tests deliver them by hand.
+const deepLink = vi.hoisted(() => ({ deliver: (_url: string): void => {} }))
+vi.mock('../../packages/desktop/src/native.ts', () => ({
+  onDeepLink: async (cb: (url: string) => void) => {
+    deepLink.deliver = cb
+    return () => {}
+  },
+  openExternal: async () => {},
+}))
 
 const appClient = () => createAppClient(env.url, env.anonKey)
 
@@ -61,4 +71,37 @@ it('an invited person with a name opens the app straight into the inviter\'s wor
   render(<App client={client} />)
   expect(await screen.findByText(teamName)).toBeTruthy()
   expect(screen.queryByText('Crie seu workspace')).toBeNull()
+})
+
+it('a sign-in error from the browser goes away when the person asks for a code', async () => {
+  const user = userEvent.setup()
+  render(<App client={appClient()} />)
+  await screen.findByRole('button', { name: 'Entrar com Google' })
+  act(() => deepLink.deliver('sala://auth/callback?error=access_denied'))
+  expect(screen.getByRole('alert').textContent).toBe('Não foi possível entrar. Tente de novo.')
+
+  await user.type(screen.getByLabelText('E-mail'), `app-erro-${randomUUID()}@test.local`)
+  await user.click(screen.getByRole('button', { name: 'Enviar código' }))
+  expect(await screen.findByText(/^Enviamos um código de 6 dígitos/)).toBeTruthy()
+  expect(screen.queryByRole('alert')).toBeNull()
+})
+
+it('a sign-in error does not come back after signing in and out', async () => {
+  const client = appClient()
+  render(<App client={client} />)
+  await screen.findByRole('button', { name: 'Entrar com Google' })
+  act(() => deepLink.deliver('sala://auth/callback?error=access_denied'))
+  expect(screen.getByRole('alert')).toBeTruthy()
+
+  // Signing in another way, here with the email code straight through the client.
+  const email = `app-volta-${randomUUID()}@test.local`
+  await sendLoginCode(client, email)
+  await verifyLoginCode(client, email, await loginCode(email))
+  expect(await screen.findByLabelText('Seu nome')).toBeTruthy()
+
+  await act(async () => {
+    await client.auth.signOut()
+  })
+  expect(await screen.findByRole('button', { name: 'Entrar com Google' })).toBeTruthy()
+  expect(screen.queryByRole('alert')).toBeNull()
 })

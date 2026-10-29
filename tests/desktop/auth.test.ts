@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import type { User } from '@supabase/supabase-js'
 import { createAppClient } from '../../packages/desktop/src/data/client.ts'
 import {
@@ -6,7 +6,8 @@ import {
 } from '../../packages/desktop/src/data/auth.ts'
 import { friendlyError } from '../../packages/desktop/src/data/errors.ts'
 import { acceptInvites, createWorkspace, loadMembers, loadMyMemberships } from '../../packages/desktop/src/data/team.ts'
-import { createTestTeam, env, loginCode } from '../helpers/supabase'
+import { parseAuthCallback } from '../../packages/desktop/src/lib/link.ts'
+import { createTestTeam, env, loginCode, serviceClient } from '../helpers/supabase'
 
 const newEmail = (prefix: string) => `${prefix}-${randomUUID()}@test.local`
 const appClient = () => createAppClient(env.url, env.anonKey)
@@ -101,7 +102,7 @@ it('oauthUrl points to the provider through Supabase', async () => {
 
   if (settings.external.google) {
     expect(result).toMatchObject({ url: expect.stringContaining('/auth/v1/authorize?provider=google') })
-    expect(result).toMatchObject({ url: expect.stringContaining('redirect_to=sala%3A%2F%2Fauth%2Fcallback') })
+    expect(result).toMatchObject({ url: expect.stringContaining('redirect_to=sala%3A%2F%2Fauth%2Fcallback%3Fsb_flow_id%3D') })
     expect(result).toMatchObject({ url: expect.stringContaining('code_challenge=') })
   } else {
     expect(result).toEqual({ error: 'Esse jeito de entrar ainda não está disponível.' })
@@ -118,6 +119,50 @@ it('a code that did not come from the provider is refused with a readable messag
   const client = appClient()
   await oauthUrl(client, 'apple').catch(() => undefined) // stores the PKCE verifier, as a real sign-in does
   await expect(finishOAuth(client, randomUUID())).rejects.toThrow('Não foi possível entrar. Tente de novo.')
+})
+
+it("finishing Google or Apple uses that sign-in's own PKCE verifier", async () => {
+  const client = appClient()
+  // Straight through supabase-js, without oauthUrl's check, so the test does not depend on Google being on.
+  const { data } = await client.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: 'sala://auth/callback', skipBrowserRedirect: true },
+  })
+  const started = new URL(data.url!)
+  // An email code asked for afterwards starts a newer PKCE flow on the same client.
+  await sendLoginCode(client, newEmail('pkce'))
+
+  // The link Supabase sends back: this sign-in's redirect plus the code.
+  const back = new URL(started.searchParams.get('redirect_to')!)
+  back.searchParams.set('code', randomUUID())
+  const { code, flowId } = parseAuthCallback(back.href) as { code: string; flowId?: string }
+  const fetchSpy = vi.spyOn(globalThis, 'fetch')
+  try {
+    // The code is made up, so Supabase refuses it; what matters is the verifier sent with it.
+    await expect(finishOAuth(client, code, flowId)).rejects.toThrow('Não foi possível entrar. Tente de novo.')
+    const exchange = fetchSpy.mock.calls.find(([url]) => String(url).includes('grant_type=pkce'))
+    const { code_verifier } = JSON.parse(String(exchange?.[1]?.body)) as { code_verifier: string }
+    expect(createHash('sha256').update(code_verifier).digest('base64url')).toBe(started.searchParams.get('code_challenge'))
+  } finally {
+    fetchSpy.mockRestore()
+  }
+})
+
+it('the redirect allow list accepts the callback with its flow id', async () => {
+  const email = newEmail('retorno')
+  const { error: createError } = await serviceClient().auth.admin.createUser({ email, email_confirm: true })
+  expect(createError).toBeNull()
+  const flowId = randomUUID().replaceAll('-', '')
+  const { data, error } = await serviceClient().auth.admin.generateLink({
+    type: 'magiclink',
+    email,
+    options: { redirectTo: `sala://auth/callback?sb_flow_id=${flowId}` },
+  })
+  expect(error).toBeNull()
+
+  // Supabase sends the browser to the redirect only when the allow list has it, and to the site URL otherwise.
+  const response = await fetch(data.properties!.action_link, { redirect: 'manual' })
+  expect(response.headers.get('location')).toMatch(new RegExp(`^sala://auth/callback\\?sb_flow_id=${flowId}[&#]`))
 })
 
 it('sign-in calls without a connection say so', async () => {
@@ -138,6 +183,9 @@ it('displayNameOf prefers the saved name, then the name from Google or Apple', (
   expect(displayNameOf(user({ full_name: ' Ana Souza ', name: 'Ana S' }))).toBe('Ana Souza')
   expect(displayNameOf(user({ name: 'Ana S' }))).toBe('Ana S')
   expect(displayNameOf(user({ display_name: '   ', full_name: 'Ana Souza' }))).toBe('Ana Souza')
+  // The server takes at most 80 characters, counted as code points; Google and Apple send names of any length.
+  expect(Array.from(displayNameOf(user({ full_name: '😀'.repeat(90) }))!)).toHaveLength(80)
+  expect(displayNameOf(user({ full_name: `${'a'.repeat(79)} Souza` }))).toBe('a'.repeat(79))
   expect(displayNameOf(user({ display_name: 42 }))).toBeNull()
   expect(displayNameOf(user({}))).toBeNull()
 })

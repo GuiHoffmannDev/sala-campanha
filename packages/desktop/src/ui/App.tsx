@@ -26,7 +26,11 @@ export function App({ client }: { client: SupabaseClient }) {
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
-    const { data } = client.auth.onAuthStateChange((_event, s) => setSession(s))
+    const { data } = client.auth.onAuthStateChange((_event, s) => {
+      setSession(s)
+      // Once signed in, an earlier sign-in error is over; it must not come back after signing out.
+      if (s) setLoginError(null)
+    })
     return () => data.subscription.unsubscribe()
   }, [client])
 
@@ -38,8 +42,11 @@ export function App({ client }: { client: SupabaseClient }) {
       if (!active) return
       const callback = parseAuthCallback(url)
       if (!callback) return
-      if ('code' in callback) finishOAuth(client, callback.code).catch((e: unknown) => setLoginError(friendlyError(e)))
-      else setLoginError('Não foi possível entrar. Tente de novo.')
+      if ('code' in callback) {
+        finishOAuth(client, callback.code, callback.flowId).catch((e: unknown) => setLoginError(friendlyError(e)))
+      } else {
+        setLoginError('Não foi possível entrar. Tente de novo.')
+      }
     }).then(
       (unlisten) => {
         if (active) stop = unlisten
@@ -93,8 +100,14 @@ export function App({ client }: { client: SupabaseClient }) {
   } else if (!session) {
     content = (
       <LoginScreen
-        sendCode={(email) => sendLoginCode(client, email)}
-        verifyCode={(email, code) => verifyLoginCode(client, email, code)}
+        sendCode={(email) => {
+          setLoginError(null)
+          return sendLoginCode(client, email)
+        }}
+        verifyCode={(email, code) => {
+          setLoginError(null)
+          return verifyLoginCode(client, email, code)
+        }}
         startOAuth={startOAuth}
         error={loginError}
       />

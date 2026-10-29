@@ -3,6 +3,8 @@ import { parseAuthCallback } from '../../packages/desktop/src/lib/link.ts'
 it('reads the code from the auth callback', () => {
   expect(parseAuthCallback('sala://auth/callback?code=abc-123')).toEqual({ code: 'abc-123' })
   expect(parseAuthCallback('sala://auth/callback/?code=abc-123')).toEqual({ code: 'abc-123' })
+  // supabase-js puts the id of the sign-in in the link, so the code is traded with that sign-in's verifier.
+  expect(parseAuthCallback('sala://auth/callback?sb_flow_id=abc123&code=xyz')).toEqual({ code: 'xyz', flowId: 'abc123' })
 })
 
 it('reads the error description', () => {

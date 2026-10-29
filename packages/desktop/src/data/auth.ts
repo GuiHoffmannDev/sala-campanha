@@ -39,9 +39,12 @@ export async function oauthUrl(client: SupabaseClient, provider: OAuthProvider):
   return data.url
 }
 
-/** Trades the code from `sala://auth/callback` for a session (PKCE). */
-export async function finishOAuth(client: SupabaseClient, code: string): Promise<void> {
-  const { error } = await client.auth.exchangeCodeForSession(code)
+/**
+ * Trades the code from `sala://auth/callback` for a session (PKCE), with the
+ * verifier of the sign-in named by `flowId` (the link's `sb_flow_id`).
+ */
+export async function finishOAuth(client: SupabaseClient, code: string, flowId?: string): Promise<void> {
+  const { error } = await client.auth.exchangeCodeForSession(code, flowId ? { flowId } : undefined)
   if (error) throw isAuthRetryableFetchError(error) ? error : new UserFacingError('Não foi possível entrar. Tente de novo.')
 }
 
@@ -55,7 +58,8 @@ export function displayNameOf(user: User): string | null {
   const metadata: Record<string, unknown> = user.user_metadata ?? {}
   for (const key of ['display_name', 'full_name', 'name']) {
     const value = metadata[key]
-    if (typeof value === 'string' && value.trim()) return value.trim()
+    // The server takes at most 80 characters (code points); Google and Apple send names of any length.
+    if (typeof value === 'string' && value.trim()) return Array.from(value.trim()).slice(0, 80).join('').trim()
   }
   return null
 }
