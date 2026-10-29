@@ -225,15 +225,15 @@ it('renders the app title', () => {
   - `type SessionEvent`: união discriminada por `kind`, com o `body` tipado.
   - `parseEvent(row: unknown): SessionEvent | null`. Devolve null para tipo desconhecido ou corpo inválido, para uma linha ruim não quebrar o chat.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `tests/shared/events.test.ts`: `parses every event kind` (um literal por tipo); `returns null for an unknown kind or a bad body`.
   - `tests/shared/agent.test.ts`:
     - `inheritedModel picks the latest valid choice that names the capability`: `[opus, { image: fal }]` dá opus para texto e fal para imagem.
     - `inheritedModel skips an invalid choice whole`.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/shared`. Expected: FAIL.
-- [ ] **Step 3: Implementar** e mudar `job.ts` para usar o shared.
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS, inclusive `tests/executor/job.test.ts` sem mudança.
-- [ ] **Step 5: Commit.** `git add -A && git commit -m "refactor(shared): model choice checks and conversation event schemas shared with the app"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/shared`. Expected: FAIL.
+- [x] **Step 3: Implementar** e mudar `job.ts` para usar o shared.
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS, inclusive `tests/executor/job.test.ts` sem mudança.
+- [x] **Step 5: Commit.** `git add -A && git commit -m "refactor(shared): model choice checks and conversation event schemas shared with the app"`
 
 ---
 

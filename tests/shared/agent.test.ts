@@ -5,6 +5,7 @@ import {
   AgentStartedBodySchema,
   agentErrorMessage,
   findModel,
+  inheritedModel,
   MODEL_CATALOG,
   ModelChoiceSchema,
 } from '../../packages/shared/src/agent.ts'
@@ -100,4 +101,25 @@ it('agent event bodies parse the contract shapes', () => {
     message_ids: [1], round: 1, code: 'nope', message: 'm', image_prompt: null,
   }).success).toBe(false)
   expect(AGENT_ERROR_CODES).toEqual(['missing_key', 'invalid_model', 'wrong_status', 'provider_error', 'timeout', 'invalid_output', 'internal'])
+})
+
+const opus = { provider: 'anthropic', model: 'claude-opus-5-5' } as const
+const astra = { provider: 'openai', model: 'gpt-6-astra' } as const
+const fal = { provider: 'fal', model: 'fal-ai/flux-pro/kontext/max/multi' } as const
+
+it('inheritedModel picks the latest valid choice that names the capability', () => {
+  const choices = [{ text: { ...opus, effort: 'max' } }, { image: fal }]
+  expect(inheritedModel(choices, 'text')).toEqual({ ...findModel(opus, 'text'), effort: 'max' })
+  expect(inheritedModel(choices, 'image')).toEqual({ ...findModel(fal, 'image'), effort: null })
+  expect(inheritedModel([{ text: astra }, { text: opus }], 'text')?.model).toBe('claude-opus-5-5')
+  expect(inheritedModel([], 'text')).toBeUndefined()
+})
+
+it('inheritedModel skips an invalid choice whole', () => {
+  // The later choice names a valid text model, but its image model is not in the catalog.
+  const halfInvalid = { text: opus, image: { provider: 'fal', model: 'nope' } }
+  expect(inheritedModel([{ text: astra }, halfInvalid], 'text')?.model).toBe('gpt-6-astra')
+  expect(inheritedModel([{ text: astra }, halfInvalid], 'image')).toBeUndefined()
+  // An effort the model refuses, a malformed value and null are skipped too.
+  expect(inheritedModel([{ text: astra }, { text: { ...opus, effort: 'turbo' } }, 'claude', null], 'text')?.model).toBe('gpt-6-astra')
 })

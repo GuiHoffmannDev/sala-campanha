@@ -42,6 +42,42 @@ export function findModel(ref: ModelRef, capability: ModelCapability): CatalogMo
   return MODEL_CATALOG.find(m => m.provider === ref.provider && m.model === ref.model && m.capability === capability)
 }
 
+/** A catalog model with the effort chosen for it; null means the provider default. */
+export type ChosenModel = CatalogModel & { effort: string | null }
+export type CheckedChoice = Partial<Record<ModelCapability, ChosenModel>>
+
+/**
+ * Checks a stored model choice: it passes ModelChoiceSchema, every model it names is in the
+ * catalog for its capability, and every effort is one the model accepts.
+ */
+export function checkModelChoice(choice: unknown): CheckedChoice | AgentErrorInput {
+  const parsed = ModelChoiceSchema.safeParse(choice)
+  if (!parsed.success) {
+    // shortcut: the malformed choice has no readable model name, so the copy names none.
+    return { code: 'invalid_model', model: '(inválido)', capability: 'text' }
+  }
+  const chosen: CheckedChoice = {}
+  for (const capability of ['text', 'image'] as const) {
+    const ref = parsed.data[capability]
+    if (!ref) continue
+    const model = findModel(ref, capability)
+    if (!model) return { code: 'invalid_model', model: ref.model, capability }
+    if (ref.effort !== undefined && !model.efforts.includes(ref.effort)) {
+      return { code: 'invalid_model', model: `${ref.model} com esforço ${ref.effort}`, capability }
+    }
+    chosen[capability] = { ...model, effort: ref.effort ?? null }
+  }
+  return chosen
+}
+
+/**
+ * The model of `capability` in the latest valid choice that names it (`choices` oldest first).
+ * Invalid choices are skipped whole, so an old mistake or a model since removed from the catalog never locks the piece.
+ */
+export function inheritedModel(choices: unknown[], capability: ModelCapability): ChosenModel | undefined {
+  return choices.map((c) => checkModelChoice(c)).map((c) => ('code' in c ? undefined : c[capability])).findLast((m) => m !== undefined)
+}
+
 export const AGENT_ERROR_CODES = [
   'missing_key',
   'invalid_model',

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { PieceKind, PieceStatus, Provider } from '@sala/shared'
 import {
-  agentErrorMessage, findModel, MODEL_CATALOG, ModelChoiceSchema, type AgentErrorInput, type CatalogModel, type ModelCapability,
+  agentErrorMessage, checkModelChoice, inheritedModel, MODEL_CATALOG, type AgentErrorInput, type CheckedChoice, type ChosenModel, type ModelCapability,
 } from '@sala/shared/agent'
 import { ClaimLostError, type ExecutorDb, type InboxMessage } from './db.ts'
 import { errorText, type Logger } from './log.ts'
@@ -12,39 +12,12 @@ import { ProviderError, type GeneratedImage, type InputImage, type Providers } f
 export type JobDeps = { db: ExecutorDb; providers: Providers; log: Logger; touchIntervalMs: number; textTimeoutMs: number; imageTimeoutMs: number }
 export type RoundOutcome = 'ok' | 'failed' | 'claim_lost'
 
-/** A catalog model with the effort chosen for it; null means the provider default. */
-type ChosenModel = CatalogModel & { effort: string | null }
 type Models = { text: ChosenModel; image: ChosenModel | null }
-type Choice = Partial<Record<ModelCapability, ChosenModel>>
 
 const AGENT_STATUSES: readonly PieceStatus[] = ['gerando', 'base_em_revisao']
 const EXTENSIONS: Record<GeneratedImage['mimeType'], string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }
 
 const redactAll = (text: string, keys: string[]) => keys.reduce(redact, text)
-
-/**
- * Checks a stored model choice: it passes ModelChoiceSchema, every model it names is in the
- * catalog for its capability, and every effort is one the model accepts.
- */
-function checkChoice(choice: unknown): Choice | AgentErrorInput {
-  const parsed = ModelChoiceSchema.safeParse(choice)
-  if (!parsed.success) {
-    // shortcut: the malformed choice has no readable model name, so the copy names none.
-    return { code: 'invalid_model', model: '(inválido)', capability: 'text' }
-  }
-  const chosen: Choice = {}
-  for (const capability of ['text', 'image'] as const) {
-    const ref = parsed.data[capability]
-    if (!ref) continue
-    const model = findModel(ref, capability)
-    if (!model) return { code: 'invalid_model', model: ref.model, capability }
-    if (ref.effort !== undefined && !model.efforts.includes(ref.effort)) {
-      return { code: 'invalid_model', model: `${ref.model} com esforço ${ref.effort}`, capability }
-    }
-    chosen[capability] = { ...model, effort: ref.effort ?? null }
-  }
-  return chosen
-}
 
 /**
  * Picks the text model (always) and the image model (imagem and imagem_texto pieces), each with its effort.
@@ -55,18 +28,16 @@ function checkChoice(choice: unknown): Choice | AgentErrorInput {
  * Without a choice for a capability, the first catalog model whose provider has a key, at the provider's default effort.
  */
 export function resolveModels(kind: PieceKind, batch: InboxMessage[], choices: unknown[], keyed: Provider[]): Models | AgentErrorInput {
-  const isError = (c: Choice | AgentErrorInput): c is AgentErrorInput => 'code' in c
   const fromBatch = batch.map((m) => m.body.model).findLast((v) => v != null)
-  let batchChoice: Choice = {}
+  let batchChoice: CheckedChoice = {}
   if (fromBatch != null) {
-    const checked = checkChoice(fromBatch)
-    if (isError(checked)) return checked
+    const checked = checkModelChoice(fromBatch)
+    if ('code' in checked) return checked
     batchChoice = checked
   }
-  const inherited = choices.map(checkChoice).filter((c): c is Choice => !isError(c))
 
   const pick = (capability: ModelCapability): ChosenModel | AgentErrorInput => {
-    const model = batchChoice[capability] ?? inherited.findLast((c) => c[capability])?.[capability]
+    const model = batchChoice[capability] ?? inheritedModel(choices, capability)
     if (model) return keyed.includes(model.provider) ? model : { code: 'missing_key', provider: model.provider }
     const fallback = MODEL_CATALOG.find((m) => m.capability === capability && keyed.includes(m.provider))
     return fallback ? { ...fallback, effort: null } : { code: 'missing_key', capability }
