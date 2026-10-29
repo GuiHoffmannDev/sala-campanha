@@ -451,8 +451,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 3 do plano
 ```
 
 ### Tarefa 4 — Login com Google, Apple e código por e-mail, entrada no workspace e mensagens de erro
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
