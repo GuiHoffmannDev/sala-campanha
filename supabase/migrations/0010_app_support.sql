@@ -201,9 +201,10 @@ $$;
 
 -- Members -------------------------------------------------------------------
 
--- Both functions lock the team's member rows first, so two admins demoting or
+-- Both functions refuse non-admins before locking, so nobody outside the team
+-- can lock its member rows. Then they lock the team's member rows and check the
+-- caller's role again against the latest state, so two admins demoting or
 -- removing each other at the same time cannot leave the team without an admin.
--- The caller's role is checked after the lock, against the latest state.
 create function public.set_member_role(p_team uuid, p_user uuid, p_role public.team_role)
 returns void
 language plpgsql
@@ -213,11 +214,15 @@ as $$
 declare
   v_current public.team_role;
 begin
-  perform 1 from public.team_members m where m.team_id = p_team for update;
-
   if private.team_role_of(p_team) is distinct from 'admin' then
     raise exception 'only team admins can manage members' using errcode = '42501';
   end if;
+  perform 1 from public.team_members m where m.team_id = p_team for update;
+  -- Checked again after the lock: a concurrent call may have demoted or removed the caller.
+  if private.team_role_of(p_team) is distinct from 'admin' then
+    raise exception 'only team admins can manage members' using errcode = '42501';
+  end if;
+
   select m.role into v_current
   from public.team_members m
   where m.team_id = p_team and m.user_id = p_user;
@@ -245,11 +250,15 @@ as $$
 declare
   v_current public.team_role;
 begin
-  perform 1 from public.team_members m where m.team_id = p_team for update;
-
   if private.team_role_of(p_team) is distinct from 'admin' then
     raise exception 'only team admins can manage members' using errcode = '42501';
   end if;
+  perform 1 from public.team_members m where m.team_id = p_team for update;
+  -- Checked again after the lock: a concurrent call may have demoted or removed the caller.
+  if private.team_role_of(p_team) is distinct from 'admin' then
+    raise exception 'only team admins can manage members' using errcode = '42501';
+  end if;
+
   select m.role into v_current
   from public.team_members m
   where m.team_id = p_team and m.user_id = p_user;

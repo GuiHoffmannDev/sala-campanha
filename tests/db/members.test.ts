@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { anonClient, createTestTeam, dbQuery, serviceClient, uploadTeamFile } from '../helpers/supabase'
+import type pg from 'pg'
+import { anonClient, createTestTeam, dbClient, dbQuery, serviceClient, uploadTeamFile } from '../helpers/supabase'
 import { closeChannels, foreign, joinPresence, listen, waitFor, warmUpRealtime } from '../helpers/realtime'
 
 type NewUser = { userId: string; email: string; client: SupabaseClient }
@@ -35,6 +36,15 @@ async function roleOf(teamId: string, userId: string): Promise<string | null> {
 
 const invite = (client: SupabaseClient, team: string, email: string, role = 'designer') =>
   client.rpc('invite_member', { p_team: team, p_email: email, p_role: role })
+
+const claimsOf = (userId: string) => JSON.stringify({ sub: userId, role: 'authenticated' })
+
+/** Opens a transaction on `c` that calls functions as `userId`, the way PostgREST does. */
+async function beginAs(c: pg.Client, userId: string): Promise<void> {
+  await c.query('begin')
+  await c.query('set local role authenticated')
+  await c.query("select set_config('request.jwt.claims', $1, true)", [claimsOf(userId)])
+}
 
 afterEach(closeChannels)
 beforeAll(warmUpRealtime, 40_000)
@@ -217,6 +227,30 @@ it('admin changes a role; the last admin cannot be demoted or removed', async ()
   expect((await setRole(admin, designer.userId, 'admin')).error).toBeNull()
   expect((await remove(admin, first.userId)).error).toBeNull()
   expect(await roleOf(a.teamId, first.userId)).toBeNull()
+})
+
+it("a member of another team cannot lock the team's member rows", async () => {
+  const a = await createTestTeam()
+  const b = await createTestTeam()
+  const c1 = await dbClient()
+  const c2 = await dbClient()
+  try {
+    // c1 holds the lock on A's member rows with an open transaction.
+    await beginAs(c1, a.members.admin.userId)
+    await c1.query("select public.set_member_role($1, $2, 'gestor')", [a.teamId, a.members.designer.userId])
+
+    // B's admin is refused before the lock, so the lock timeout never fires.
+    await c2.query('set role authenticated')
+    await c2.query("select set_config('request.jwt.claims', $1, false)", [claimsOf(b.members.admin.userId)])
+    await c2.query("set lock_timeout = '1s'")
+    const notAdmin = { code: '42501', message: 'only team admins can manage members' }
+    const target = a.members.espectador.userId
+    await expect(c2.query("select public.set_member_role($1, $2, 'admin')", [a.teamId, target])).rejects.toMatchObject(notAdmin)
+    await expect(c2.query('select public.remove_member($1, $2)', [a.teamId, target])).rejects.toMatchObject(notAdmin)
+  } finally {
+    await c1.query('rollback').catch(() => undefined)
+    await Promise.all([c1.end(), c2.end()])
+  }
 })
 
 it('members of another team cannot join the team presence channel', async () => {
