@@ -1,0 +1,165 @@
+---
+interface Props {
+  /** Where the signup happened, sent to Loops as the contact's `source`. Also keeps ids unique per form. */
+  source: string
+  tone?: 'light' | 'dark'
+}
+
+const { source, tone = 'light' } = Astro.props
+const endpoint = import.meta.env.PUBLIC_LOOPS_FORM_ENDPOINT ?? ''
+if (import.meta.env.PROD && !endpoint) {
+  throw new Error('PUBLIC_LOOPS_FORM_ENDPOINT is not set. Copy packages/website/.env.example to .env and fill it in.')
+}
+const inputId = `email-${source}`
+const statusId = `status-${source}`
+---
+<form class:list={['waitlist', tone]} method="post" action={endpoint || undefined} data-endpoint={endpoint} data-source={source} novalidate>
+  <label for={inputId}>Work email</label>
+  <div class="row">
+    <input
+      id={inputId}
+      name="email"
+      type="email"
+      autocomplete="email"
+      inputmode="email"
+      placeholder="you@yourbrand.com"
+      required
+      aria-describedby={statusId}
+    />
+    <input type="hidden" name="source" value={source} />
+    <button class="button" type="submit">Join waitlist</button>
+  </div>
+  <p class="status" id={statusId} role="status" aria-live="polite">
+    {endpoint ? 'We’ll email you when Tink opens. Nothing else.' : 'Dev only: the waitlist endpoint is not set, so signups are not sent.'}
+  </p>
+</form>
+
+<style>
+  .waitlist {
+    display: grid;
+    gap: 0.5rem;
+    max-width: 32rem;
+    font-family: var(--sans);
+  }
+
+  label {
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  input[type='email'] {
+    flex: 1 1 14rem;
+    min-width: 0;
+    min-height: 3rem;
+    padding: 0 1.125rem;
+    border: 1.5px solid var(--ink);
+    border-radius: var(--radius-button);
+    background: var(--sheet);
+    color: var(--ink);
+    font: 1rem var(--sans);
+  }
+
+  input[type='email']::placeholder {
+    color: #76766f;
+  }
+
+  input[aria-invalid='true'] {
+    border-color: #b3261e;
+  }
+
+  .row .button {
+    flex: 0 0 auto;
+  }
+
+  .status {
+    min-height: 1.5em;
+    color: var(--graphite);
+    font-size: 0.875rem;
+  }
+
+  .status[data-state='error'] {
+    color: #b3261e;
+  }
+
+  .status[data-state='success'] {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .dark label,
+  .dark .status,
+  .dark .status[data-state='success'] {
+    color: var(--paper);
+  }
+
+  .dark .status[data-state='error'] {
+    color: #ffb4ab;
+  }
+
+  .dark .button {
+    background: var(--highlight);
+    border-color: var(--highlight);
+    color: var(--ink);
+  }
+
+  .dark .button:hover {
+    background: var(--paper);
+    border-color: var(--paper);
+  }
+
+  .dark input[type='email'] {
+    border-color: var(--paper);
+  }
+
+  @media (max-width: 30rem) {
+    .row .button {
+      flex: 1 1 100%;
+    }
+  }
+</style>
+
+<script>
+  import { joinWaitlist } from '../lib/waitlist.ts'
+
+  for (const form of document.querySelectorAll<HTMLFormElement>('form.waitlist')) {
+    const input = form.querySelector<HTMLInputElement>('input[type="email"]')!
+    const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!
+    const status = form.querySelector<HTMLElement>('.status')!
+    let busy = false
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      if (busy) return
+      busy = true
+      button.setAttribute('aria-disabled', 'true')
+      button.textContent = 'Joining…'
+      status.removeAttribute('data-state')
+      status.textContent = 'Joining the waitlist…'
+
+      const result = await joinWaitlist(form.dataset.endpoint ?? '', input.value, form.dataset.source ?? 'website')
+
+      busy = false
+      button.removeAttribute('aria-disabled')
+      button.textContent = 'Join waitlist'
+      if (result.ok) {
+        input.removeAttribute('aria-invalid')
+        input.value = ''
+        status.dataset.state = 'success'
+        status.textContent = 'You’re on the list. We’ll email you when Tink opens.'
+        return
+      }
+      status.dataset.state = 'error'
+      status.textContent = result.message
+      if (result.reason === 'invalid-email') {
+        input.setAttribute('aria-invalid', 'true')
+        input.focus()
+      }
+    })
+  }
+</script>

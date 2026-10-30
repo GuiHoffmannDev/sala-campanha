@@ -1,0 +1,145 @@
+---
+import Logo from './Logo.astro'
+import { FOOTER_GROUPS } from '../data/site.ts'
+---
+<footer class="footer">
+  <div class="wrap top">
+    <div class="intro">
+      <Logo />
+      <p>Your campaign, in one room. A Mac app for brand teams, opening soon.</p>
+      <a class="button light" href="#waitlist">Join waitlist</a>
+    </div>
+    <nav class="groups" aria-label="Footer">
+      {FOOTER_GROUPS.map((group) => (
+        <div>
+          <h2>{group.title}</h2>
+          <ul>
+            {group.links.map((link) => <li><a href={link.href}>{link.label}</a></li>)}
+          </ul>
+        </div>
+      ))}
+    </nav>
+  </div>
+
+  <div class="wrap legal">
+    <a href="/privacy">Privacy</a>
+    <p>© {new Date().getFullYear()} Tink</p>
+  </div>
+
+  <!-- Giant striped wordmark, cropped by the page edge. -->
+  <div class="wrap wordmark" aria-hidden="true">Tink</div>
+</footer>
+
+<style>
+  .footer {
+    overflow: hidden;
+    background: var(--brown);
+    color: #f7f5f0;
+  }
+
+  .top {
+    display: grid;
+    gap: 3rem;
+    padding-block: clamp(3rem, 2rem + 4vw, 5rem) 3rem;
+  }
+
+  .intro {
+    display: grid;
+    gap: 1.25rem;
+    justify-items: start;
+    max-width: 22rem;
+  }
+
+  .intro p {
+    color: #d8cfc8;
+    font-size: 1.125rem;
+    line-height: 1.45;
+  }
+
+  .button.light {
+    background: #f7f5f0;
+    border-color: #f7f5f0;
+    color: var(--ink);
+  }
+
+  .button.light:hover {
+    background: var(--lilac);
+    border-color: var(--lilac);
+  }
+
+  .groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: 2rem;
+  }
+
+  h2 {
+    margin-bottom: 1rem;
+    color: #b9ada5;
+    font-family: var(--sans);
+    font-size: 0.875rem;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  ul {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  ul a:hover,
+  .legal a:hover {
+    text-decoration: underline;
+    text-decoration-color: var(--lilac);
+  }
+
+  .legal {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 1.25rem;
+    border-top: 1px solid #4a3b35;
+    color: #b9ada5;
+    font-size: 0.8125rem;
+  }
+
+  .legal a {
+    text-decoration: underline;
+  }
+
+  .wordmark {
+    margin-bottom: -0.3em;
+    font-family: var(--display);
+    font-size: clamp(8rem, 4rem + 22vw, 24rem);
+    font-weight: 700;
+    letter-spacing: -0.06em;
+    line-height: 0.8;
+    color: transparent;
+    background: repeating-linear-gradient(
+      180deg,
+      var(--lilac) 0 0.045em,
+      transparent 0.045em 0.07em,
+      var(--orange) 0.07em 0.115em,
+      transparent 0.115em 0.14em,
+      var(--sky) 0.14em 0.185em,
+      transparent 0.185em 0.21em
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    user-select: none;
+  }
+
+  @media (min-width: 52rem) {
+    .top {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    }
+  }
+</style>

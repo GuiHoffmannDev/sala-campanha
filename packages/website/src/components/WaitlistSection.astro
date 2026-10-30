@@ -1,0 +1,45 @@
+---
+import WaitlistForm from './WaitlistForm.astro'
+import PatternFrame from './PatternFrame.astro'
+---
+<section class="closing wrap" id="waitlist" aria-labelledby="waitlist-title">
+  <PatternFrame pattern="checker" fill="var(--lilac)">
+    <div class="inner">
+      <h2 id="waitlist-title">Bring the whole brand team into the room.</h2>
+      <p>Tink is a Mac app, opening to teams soon. Leave your work email and we’ll let you know when it’s ready.</p>
+      <WaitlistForm source={`closing${Astro.url.pathname.replace(/\/+$/, '').replaceAll('/', '-') || '-home'}`} />
+    </div>
+  </PatternFrame>
+</section>
+
+<style>
+  .closing {
+    padding-block: clamp(3rem, 2rem + 4vw, 6rem);
+  }
+
+  .inner {
+    display: grid;
+    gap: 1.25rem;
+    justify-items: center;
+    padding-block: clamp(1rem, 0.5rem + 3vw, 3rem);
+    text-align: center;
+  }
+
+  h2 {
+    max-width: 18ch;
+  }
+
+  p {
+    max-width: 34rem;
+    color: var(--ink);
+  }
+
+  .inner :global(form) {
+    width: 100%;
+    justify-items: center;
+  }
+
+  .inner :global(.row) {
+    justify-content: center;
+  }
+</style>

@@ -1,0 +1,158 @@
+---
+// Tink against the usual setup: a chat app plus separate AI tools. Every row comes from the product spec.
+type Rating = 'strong' | 'tradeoff' | 'short'
+type Cell = [Rating, string]
+
+const rows: { aspect: string; usual: Cell; tink: Cell }[] = [
+  { aspect: 'Where the request lives', usual: ['short', 'Spread across chat, email and the AI tool'], tink: ['strong', 'One thread per piece'] },
+  { aspect: 'Who talks to the AI', usual: ['tradeoff', 'Whoever has the tool open'], tink: ['strong', 'Anyone on the team'] },
+  { aspect: 'Prompts and drafts', usual: ['short', 'Only the person who generated them'], tink: ['strong', 'The whole team sees every version'] },
+  { aspect: 'Changing direction', usual: ['short', 'Start another round'], tink: ['strong', 'Redirect mid-generation, no restart'] },
+  { aspect: 'References', usual: ['tradeoff', 'Uploaded again every time'], tink: ['strong', 'A photo library per campaign'] },
+  { aspect: 'Approval', usual: ['short', 'A “looks good” lost in the chat'], tink: ['strong', 'The lead approves in the piece'] },
+  { aspect: 'Feedback on the final', usual: ['tradeoff', 'Screenshots with arrows'], tink: ['strong', 'Comments pinned to the exact spot'] },
+  { aspect: 'AI costs', usual: ['tradeoff', 'Separate tools, person by person'], tink: ['strong', 'Workspace keys, paid to providers directly'] },
+  { aspect: 'Finishing touches', usual: ['strong', 'The designer’s own tools'], tink: ['strong', 'Still the designer’s own tools'] },
+]
+
+const label: Record<Rating, string> = { strong: 'Strong', tradeoff: 'Trade-off', short: 'Falls short' }
+---
+<div class="compare">
+  <div class="scroller" role="region" aria-labelledby="compare-title" tabindex="0">
+    <table>
+      <caption class="visually-hidden">How Tink compares with a chat app plus separate AI tools</caption>
+      <thead>
+        <tr>
+          <td></td>
+          <th scope="col">Chat app + AI tools</th>
+          <th scope="col" class="tink">Tink</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr>
+            <th scope="row">{row.aspect}</th>
+            {[row.usual, row.tink].map(([rating, text], i) => (
+              <td class:list={[{ tink: i === 1 }]}>
+                <span class:list={['icon', rating]} aria-hidden="true"></span>
+                <span class="visually-hidden">{label[rating]}:</span>
+                {text}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+  <ul class="legend" aria-label="Legend">
+    {(['strong', 'tradeoff', 'short'] as const).map((rating) => (
+      <li><span class:list={['icon', rating]} aria-hidden="true"></span>{label[rating]}</li>
+    ))}
+  </ul>
+</div>
+
+<style>
+  .scroller {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    min-width: 40rem;
+    border-collapse: collapse;
+    background: var(--sheet);
+    font-size: 0.9375rem;
+  }
+
+  th,
+  td {
+    padding: 0.875rem 1rem;
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  thead th,
+  thead td {
+    border-bottom: 1.5px solid var(--ink);
+    font-weight: 600;
+  }
+
+  tbody tr:nth-child(even) {
+    background: #f1ede6;
+  }
+
+  tbody th {
+    width: 26%;
+    font-weight: 600;
+  }
+
+  td {
+    color: var(--graphite);
+  }
+
+  /* The Tink column runs dark from header to last row. */
+  .tink {
+    background: var(--brown);
+    color: #f7f5f0;
+  }
+
+  tbody tr:nth-child(even) .tink {
+    background: #3a2c27;
+  }
+
+  .icon {
+    display: inline-grid;
+    place-items: center;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin-right: 0.5rem;
+    border-radius: 50%;
+    vertical-align: -0.2em;
+    font-size: 0.6875rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .strong {
+    background: var(--ink);
+    color: #fff;
+  }
+
+  .strong::before {
+    content: '✓';
+  }
+
+  .tink .strong {
+    background: var(--lilac);
+    color: var(--ink);
+  }
+
+  .tradeoff {
+    background: var(--highlight);
+    color: var(--ink);
+  }
+
+  .tradeoff::before {
+    content: '–';
+  }
+
+  .short {
+    background: var(--orange);
+    color: var(--ink);
+  }
+
+  .short::before {
+    content: '×';
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    margin: 1rem 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--graphite);
+    font-size: 0.8125rem;
+  }
+</style>

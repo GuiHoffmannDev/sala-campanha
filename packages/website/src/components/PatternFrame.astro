@@ -1,0 +1,30 @@
+---
+// A layered frame: colored rim, a band of geometric pattern, a taupe mat, then the content panel.
+interface Props {
+  pattern: 'stripes' | 'checker' | 'cubes'
+  /** Background of the content panel. */
+  fill?: string
+  class?: string
+}
+
+const { pattern, fill = 'var(--sheet)', class: className } = Astro.props
+---
+<div class:list={['frame', `pattern-${pattern}`, className]}>
+  <div class="panel" style={`--fill: ${fill}`}>
+    <slot />
+  </div>
+</div>
+
+<style>
+  .frame {
+    padding: clamp(0.75rem, 0.5rem + 1.4vw, 1.5rem);
+    border: clamp(0.4rem, 0.3rem + 0.5vw, 0.75rem) solid var(--orange);
+  }
+
+  .panel {
+    height: 100%;
+    padding: clamp(1rem, 0.5rem + 3vw, 3.5rem);
+    border: clamp(0.35rem, 0.25rem + 0.4vw, 0.6rem) solid var(--taupe);
+    background: var(--fill);
+  }
+</style>

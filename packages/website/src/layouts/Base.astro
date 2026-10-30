@@ -1,0 +1,41 @@
+---
+import '../styles/global.css'
+import Nav from '../components/Nav.astro'
+import Footer from '../components/Footer.astro'
+import WaitlistSection from '../components/WaitlistSection.astro'
+import { SITE } from '../data/site.ts'
+
+interface Props {
+  title?: string
+  description?: string
+}
+
+const { title, description = SITE.description } = Astro.props
+const pageTitle = title ? `${title} | ${SITE.name}` : `${SITE.name}, the shared room for your brand team`
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta name="theme-color" content="#f7f5f0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- Lets CSS hide animated states only when scripts will run to reveal them. -->
+    <script is:inline>document.documentElement.classList.add('js')</script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <Nav />
+    <main id="main">
+      <slot />
+      <WaitlistSection />
+    </main>
+    <Footer />
+  </body>
+</html>

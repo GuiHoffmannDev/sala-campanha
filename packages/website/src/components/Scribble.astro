@@ -1,0 +1,182 @@
+---
+// Blue-pencil marks drawn over text, like an editor marking up a proof.
+// Decorative only: the words inside stay plain text for assistive tech.
+interface Props {
+  kind: 'strike' | 'underline' | 'circle' | 'arrow'
+  /** Seconds to wait after the mark scrolls into view. */
+  delay?: number
+  /** Redraw the mark when a pointer moves over it. */
+  replay?: boolean
+  class?: string
+}
+
+const { kind, delay = 0, replay = false, class: className } = Astro.props
+
+// Hand-drawn paths with deliberate wobble. Lines stretch to the text; the arrow keeps its shape.
+const shapes = {
+  strike: {
+    viewBox: '0 0 100 20',
+    stretch: true,
+    paths: ['M1 11.6C18 9.9 41 12.8 63 10.6S90 10.4 99 9.4', 'M4 13.4C29 11.6 58 14.2 97 11.9'],
+  },
+  underline: {
+    viewBox: '0 0 100 20',
+    stretch: true,
+    paths: ['M1 15.8C21 14.2 47 17.6 71 15.4S93 14.8 99 16.6'],
+  },
+  circle: {
+    viewBox: '0 0 100 40',
+    stretch: true,
+    paths: ['M55 4.2C24 2.4 3.4 10.2 4 21.2 4.6 33.4 33 38.4 60 36.4 86 34.4 98.4 26 96.2 15.6 94 5.6 69 1.6 38 5.4'],
+  },
+  arrow: {
+    viewBox: '0 0 100 60',
+    stretch: false,
+    paths: ['M94 6C70 8 34 20 10 50', 'M10 50C12 44 12.6 40 12.4 35', 'M10 50C15.6 48 19.6 47.4 24 47.6'],
+  },
+}
+
+const shape = shapes[kind]
+---
+<span
+  class:list={['scribble', `scribble-${kind}`, className]}
+  data-draw
+  data-replay={replay ? '' : undefined}
+  style={`--delay: ${delay}s`}
+>
+  <slot />
+  <svg
+    aria-hidden="true"
+    focusable="false"
+    viewBox={shape.viewBox}
+    preserveAspectRatio={shape.stretch ? 'none' : 'xMidYMid meet'}
+  >
+    {shape.paths.map((d) => <path d={d} />)}
+  </svg>
+</span>
+
+<style>
+  .scribble {
+    position: relative;
+    display: inline-block;
+  }
+
+  svg {
+    position: absolute;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  path {
+    fill: none;
+    stroke: var(--pencil);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .scribble-strike {
+    white-space: nowrap;
+  }
+
+  .scribble-strike svg {
+    /* Lift the line to the x-height middle of the heavy sans. */
+    translate: 0 -0.07em;
+    inset: 0 -0.08em;
+    width: calc(100% + 0.16em);
+    height: 100%;
+  }
+
+  .scribble-strike path {
+    stroke-width: 3.5;
+  }
+
+  .scribble-underline svg {
+    left: -0.05em;
+    right: -0.05em;
+    bottom: -0.22em;
+    width: calc(100% + 0.1em);
+    height: 0.6em;
+  }
+
+  .scribble-circle svg {
+    inset: -0.32em -0.45em -0.28em;
+    width: calc(100% + 0.9em);
+    height: calc(100% + 0.6em);
+  }
+
+  .scribble-arrow {
+    display: block;
+    width: 5.5rem;
+    height: 3.3rem;
+  }
+
+  .scribble-arrow svg {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Hidden until drawn, but only when JS runs and motion is welcome.
+     A wipe, not a dash animation: dashes break with non-scaling strokes. */
+  .scribble {
+    --from: inset(0 100% 0 0);
+  }
+
+  .scribble-arrow {
+    --from: inset(0 0 0 100%);
+  }
+
+  @keyframes draw {
+    from {
+      clip-path: var(--from);
+    }
+    to {
+      clip-path: inset(0 0 0 0);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.js) .scribble:not(.is-drawn) svg {
+      clip-path: var(--from);
+    }
+
+    /* Fill only backwards, so no clip remains once drawn and round caps are not cut. */
+    :global(.js) .is-drawn svg {
+      animation: draw 0.6s cubic-bezier(0.65, 0, 0.35, 1) var(--delay) backwards;
+    }
+  }
+</style>
+
+<script>
+  const marks = document.querySelectorAll<HTMLElement>('[data-draw]')
+  const motionOk = window.matchMedia('(prefers-reduced-motion: no-preference)')
+
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue
+          entry.target.classList.add('is-drawn')
+          observer.unobserve(entry.target)
+        }
+      },
+      { rootMargin: '0px 0px -12% 0px' },
+    )
+    marks.forEach((mark) => observer.observe(mark))
+  } else {
+    marks.forEach((mark) => mark.classList.add('is-drawn'))
+  }
+
+  // Answer the visitor's pointer: a quick redraw of the mark they touched.
+  for (const mark of document.querySelectorAll<HTMLElement>('[data-replay]')) {
+    mark.addEventListener('pointerenter', () => {
+      if (!motionOk.matches || !mark.classList.contains('is-drawn')) return
+      mark.style.setProperty('--delay', '0s')
+      mark.classList.remove('is-drawn')
+      void mark.offsetWidth // restart the transition from the hidden state
+      mark.classList.add('is-drawn')
+    })
+  }
+</script>
