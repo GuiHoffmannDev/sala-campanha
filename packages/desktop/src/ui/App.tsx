@@ -9,6 +9,7 @@ import { parseAuthCallback } from '../lib/link.ts'
 import { onDeepLink, openExternal } from '../native.ts'
 import { LoginScreen } from './LoginScreen.tsx'
 import { Onboarding } from './Onboarding.tsx'
+import { ThemePicker } from './ThemePicker.tsx'
 
 // What the app knows about the signed-in person's workspaces. `userId` ties it
 // to one person, so a later sign-in never shows the previous person's data.
@@ -132,7 +133,11 @@ export function App({ client }: { client: SupabaseClient }) {
 
   return (
     <main className="app">
-      <h1>Sala da Campanha</h1>
+      {/* The picker moves to the sidebar footer with the Shell (Task 5). */}
+      <header className="app-header">
+        <h1>Sala da Campanha</h1>
+        <ThemePicker />
+      </header>
       {content}
     </main>
   )

@@ -85,6 +85,16 @@ Layout no estilo Conductor, **chat no centro** (opção A escolhida nos mockups)
 
 Mockup de referência: `.superpowers/brainstorm/.../content/layout.html` (opção A), produzido na sessão de brainstorming. É um wireframe, não um design visual final.
 
+**Tema visual (decidido em 2026-10-31, pelo fundador):**
+
+- Dois temas, claro e escuro, como variações do mesmo sistema. Layout, hierarquia, ícones e estados são iguais nos dois; só mudam cores, bordas e sombras.
+- Seletor "Tema" com Claro, Escuro e Sistema. Sistema segue a aparência do macOS. A escolha fica salva entre sessões.
+- Claro: fundo `#F4F5F7`, painéis `#FFFFFF`, superfícies secundárias `#ECEEF2`, texto `#191B20` e `#5C6370`, bordas `#DDE1E7`, ação violeta `#5546D7` com texto branco. Sombras leves.
+- Escuro: fundo grafite `#15161A`, painéis `#1D1F24`, superfícies e campos `#262930`, texto `#F1F2F4` e `#ADB2BD`, bordas `#353943`, ação `#A99BFF` e botão principal `#5546D7`. Bordas no lugar de sombras.
+- Verde, âmbar e vermelho só para status, alertas e confirmações (escuros no tema claro, claros no escuro), nunca como decoração.
+- Texto com contraste WCAG AA e foco visível na navegação por teclado.
+- Referência de acabamento (densidade, cantos, bordas, espaçamento): `docs/superpowers/specs/assets/2026-10-31-referencia-visual-app.png`. É só referência visual: threads, reações, grupos e mensagens diretas do print não fazem parte do produto.
+
 ## 5. Ciclo de vida de uma peça (decidido)
 
 Uma peça é a unidade de trabalho: por exemplo, "Banner Instagram — Black Friday". Ela pode conter imagem, texto ou os dois (ex.: post com imagem e legenda).

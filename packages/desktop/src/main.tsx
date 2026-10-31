@@ -3,7 +3,11 @@ import { createRoot } from 'react-dom/client'
 import './app.css'
 import { createAppClient } from './data/client.ts'
 import { readEnv } from './env.ts'
+import { applyTheme, loadTheme } from './lib/theme.ts'
 import { App } from './ui/App.tsx'
+
+// Before the first render, so the first paint already uses the chosen theme.
+applyTheme(loadTheme())
 
 const root = document.getElementById('root')
 if (!root) throw new Error('index.html has no #root element')

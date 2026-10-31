@@ -28,6 +28,11 @@
 - Trechos de legenda contam code points (`Array.from(caption)`), nunca unidades UTF-16.
 - Link: `sala://campanha/<campaign_id>` e `sala://campanha/<campaign_id>/peca/<piece_id>`, com uuids em minúsculas. O retorno do login é `sala://auth/callback`.
 - Toda a interface em português do Brasil, com os rótulos exatos da Task 6 (`labels.ts`) e as mensagens exatas da Task 4 (`errors.ts`).
+- Visual *(revisão de 2026-10-31; spec, seção 4, "Tema visual")*:
+  - Cores só pelos tokens de `src/app.css` (`--bg`, `--panel`, `--surface`, `--text`, `--text-muted`, `--border`, `--accent`, `--accent-bg`, `--on-accent`, `--accent-soft`, `--success`, `--warning`, `--danger`, `--shadow`). Nenhum hex nos componentes. Token novo entra nos três blocos de `app.css` (claro, escuro do sistema e `data-theme="dark"`), e `tests/desktop/theme-contrast.test.ts` confere o contraste.
+  - Cores semânticas só para status e alertas: `Aprovada` e confirmações em `--success`; `Base em revisão` e `Final em revisão` em `--warning`; `agent_error`, entrega `falhou` e erros em `--danger`; "na fila" em `--text-muted`.
+  - Item selecionado (campanha, peça) com fundo `--accent-soft`; não lido em negrito com selo `--accent-soft`; campo focado com borda `--accent`; carregamento em `--text-muted`.
+  - Painéis separados por `--panel` e `--border` (a sombra `--shadow` só existe no claro). Acabamento conforme `docs/superpowers/specs/assets/2026-10-31-referencia-visual-app.png`, só como referência visual.
 - Dependências novas só estas.
   - Runtime de `@sala/desktop`: `react`, `react-dom`, `@tauri-apps/api` e os 4 plugins. Também `@sala/shared`, `@supabase/supabase-js` e `zod`, que já estão no repositório.
   - Dev: `@tauri-apps/cli`, `vite`, `@vitejs/plugin-react`, `@types/react`, `@types/react-dom`, `@testing-library/react`, `@testing-library/user-event` e `jsdom`.
@@ -56,11 +61,11 @@ packages/desktop/
     data/   client.ts errors.ts auth.ts team.ts keys.ts campaigns.ts files.ts
             references.ts events.ts versions.ts comments.ts presence.ts
     lib/    link.ts workspace.ts labels.ts timeline.ts routing.ts models.ts actions.ts
-            excerpt.ts presence.ts
+            excerpt.ts presence.ts theme.ts
     ui/     App.tsx LoginScreen.tsx Onboarding.tsx Shell.tsx CampaignSidebar.tsx PieceList.tsx
             PieceHeader.tsx Chat.tsx Timeline.tsx Composer.tsx ModelPicker.tsx
             ReferenceLibrary.tsx VersionViewer.tsx CommentLayer.tsx
-            UploadFinalDialog.tsx Settings.tsx
+            UploadFinalDialog.tsx Settings.tsx ThemePicker.tsx
   src-tauri/                   # gerado por `tauri init`: Cargo.toml, tauri.conf.json,
                                # capabilities/default.json, src/lib.rs, src/main.rs, icons/
 packages/shared/src/agent.ts   # + checkModelChoice, inheritedModel
@@ -380,6 +385,7 @@ it('renders the app title', () => {
   - **`PieceList` (direita):** as peças da campanha, com miniatura, título, tipo e status (rótulos da Task 6), e o botão "Nova peça" (título e tipo).
   - **`PieceHeader` (topo):** nome da campanha e da peça (renomear direto, se `can_write`), espaço dos avatares (Task 11) e o botão "Compartilhar", que copia `buildLink` com `copyText` e mostra "Link copiado".
   - **Centro:** "Escolha uma peça" até a Task 6.
+  - **`ThemePicker`:** sai do cabeçalho do `App` e vai para o rodapé da `CampaignSidebar` *(revisão de 2026-10-31)*.
   - **`App`:** as URLs do `onDeepLink` (Task 4) que não são de login passam por `parseLink` e `resolveRoute`. Um link que chega sem sessão fica guardado e é aberto depois do login. O `notice` aparece num aviso que some ao clicar.
   - **`espectador`:** não vê "Nova campanha" nem "Nova peça".
 
@@ -782,6 +788,7 @@ it('renders the app title', () => {
   - [ ] Com `pnpm fake-agent` rodando e chaves falsas cadastradas, pedir uma peça e receber a versão; aprovar, enviar a final, comentar no ponto e no trecho, e aprovar a final.
   - [ ] Como espectador, nenhum botão de escrita aparece.
   - [ ] As configurações (só admin) salvam a chave e mostram só `...last4`; convidar e cancelar convite funcionam.
+  - [ ] Tema: alternar Claro, Escuro e Sistema; com Sistema, trocar a aparência do macOS muda o app na hora; fechar e reabrir mantém a escolha; navegar só com Tab mostra o foco em todos os controles.
   - [ ] `grep -r` por um trecho da chave salva no diretório de dados do app (`~/Library/WebKit/app.salacampanha.desktop`, `~/Library/Application Support/app.salacampanha.desktop`) não acha nada.
 - [ ] **Step 4: Registrar.**
   - Preencher "Verificado" neste plano.
@@ -805,6 +812,7 @@ it('renders the app title', () => {
 | Presença | Canal privado `team:<id>`, autorizado por policy em `realtime.messages`. Um membro de outro time não entra |
 | Escolha de modelo | O app sempre manda uma escolha explícita. O valor inicial do seletor segue a mesma herança por capacidade do executor (`inheritedModel` no shared) |
 | Imagens | URLs assinadas de 1 h. Baixar abre uma URL assinada com `download` no navegador padrão |
+| Tema | Claro, Escuro e Sistema (`src/lib/theme.ts`, `ui/ThemePicker.tsx`). Sistema não grava atributo e segue o macOS pela media query; a escolha explícita vai em `data-theme` no `<html>` e em `localStorage` (`sala.theme`), com `try/catch`. Tokens em `app.css` (revisão de 2026-10-31) |
 | Vários workspaces | Seletor na lateral; o último workspace usado fica no `localStorage`; um link de outro workspace da pessoa troca para ele (revisão de 2026-10-28: antes, usava o primeiro time) |
 | Teste sem chaves | `pnpm fake-agent` roda o worker do Plano 2 com provedores falsos, só contra o Supabase local. O fluxo inteiro do app pode ser testado antes de existir chave de provedor |
 
