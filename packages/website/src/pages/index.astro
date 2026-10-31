@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro'
 import Scribble from '../components/Scribble.astro'
-import ChatScene from '../components/ChatScene.astro'
+import LaunchScene from '../components/LaunchScene.astro'
 import HeroCollage from '../components/HeroCollage.astro'
 import PatternFrame from '../components/PatternFrame.astro'
 import Comparison from '../components/Comparison.astro'
@@ -27,7 +27,7 @@ import Comparison from '../components/Comparison.astro'
 
   <section class="wrap" aria-label="Tink Room in action">
     <PatternFrame pattern="cubes" fill="var(--sky)">
-      <div class="center"><ChatScene /></div>
+      <div class="center"><LaunchScene /></div>
     </PatternFrame>
 
     <ol class="steps">
@@ -208,15 +208,6 @@ import Comparison from '../components/Comparison.astro'
 
   .keys-frame {
     margin-top: 2.5rem;
-  }
-
-  /* Section intro under a display headline. */
-  .lede {
-    max-width: 40rem;
-    margin-top: 1.25rem;
-    color: var(--muted);
-    font-size: var(--step-1);
-    line-height: 1.4;
   }
 
   .lede .mark {

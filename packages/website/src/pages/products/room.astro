@@ -1,0 +1,402 @@
+---
+// Room: the campaign's shared conversation, from concept to the last piece. The closing waitlist
+// section comes from the Base layout.
+import Base from '../../layouts/Base.astro'
+import PatternFrame from '../../components/PatternFrame.astro'
+import ProductIcon from '../../components/ProductIcon.astro'
+import IdentityScene from '../../components/IdentityScene.astro'
+import { PRODUCTS } from '../../data/products.ts'
+
+const room = PRODUCTS.find((product) => product.slug === 'room')!
+
+// The five stages of a campaign, each ending in an approval inside the thread.
+const stages = [
+  {
+    name: 'Concept',
+    who: 'Planning',
+    work: 'The agent drafts concept routes from the brief. Planning picks one and sharpens it.',
+  },
+  {
+    name: 'Visual identity',
+    who: 'Design',
+    work: 'The agent makes identity directions. Designers steer every round right in the thread.',
+    stalls: true,
+  },
+  {
+    name: 'Campaign',
+    who: 'Planning',
+    work: 'Concept and identity come together into one campaign the whole team can see.',
+  },
+  {
+    name: 'Briefs',
+    who: 'Social and paid media',
+    work: 'The agent drafts a brief for each channel. Each team edits its own.',
+  },
+  {
+    name: 'Pieces',
+    who: 'Design, social and media',
+    work: 'Posts, ads and banners made from the briefs, each signed off before it ships.',
+  },
+]
+---
+<Base title={room.name} description={`${room.name} by Tink. ${room.summary}`}>
+  <section class="hero wrap" aria-labelledby="room-title">
+    <div class="intro">
+      <p class="product"><ProductIcon slug={room.slug} color={room.color} /> {room.name}</p>
+      <h1 id="room-title">From first idea to final piece, one room for the whole team.</h1>
+      <p class="lede">
+        Your brand team and AI agents run the whole campaign in one conversation: concept, visual identity, briefs
+        and every piece, each approved in the same thread.
+      </p>
+      <a class="big-cta" href="#waitlist">Join waitlist</a>
+    </div>
+
+    <PatternFrame pattern="stripes" fill="var(--kraft)" class="sheets-frame">
+      <div class="sheets" aria-hidden="true">
+        {stages.map((stage, i) => (
+          <div class:list={['sheet', { key: stage.stalls }]} style={`--i: ${i - 2}`}>
+            <span class="num">{i + 1}</span>
+            <strong>{stage.name}</strong>
+            <span class="line"></span>
+            <span class="line short"></span>
+            <span class="stamp">✓ Approved</span>
+          </div>
+        ))}
+      </div>
+    </PatternFrame>
+  </section>
+
+  <section class="wrap turn" aria-label="Not a chatbot">
+    <p class="duo">A chatbot helps one person. <span class="rest">Room works with your whole team.</span></p>
+    <p class="lede">
+      Planning, design, social and media share the thread with the agent, and every decision stays where the work
+      happened.
+    </p>
+  </section>
+
+  <section class="wrap" aria-labelledby="stages-title">
+    <h2 id="stages-title">Every stage of the campaign, in the thread.</h2>
+    <ol class="stages">
+      {stages.map((stage, i) => (
+        <li class:list={{ stalls: stage.stalls }}>
+          <span class="num">{i + 1}</span>
+          <h3>{stage.name}</h3>
+          <p class="who">{stage.who} + agent</p>
+          <p>{stage.work}</p>
+          <p class="stamp">✓ Approved in the thread</p>
+          {stage.stalls && <p class="flag">Where campaigns stall</p>}
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section class="wrap zoom" aria-labelledby="zoom-title">
+    <div>
+      <h2 id="zoom-title">Where campaigns stall: the visual identity.</h2>
+      <p class="lede">Rounds of changes scattered across chat and email. Versions nobody can find. Then days waiting for a yes.</p>
+      <p class="lede">
+        In Room, every round happens in the thread, the earlier ones stay put, and the approver signs off right there.
+      </p>
+    </div>
+    <PatternFrame pattern="cubes" fill="var(--sky)">
+      <div class="center"><IdentityScene /></div>
+    </PatternFrame>
+  </section>
+
+  <section class="wrap" aria-labelledby="perks-title">
+    <h2 id="perks-title" class="visually-hidden">What changes for the team</h2>
+    <ul class="perks">
+      <li>
+        <svg class="shape" aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#2e221e" /></svg>
+        <h3>Every version kept</h3>
+        <p>Each round stays in the thread with the request that changed it, so anyone can see how you got here.</p>
+      </li>
+      <li>
+        <svg class="shape" aria-hidden="true" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" fill="#e2924a" /></svg>
+        <h3>Steer mid-generation</h3>
+        <p>Anyone can redirect the agent while it works. It folds the note in without starting over.</p>
+      </li>
+      <li>
+        <svg class="shape" aria-hidden="true" viewBox="0 0 16 16"><path d="M8 .8c.7 4.1 2.4 6 6.5 7.2-4.1 1.2-5.8 3.1-6.5 7.2-.7-4.1-2.4-6-6.5-7.2C5.6 6.8 7.3 4.9 8 .8z" fill="#f7e14a" stroke="#2e221e" stroke-width="1" stroke-linejoin="round" /></svg>
+        <h3>Approval in place</h3>
+        <p>Mention the approver. They get notified and sign off in the thread, not in another app.</p>
+      </li>
+    </ul>
+  </section>
+</Base>
+
+<style>
+  section.wrap {
+    padding-block: clamp(3rem, 2rem + 4vw, 6rem);
+  }
+
+  h2 {
+    max-width: 22ch;
+  }
+
+  /* Hero: promise on the left, the five stages as a fan of paper sheets on the right. */
+  .hero {
+    display: grid;
+    gap: 2.5rem;
+    align-items: center;
+  }
+
+  .intro {
+    display: grid;
+    gap: 1.25rem;
+    justify-items: start;
+  }
+
+  /* Figma-style product lockup: big tile icon and the name in ink, at the headline's size and weight. */
+  .product,
+  h1 {
+    font-size: clamp(2.25rem, 1.2rem + 3.2vw, 4rem);
+    font-weight: 400;
+    letter-spacing: -0.025em;
+    line-height: 1.08;
+  }
+
+  .product {
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+    color: var(--ink);
+  }
+
+  .product :global(.product-icon) {
+    width: 0.95em;
+    height: 0.95em;
+  }
+
+  .intro {
+    gap: 0;
+  }
+
+  h1 {
+    max-width: 18ch;
+    color: var(--muted);
+  }
+
+  .intro .lede {
+    margin-top: 1.5rem;
+  }
+
+  .big-cta {
+    margin-top: 1.5rem;
+  }
+
+  .big-cta {
+    display: inline-flex;
+    align-items: center;
+    min-height: 3.5rem;
+    padding: 0.875rem 2.25rem;
+    border-radius: var(--radius-button);
+    background: var(--ink);
+    color: var(--paper);
+    font-size: clamp(1.125rem, 0.85rem + 0.8vw, 1.5rem);
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+  }
+
+  .big-cta:hover {
+    background: var(--pencil);
+  }
+
+  .sheets {
+    --spread: clamp(1.75rem, 8vw, 7rem);
+    display: grid;
+    place-items: center;
+    min-height: clamp(15rem, 30vw, 24rem);
+  }
+
+  .sheet {
+    display: grid;
+    align-content: start;
+    gap: 0.5rem;
+    grid-area: 1 / 1;
+    width: clamp(5.5rem, 9vw, 7.5rem);
+    aspect-ratio: 4 / 5;
+    padding: 0.75rem;
+    background: var(--sheet);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 0.08), 0 10px 20px -8px rgb(0 0 0 / 0.3);
+    font-size: clamp(0.6875rem, 0.55rem + 0.4vw, 0.875rem);
+    line-height: 1.2;
+    transform: translateX(calc(var(--i) * var(--spread))) rotate(calc(var(--i) * 4deg));
+  }
+
+  .sheet .num {
+    color: var(--muted);
+    font-family: var(--serif);
+  }
+
+  .sheet .line {
+    height: 0.3rem;
+    border-radius: 2px;
+    background: var(--rule);
+  }
+
+  .sheet .line.short {
+    width: 60%;
+  }
+
+  .sheet .stamp {
+    justify-self: start;
+    margin-top: auto;
+    padding: 0.0625rem 0.375rem;
+    border: 1.5px solid #1d6b34;
+    border-radius: 4px;
+    color: #1d6b34;
+    font-size: 0.75em;
+    font-weight: 700;
+    transform: rotate(-6deg);
+  }
+
+  /* The identity sheet: where campaigns stall. */
+  .sheet.key {
+    z-index: 1;
+    outline: 2px solid var(--pencil);
+  }
+
+  @media (min-width: 64rem) {
+    .hero {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+      column-gap: clamp(2rem, 5vw, 6rem);
+      min-height: min(calc(100svh - 5rem), 52rem);
+    }
+  }
+
+  /* The turn away from "another chatbot". */
+  .turn .duo {
+    max-width: 48rem;
+    font-size: var(--step-3);
+    line-height: 1.1;
+  }
+
+  /* Stages */
+  .stages {
+    display: grid;
+    gap: 1rem;
+    margin: 2.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .stages li {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 0.5rem;
+    padding: 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    background: var(--sheet);
+  }
+
+  .stages .num {
+    color: var(--muted);
+    font-family: var(--serif);
+    font-size: var(--step-1);
+  }
+
+  .stages .who {
+    color: var(--pencil);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .stages li > p:not(.who, .stamp, .flag) {
+    color: var(--muted);
+    font-size: 0.9375rem;
+  }
+
+  .stages .stamp {
+    margin-top: auto;
+    padding-top: 0.75rem;
+    color: #1d6b34;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  .stages .stalls {
+    border: 2px solid var(--pencil);
+  }
+
+  .flag {
+    position: absolute;
+    top: -0.75rem;
+    right: 1rem;
+    padding: 0.125rem 0.625rem;
+    border-radius: 999px;
+    background: var(--pencil);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  @media (min-width: 40rem) {
+    .stages {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 72rem) {
+    .stages {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+  }
+
+  /* Zoom on the visual identity */
+  .zoom {
+    display: grid;
+    gap: 2.5rem;
+    align-items: center;
+  }
+
+  .center {
+    display: grid;
+    place-items: center;
+  }
+
+  @media (min-width: 64rem) {
+    .zoom {
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      column-gap: clamp(2rem, 5vw, 6rem);
+    }
+  }
+
+  /* Perks: marked with the same simple shapes as the home page steps. */
+  .perks {
+    display: grid;
+    gap: 2rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+    padding-top: 2.5rem;
+  }
+
+  .perks li {
+    display: grid;
+    gap: 0.375rem;
+    align-content: start;
+  }
+
+  .shape {
+    width: 0.875rem;
+    height: 0.875rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .perks p {
+    max-width: 24rem;
+    color: var(--muted);
+    font-size: 1rem;
+  }
+
+  @media (min-width: 52rem) {
+    .perks {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+</style>

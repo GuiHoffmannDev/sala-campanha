@@ -1,0 +1,369 @@
+---
+// Solutions: Tink seen from each role on a brand team. Draft written from the product spec and the Room page,
+// pending the founder's review. The closing waitlist section comes from the Base layout.
+import Base from '../layouts/Base.astro'
+import PatternFrame from '../components/PatternFrame.astro'
+
+const roles = [
+  {
+    id: 'leads',
+    label: 'For brand leads',
+    title: 'Ask the agent yourself.',
+    rest: 'No relay, no guessing.',
+    points: [
+      'Describe the piece in plain words and attach references from the campaign’s photo library.',
+      'See every prompt and every version, including the ones that didn’t make it.',
+      'Approve the base and the final inside the piece. The approval is logged with your name.',
+    ],
+    pattern: 'stripes',
+    fill: 'var(--lilac)',
+  },
+  {
+    id: 'designers',
+    label: 'For designers',
+    title: 'Keep the craft.',
+    rest: 'Drop the translating.',
+    points: [
+      'Requests land in the thread you share with the agent, so you stop turning messages into prompts.',
+      'Steer the agent mid-generation and keep every round, with the request that changed it.',
+      'Finish in Photoshop as always, upload the final, and get comments pinned to the exact spot.',
+    ],
+    pattern: 'cubes',
+    fill: 'var(--sky)',
+  },
+  {
+    id: 'social-media',
+    label: 'For social and media teams',
+    title: 'Your channel’s brief,',
+    rest: 'from the same campaign.',
+    points: [
+      'The agent drafts a brief for each channel from the approved campaign.',
+      'Each team edits its own brief, in the same thread as everyone else.',
+      'Posts, ads and banners are made from the briefs, each signed off before it ships.',
+    ],
+    pattern: 'checker',
+    fill: 'var(--kraft)',
+  },
+  {
+    id: 'admins',
+    label: 'For workspace admins',
+    title: 'Keys and people,',
+    rest: 'in one place.',
+    points: [
+      'Add one API key per AI provider. The whole workspace uses it, and providers bill you directly.',
+      'Keys are stored encrypted, never sent to the app and shown masked. Only you can replace or remove them.',
+      'Invite people by email and give each one a role: lead, designer or viewer.',
+    ],
+    pattern: 'stripes',
+    fill: 'var(--orange)',
+  },
+] as const
+---
+<Base
+  title="Solutions"
+  description="Tink for every role on a brand team: leads, designers, social and media teams, and workspace admins."
+>
+  <section class="hero wrap" aria-labelledby="solutions-title">
+    <h1 id="solutions-title">Solutions. <span class="rest">One room, whatever your part in the campaign.</span></h1>
+    <nav class="jump" aria-label="Jump to a role">
+      <ul>
+        {roles.map((role) => (
+          <li><a href={`#${role.id}`}>{role.label}</a></li>
+        ))}
+      </ul>
+    </nav>
+  </section>
+
+  {roles.map((role, i) => (
+    <section id={role.id} class:list={['wrap', 'role', { flip: i % 2 === 1 }]} aria-labelledby={`${role.id}-title`}>
+      <div class="copy">
+        <p class="label">{role.label}</p>
+        <h2 id={`${role.id}-title`}>{role.title} <span class="rest">{role.rest}</span></h2>
+        <ul class="points">
+          {role.points.map((point) => <li>{point}</li>)}
+        </ul>
+      </div>
+
+      <PatternFrame pattern={role.pattern} fill={role.fill}>
+        <div class="center">
+          {role.id === 'leads' && (
+            <div class="mock" aria-hidden="true">
+              <p class="mock-title">Summer launch / Instagram post</p>
+              <div class="thumbs">
+                <span class="thumb"></span>
+                <span class="thumb picked"></span>
+                <span class="thumb"></span>
+              </div>
+              <span class="pill dark">Approve base version</span>
+            </div>
+          )}
+          {role.id === 'designers' && (
+            <div class="mock" aria-hidden="true">
+              <p class="mock-title">Final in review</p>
+              <div class="canvas">
+                <span class="pin">1</span>
+                <span class="comment">Logo smaller here</span>
+              </div>
+              <span class="pill">Upload new version</span>
+            </div>
+          )}
+          {role.id === 'social-media' && (
+            <div class="briefs" aria-hidden="true">
+              {['Social', 'Paid media', 'Email'].map((channel) => (
+                <div class="mock brief">
+                  <p class="mock-title">Brief · {channel}</p>
+                  <span class="line"></span>
+                  <span class="line short"></span>
+                </div>
+              ))}
+            </div>
+          )}
+          {role.id === 'admins' && (
+            <div class="mock" aria-hidden="true">
+              <p class="mock-title">Workspace</p>
+              <ul class="rows">
+                <li><span>Image model key</span><code>sk-…a1b2</code></li>
+                <li><span>Text model key</span><code>sk-…9f3c</code></li>
+                <li><span>Invite by email</span><span class="pill small">Lead</span></li>
+              </ul>
+            </div>
+          )}
+        </div>
+      </PatternFrame>
+    </section>
+  ))}
+</Base>
+
+<style>
+  section.wrap {
+    padding-block: clamp(3rem, 2rem + 4vw, 6rem);
+  }
+
+  h1 {
+    max-width: 18ch;
+  }
+
+  h2 {
+    max-width: 16ch;
+  }
+
+  h1 .rest,
+  h2 .rest {
+    color: var(--muted);
+  }
+
+  .center {
+    display: grid;
+    place-items: center;
+  }
+
+  /* Jump links to each role. */
+  .jump ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+    margin: 2.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .jump a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0 1.125rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--sheet);
+    color: var(--ink);
+    font-size: 1rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: border-color 0.15s ease;
+  }
+
+  .jump a:hover {
+    border-color: var(--ink);
+  }
+
+  /* Each role: copy on one side, a framed example on the other, alternating. */
+  .role {
+    display: grid;
+    gap: 2.5rem;
+    align-items: center;
+    scroll-margin-top: 5rem;
+  }
+
+  @media (min-width: 64rem) {
+    .role {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: clamp(2rem, 5vw, 6rem);
+    }
+
+    .role.flip .copy {
+      order: 2;
+    }
+  }
+
+  .label {
+    margin-bottom: 1rem;
+    color: var(--pencil);
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+
+  .points {
+    display: grid;
+    gap: 1rem;
+    margin: 2rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .points li {
+    max-width: 34rem;
+    padding-left: 1.5rem;
+    border-left: 2px solid var(--rule);
+    color: var(--graphite);
+  }
+
+  /* Example cards, product-style. */
+  .mock {
+    display: grid;
+    gap: 0.875rem;
+    width: min(100%, 22rem);
+    padding: 1.125rem;
+    border-radius: 12px;
+    background: var(--sheet);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 0.08), 0 14px 28px -12px rgb(0 0 0 / 0.35);
+    font-family: var(--ui);
+    font-size: 0.875rem;
+  }
+
+  .mock-title {
+    font-weight: 600;
+  }
+
+  .pill {
+    justify-self: start;
+    padding: 0.375rem 0.875rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  .pill.dark {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .pill.small {
+    padding: 0.0625rem 0.5rem;
+    background: var(--pencil-wash);
+    border-color: transparent;
+    color: var(--pencil);
+  }
+
+  .thumbs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .thumb {
+    aspect-ratio: 4 / 5;
+    border-radius: 6px;
+    background: linear-gradient(160deg, var(--kraft), var(--orange));
+  }
+
+  .thumb.picked {
+    outline: 2px solid var(--pencil);
+    outline-offset: 2px;
+  }
+
+  .canvas {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    border-radius: 6px;
+    background: linear-gradient(160deg, var(--sky), var(--lilac));
+  }
+
+  .pin {
+    position: absolute;
+    top: 22%;
+    left: 18%;
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50% 50% 50% 0;
+    background: var(--pencil);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .comment {
+    position: absolute;
+    top: 22%;
+    left: calc(18% + 2rem);
+    padding: 0.25rem 0.625rem;
+    border-radius: 6px;
+    background: var(--sheet);
+    box-shadow: 0 4px 12px -4px rgb(0 0 0 / 0.3);
+    font-size: 0.8125rem;
+  }
+
+  .briefs {
+    display: grid;
+    gap: 0.75rem;
+    width: min(100%, 22rem);
+  }
+
+  /* Margins, not transforms, so the staggered cards shrink instead of overflowing on phones. */
+  .brief {
+    width: auto;
+  }
+
+  .brief:nth-child(2) {
+    margin-left: 1.25rem;
+  }
+
+  .brief:nth-child(3) {
+    margin-left: 2.5rem;
+  }
+
+  .line {
+    height: 0.375rem;
+    border-radius: 2px;
+    background: var(--rule);
+  }
+
+  .line.short {
+    width: 60%;
+  }
+
+  .rows {
+    display: grid;
+    gap: 0.625rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rows li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-top: 0.625rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  .rows code {
+    color: var(--muted);
+    font-size: 0.8125rem;
+  }
+</style>

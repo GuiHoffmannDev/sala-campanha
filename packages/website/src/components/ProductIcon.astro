@@ -1,5 +1,6 @@
 ---
-// A product's mini logo: a colored tile with one simple ink drawing. Decorative, since the name sits next to it.
+// A product's mini logo, Figma-style: a pale tint of the product color as the tile, the drawing in the strong color.
+// Decorative, since the name sits next to it.
 import type { ProductSlug } from '../data/products.ts'
 
 interface Props {
@@ -14,18 +15,26 @@ const drawings: Record<ProductSlug, string> = {
   // Two speech bubbles.
   room: '<path d="M6.5 8.5h9a1.5 1.5 0 0 1 1.5 1.5v4.5a1.5 1.5 0 0 1-1.5 1.5H10l-3 2.5V16h-.5A1.5 1.5 0 0 1 5 14.5V10a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M19 12.5h2.5A1.5 1.5 0 0 1 23 14v4a1.5 1.5 0 0 1-1.5 1.5H21V22l-3-2.5h-4.5A1.5 1.5 0 0 1 12 18v-.5"/>',
   // Three nodes wired together.
-  workshop: '<path d="M10 9.5l8 4M10 18.5l8-4"/><circle cx="8" cy="8.5" r="2.5" fill="var(--ink)"/><circle cx="8" cy="19.5" r="2.5" fill="var(--ink)"/><circle cx="20" cy="14" r="3" fill="var(--sheet)"/>',
+  workshop: '<path d="M10 9.5l8 4M10 18.5l8-4"/><circle cx="8" cy="8.5" r="2.5" fill="currentColor"/><circle cx="8" cy="19.5" r="2.5" fill="currentColor"/><circle cx="20" cy="14" r="3" fill="var(--tile)"/>',
   // A play triangle with two motion strokes.
-  stage: '<path d="M12 8.5l9 5.5-9 5.5z" fill="var(--ink)"/><path d="M5 11h3.5M4 17h4.5"/>',
+  stage: '<path d="M12 8.5l9 5.5-9 5.5z" fill="currentColor"/><path d="M5 11h3.5M4 17h4.5"/>',
   // A fountain-pen nib.
-  studio: '<path d="M14 5l6 7-6 11-6-11z"/><path d="M14 13v10"/><circle cx="14" cy="13" r="1.4" fill="var(--ink)"/>',
+  studio: '<path d="M14 5l6 7-6 11-6-11z"/><path d="M14 13v10"/><circle cx="14" cy="13" r="1.4" fill="currentColor"/>',
   // Three stacked sheets.
-  press: '<rect x="9" y="5" width="12" height="14" rx="1.5" fill="var(--sheet)"/><path d="M7 8v12.5A1.5 1.5 0 0 0 8.5 22H18"/><path d="M5 11v11.5A1.5 1.5 0 0 0 6.5 24H15"/>',
+  press: '<rect x="9" y="5" width="12" height="14" rx="1.5" fill="var(--tile)"/><path d="M7 8v12.5A1.5 1.5 0 0 0 8.5 22H18"/><path d="M5 11v11.5A1.5 1.5 0 0 0 6.5 24H15"/>',
 }
 ---
-<svg class="product-icon" aria-hidden="true" focusable="false" viewBox="0 0 28 28" width="28" height="28">
-  <rect width="28" height="28" rx="7" fill={color} />
-  <g fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" set:html={drawings[slug]} />
+<svg
+  class="product-icon"
+  aria-hidden="true"
+  focusable="false"
+  viewBox="0 0 28 28"
+  width="28"
+  height="28"
+  style={`--tile: color-mix(in oklab, ${color} 14%, white); color: ${color}`}
+>
+  <rect width="28" height="28" rx="7" fill="var(--tile)" />
+  <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" set:html={drawings[slug]} />
 </svg>
 
 <style>

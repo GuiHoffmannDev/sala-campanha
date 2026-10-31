@@ -1,0 +1,110 @@
+---
+// The Room page's staged conversation: finding Olmo's visual identity in two rounds, then a sign-off
+// in the thread. Olmo is a made-up brand.
+import ChatScene from './ChatScene.astro'
+
+// Each board: background, wordmark style and three palette swatches.
+const round1 = [
+  { label: '1', bg: '#e6eef2', ink: '#1f3b4d', font: 'Helvetica, Arial, sans-serif', style: 'normal', weight: 700, swatches: ['#1f3b4d', '#8fb3c7', '#f7f7f2'] },
+  { label: '2', bg: 'url(#olmo-d2-gradient)', ink: '#3a1f1a', font: 'Georgia, serif', style: 'italic', weight: 400, swatches: ['#f6c9a8', '#f3a6b8', '#3a1f1a'] },
+  { label: '3', bg: '#e9efe2', ink: '#2f4a2a', font: 'Courier New, monospace', style: 'normal', weight: 700, swatches: ['#2f4a2a', '#a9c08f', '#f4f1e6'] },
+]
+const round2 = [
+  { label: '2a', bg: '#f6e3c8', ink: '#5a2a17', font: 'Georgia, serif', style: 'italic', weight: 400, swatches: ['#d9663a', '#e8b04a', '#5a2a17'] },
+  { label: '2b', bg: '#fbefdc', ink: '#3a1f1a', font: 'Georgia, serif', style: 'italic', weight: 400, swatches: ['#c9572e', '#f0c46a', '#3a1f1a'], picked: true },
+]
+---
+<ChatScene title="Olmo summer launch" piece="Visual identity" startStatus="In review" endStatus="Approved">
+  <svg slot="defs" class="defs" aria-hidden="true" focusable="false" width="0" height="0">
+    <defs>
+      <linearGradient id="olmo-d2-gradient" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#f6c9a8" />
+        <stop offset="1" stop-color="#f3a6b8" />
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <li class="msg" data-step>
+    <span class="avatar a1" aria-hidden="true">M</span>
+    <div>
+      <p class="who">Marina <span>Brand lead</span></p>
+      <p>Concept is approved: “Slow summer.” Let’s find the look.</p>
+    </div>
+  </li>
+
+  <li class="msg agent" data-step>
+    <span class="avatar" aria-hidden="true"><img src="/favicon.svg" alt="" width="28" height="28" /></span>
+    <div>
+      <p class="who">Tink agent</p>
+      <p>3 identity directions from the concept.</p>
+      <div class="versions">
+        {round1.map((d) => (
+          <svg viewBox="0 0 100 80" role="img" aria-label={`Identity direction ${d.label}`}>
+            <rect width="100" height="80" fill={d.bg} />
+            <text x="10" y="36" font-size="20" font-family={d.font} font-style={d.style} font-weight={d.weight} fill={d.ink}>olmo</text>
+            {d.swatches.map((color, i) => <circle cx={16 + i * 14} cy="56" r="5.5" fill={color} stroke="#00000022" stroke-width=".6" />)}
+            <text x="88" y="74" font-size="7" text-anchor="end" font-family="Georgia, serif" fill={d.ink}>{d.label}</text>
+          </svg>
+        ))}
+      </div>
+    </div>
+  </li>
+
+  <li class="msg" data-step>
+    <span class="avatar a2" aria-hidden="true">R</span>
+    <div>
+      <p class="who">Rafa <span>Designer</span></p>
+      <p>Direction 2, but warmer. Drop the gradient.</p>
+    </div>
+  </li>
+
+  <li class="msg agent" data-step>
+    <span class="avatar" aria-hidden="true"><img src="/favicon.svg" alt="" width="28" height="28" /></span>
+    <div>
+      <p class="who">Tink agent</p>
+      <p>Round 2: direction 2, warmer and flat.</p>
+      <div class="versions">
+        {round2.map((d) => (
+          <svg viewBox="0 0 100 80" role="img" aria-label={`Identity direction ${d.label}`} class={d.picked ? 'picked' : undefined}>
+            <rect width="100" height="80" fill={d.bg} />
+            <text x="10" y="36" font-size="20" font-family={d.font} font-style={d.style} font-weight={d.weight} fill={d.ink}>olmo</text>
+            {d.swatches.map((color, i) => <circle cx={16 + i * 14} cy="56" r="5.5" fill={color} stroke="#00000022" stroke-width=".6" />)}
+            <text x="88" y="74" font-size="7" text-anchor="end" font-family="Georgia, serif" fill={d.ink}>{d.label}</text>
+          </svg>
+        ))}
+      </div>
+      <p class="meta">Round 1 stays in the thread, so anyone can compare.</p>
+    </div>
+  </li>
+
+  <li class="msg" data-step>
+    <span class="avatar a2" aria-hidden="true">R</span>
+    <div>
+      <p class="who">Rafa <span>Designer</span></p>
+      <p><span class="tag">@Marina</span> 2b is ready for your sign-off.</p>
+      <p class="meta">Marina gets notified. Nobody chases her in another app.</p>
+    </div>
+  </li>
+
+  <li class="msg" data-step>
+    <span class="avatar a1" aria-hidden="true">M</span>
+    <div>
+      <p class="who">Marina <span>Brand lead</span></p>
+      <p>Approved. Briefs can start.</p>
+      <p class="approved">✓ Visual identity approved</p>
+    </div>
+  </li>
+</ChatScene>
+
+<style>
+  .approved {
+    justify-self: start;
+    margin-top: 0.25rem;
+    padding: 0.125rem 0.625rem;
+    border-radius: 999px;
+    background: #e3f2e6;
+    color: #1d6b34;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+</style>

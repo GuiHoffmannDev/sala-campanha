@@ -1,0 +1,192 @@
+---
+// All products: one card per entry in products.ts. Live products link to their page; "soon" ones are shown
+// without a link, like in the menu. The closing waitlist section comes from the Base layout.
+import Base from '../../layouts/Base.astro'
+import ProductIcon from '../../components/ProductIcon.astro'
+import { PRODUCTS } from '../../data/products.ts'
+
+const live = PRODUCTS.filter((product) => !('soon' in product))
+const soon = PRODUCTS.filter((product) => 'soon' in product)
+---
+<Base
+  title="All products"
+  description="Every Tink product, starting with Room: one shared conversation where your brand team and AI agents make each campaign piece together."
+>
+  <section class="hero wrap" aria-labelledby="products-title">
+    <h1 id="products-title">All products. <span class="rest">Every step of the campaign, one family of tools.</span></h1>
+    <p class="lede">Room comes first. The rest are on the way.</p>
+  </section>
+
+  <section class="wrap" aria-labelledby="live-title">
+    <h2 id="live-title" class="visually-hidden">Available now</h2>
+    <ul class="live">
+      {live.map((product) => (
+        <li>
+          <a class="card featured" href={`/products/${product.slug}`} style={`--color: ${product.color}`}>
+            <span class="big-icon"><ProductIcon slug={product.slug} color={product.color} /></span>
+            <span class="text">
+              <span class="name">{product.name}</span>
+              <span class="summary">{product.summary}</span>
+              <span class="go">Explore {product.name} <span aria-hidden="true">→</span></span>
+            </span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <section class="wrap" aria-labelledby="soon-title">
+    <h2 id="soon-title">Coming soon.</h2>
+    <ul class="grid">
+      {soon.map((product) => (
+        <li class="card" style={`--color: ${product.color}`}>
+          <span class="big-icon"><ProductIcon slug={product.slug} color={product.color} /></span>
+          <h3 class="name">{product.name}</h3>
+          <p class="summary">{product.summary}</p>
+          <p class="tag">Coming soon</p>
+        </li>
+      ))}
+    </ul>
+  </section>
+</Base>
+
+<style>
+  section.wrap {
+    padding-block: clamp(2rem, 1.5rem + 3vw, 4.5rem);
+  }
+
+  .hero {
+    padding-top: clamp(3rem, 2rem + 6vw, 7rem);
+  }
+
+  h1 {
+    max-width: 18ch;
+  }
+
+  h1 .rest {
+    color: var(--muted);
+  }
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Cards: a flat stage tinted with the product's own color, Figma-style. */
+  .card {
+    display: grid;
+    align-content: start;
+    gap: 0.75rem;
+    height: 100%;
+    padding: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+    border-radius: 16px;
+    background: color-mix(in oklab, var(--color) 12%, var(--sheet));
+    color: var(--ink);
+  }
+
+  .big-icon :global(.product-icon) {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+
+  .name {
+    font-size: var(--step-2);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  .summary {
+    max-width: 30rem;
+    color: var(--graphite);
+    font-size: 1.0625rem;
+  }
+
+  /* The live product: a wide card, the whole of it a link. */
+  .featured {
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+  }
+
+  .featured:hover {
+    background: color-mix(in oklab, var(--color) 20%, var(--sheet));
+  }
+
+  .featured .text {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .featured .name {
+    font-size: var(--step-3);
+  }
+
+  .featured .summary {
+    max-width: 36rem;
+    font-size: var(--step-1);
+    line-height: 1.35;
+  }
+
+  .go {
+    justify-self: start;
+    margin-top: 0.5rem;
+    padding: 0.5rem 1.125rem;
+    border-radius: var(--radius-button);
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  @media (min-width: 52rem) {
+    .featured {
+      grid-template-columns: auto minmax(0, 1fr);
+      column-gap: 2rem;
+      min-height: 20rem;
+      align-content: center;
+    }
+
+    .featured .big-icon :global(.product-icon) {
+      width: 6rem;
+      height: 6rem;
+    }
+  }
+
+  /* Coming soon */
+  h2 {
+    margin-bottom: 2rem;
+  }
+
+  .grid {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .grid .card {
+    grid-template-rows: auto auto 1fr auto;
+  }
+
+  .tag {
+    justify-self: start;
+    align-self: end;
+    padding: 0.125rem 0.625rem;
+    border-radius: 999px;
+    background: var(--sheet);
+    color: var(--graphite);
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  @media (min-width: 40rem) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 72rem) {
+    .grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+</style>

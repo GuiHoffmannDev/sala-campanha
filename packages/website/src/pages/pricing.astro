@@ -1,0 +1,362 @@
+---
+// Pricing: explains the cost model without numbers. Plans are not set yet, so nothing here names a price,
+// a plan or a free tier (spec: docs/superpowers/specs/2026-10-29-tink-website-design.md).
+// The closing waitlist section comes from the Base layout.
+import Base from '../layouts/Base.astro'
+import PatternFrame from '../components/PatternFrame.astro'
+
+const keySteps = [
+  {
+    title: 'The admin adds keys once',
+    text: 'One API key per AI provider, for the whole workspace. Members don’t bring their own.',
+  },
+  {
+    title: 'Each request picks a model',
+    text: 'The model menu only lists providers your workspace has keys for.',
+  },
+  {
+    title: 'Your provider bills you',
+    text: 'Usage goes on your own provider account, at their prices. Tink adds no markup because it never sells the usage.',
+  },
+]
+
+const faq = [
+  {
+    q: 'Do we buy AI credits from Tink?',
+    a: 'No. Tink doesn’t sell credits or resell AI usage. Every generation runs on your workspace’s keys and is billed by your provider.',
+  },
+  {
+    q: 'Can each person use their own key?',
+    a: 'No. Keys belong to the workspace, so the whole team works from the same accounts. If you work alone, your workspace is yours and so are its keys.',
+  },
+  {
+    q: 'Who can see our keys?',
+    a: 'Nobody, once they’re saved. They’re stored encrypted, used only by the server and shown masked. Only the admin can replace or remove them.',
+  },
+  {
+    q: 'How much will Tink cost?',
+    a: 'Plans aren’t set yet. Join the waitlist and we’ll email you when Tink opens.',
+  },
+]
+---
+<Base
+  title="Pricing"
+  description="How Tink pricing works: your team uses its own AI keys and pays providers directly. Tink doesn’t resell AI usage."
+>
+  <section class="hero wrap" aria-labelledby="pricing-title">
+    <div class="intro">
+      <h1 id="pricing-title">Pricing. <span class="rest">No markup on your AI.</span></h1>
+      <p class="lede">
+        Your team brings its own AI keys and pays each provider directly. Tink plans aren’t public yet. Join the
+        waitlist to hear first.
+      </p>
+      <a class="big-cta" href="#waitlist">Join waitlist</a>
+    </div>
+
+    <PatternFrame pattern="cubes" fill="var(--orange)">
+      <div class="center">
+        <div class="bill" aria-hidden="true">
+          <p class="card-title">Where your money goes</p>
+          <div class="line-item">
+            <div>
+              <strong>AI usage</strong>
+              <span>Billed by your providers, at their prices</span>
+            </div>
+            <span class="tag direct">Direct</span>
+          </div>
+          <div class="line-item">
+            <div>
+              <strong>Tink</strong>
+              <span>The app and your shared workspace</span>
+            </div>
+            <span class="tag soon">Plans soon</span>
+          </div>
+        </div>
+      </div>
+    </PatternFrame>
+  </section>
+
+  <section class="wrap" aria-labelledby="split-title">
+    <h2 id="split-title">Two bills, never mixed.</h2>
+    <div class="split">
+      <div class="side">
+        <p class="label">Your AI providers</p>
+        <h3>You pay for what the agent generates.</h3>
+        <p>
+          Text and images run on the providers you already use, with your workspace’s keys. Usage shows up on your
+          account with them, like any other API call.
+        </p>
+      </div>
+      <div class="side">
+        <p class="label">Tink</p>
+        <h3>You pay for the room.</h3>
+        <p>
+          The shared workspace where your team and the agent make, review and approve every piece. Plans aren’t
+          public yet.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" aria-labelledby="keys-title">
+    <h2 id="keys-title">How your keys work. <span class="rest">Set once, used by the whole team.</span></h2>
+    <ol class="steps">
+      {keySteps.map((step, i) => (
+        <li>
+          <span class="num">{i + 1}</span>
+          <h3>{step.title}</h3>
+          <p>{step.text}</p>
+        </li>
+      ))}
+    </ol>
+    <p class="more">More on the setup in <a href="/how-it-works">How it works</a>.</p>
+  </section>
+
+  <section class="wrap" aria-labelledby="faq-title">
+    <h2 id="faq-title">Questions.</h2>
+    <div class="faq">
+      {faq.map((item) => (
+        <details>
+          <summary>{item.q}</summary>
+          <p>{item.a}</p>
+        </details>
+      ))}
+    </div>
+  </section>
+</Base>
+
+<style>
+  section.wrap {
+    padding-block: clamp(3rem, 2rem + 4vw, 6rem);
+  }
+
+  h2 {
+    max-width: 22ch;
+  }
+
+  h1 .rest,
+  h2 .rest {
+    color: var(--muted);
+  }
+
+  .center {
+    display: grid;
+    place-items: center;
+  }
+
+  /* Hero: promise on the left, a two-line "bill" on the right. */
+  .hero {
+    display: grid;
+    gap: 2.5rem;
+    align-items: center;
+  }
+
+  .intro {
+    display: grid;
+    gap: 1.25rem;
+    justify-items: start;
+  }
+
+  h1 {
+    max-width: 14ch;
+  }
+
+  .intro .lede {
+    margin-top: 0;
+  }
+
+  .big-cta {
+    display: inline-flex;
+    align-items: center;
+    min-height: 3.5rem;
+    padding: 0.875rem 2.25rem;
+    border-radius: var(--radius-button);
+    background: var(--ink);
+    color: var(--paper);
+    font-size: clamp(1.125rem, 0.85rem + 0.8vw, 1.5rem);
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+  }
+
+  .big-cta:hover {
+    background: var(--pencil);
+  }
+
+  @media (min-width: 64rem) {
+    .hero {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: clamp(2rem, 5vw, 6rem);
+      min-height: min(calc(100svh - 5rem), 46rem);
+    }
+
+    h1 {
+      font-size: clamp(2.75rem, 0.8rem + 3.6vw, 5rem);
+    }
+  }
+
+  .bill {
+    display: grid;
+    gap: 0.75rem;
+    width: min(100%, 24rem);
+    padding: 1.25rem;
+    border-radius: 12px;
+    background: var(--sheet);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 0.08), 0 14px 28px -12px rgb(0 0 0 / 0.35);
+    font-family: var(--ui);
+  }
+
+  .card-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .line-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  .line-item div {
+    display: grid;
+    gap: 0.125rem;
+  }
+
+  .line-item strong {
+    font-size: 0.9375rem;
+  }
+
+  .line-item span:not(.tag) {
+    color: var(--muted);
+    font-size: 0.8125rem;
+    line-height: 1.35;
+  }
+
+  .tag {
+    flex: none;
+    padding: 0.125rem 0.625rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .tag.direct {
+    background: var(--brown);
+    color: var(--paper);
+  }
+
+  .tag.soon {
+    background: var(--highlight);
+    color: var(--ink);
+  }
+
+  /* The two bills, side by side. */
+  .split {
+    display: grid;
+    gap: 1rem;
+    margin-top: 2.5rem;
+  }
+
+  .side {
+    display: grid;
+    align-content: start;
+    gap: 0.625rem;
+    padding: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    background: var(--sheet);
+  }
+
+  .side:last-child {
+    border: 2px solid var(--pencil);
+  }
+
+  .label {
+    color: var(--pencil);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .side h3 {
+    font-size: var(--step-1);
+  }
+
+  .side p:not(.label),
+  .steps p {
+    color: var(--muted);
+    font-size: 1rem;
+  }
+
+  @media (min-width: 52rem) {
+    .split {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /* Key steps */
+  .steps {
+    display: grid;
+    gap: 1rem;
+    margin: 2.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .steps li {
+    display: grid;
+    align-content: start;
+    gap: 0.5rem;
+    padding: 1.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    background: var(--sheet);
+  }
+
+  .num {
+    color: var(--muted);
+    font-family: var(--serif);
+    font-size: var(--step-1);
+  }
+
+  @media (min-width: 52rem) {
+    .steps {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .more {
+    margin-top: 1.5rem;
+    color: var(--muted);
+  }
+
+  .more a {
+    color: var(--ink);
+  }
+
+  /* FAQ */
+  .faq {
+    max-width: 48rem;
+    margin-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  details {
+    border-bottom: 1px solid var(--rule);
+  }
+
+  summary {
+    padding-block: 1.25rem;
+    font-size: var(--step-0);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  details p {
+    max-width: 40rem;
+    padding-bottom: 1.25rem;
+    color: var(--muted);
+  }
+</style>

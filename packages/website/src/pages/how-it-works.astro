@@ -1,0 +1,607 @@
+---
+// How it works: setup, the life of one piece, who each message goes to, roles and what runs where.
+// Every claim here comes from the product spec (docs/superpowers/specs/2026-10-21-sala-campanha-design.md).
+// The closing waitlist section comes from the Base layout.
+import Base from '../layouts/Base.astro'
+import PatternFrame from '../components/PatternFrame.astro'
+
+const setup = [
+  {
+    title: 'Sign in',
+    text: 'Use Google, Apple or a code sent to your email. Your first sign-in creates your workspace, and you are its admin.',
+  },
+  {
+    title: 'Add your keys',
+    text: 'The admin adds an API key once for each AI provider the team already pays for. Everyone in the workspace uses it.',
+  },
+  {
+    title: 'Invite the team',
+    text: 'Send invites by email. Each person joins when they sign in with that address, with the role you picked.',
+  },
+]
+
+// The five statuses of a piece, split by where the work happens.
+const lifecycle = [
+  {
+    phase: 'In Tink, with the agent',
+    steps: [
+      {
+        status: 'Generating',
+        text: 'Someone describes the piece and picks the model. The agent makes image and copy versions, using the campaign photos marked as references.',
+      },
+      {
+        status: 'Base in review',
+        text: 'Anyone can redirect while it works. The lead approves one base version, and the piece moves on.',
+      },
+    ],
+  },
+  {
+    phase: 'In the designer’s own tools',
+    steps: [
+      {
+        status: 'Finishing',
+        text: 'The designer downloads the approved base and finishes it in Photoshop: logo, type and small fixes.',
+      },
+      {
+        status: 'Final in review',
+        text: 'The designer uploads the final as a new version. The lead pins comments to the exact spot, for the designer.',
+      },
+      {
+        status: 'Approved',
+        text: 'New versions until the lead signs off. Copy-only pieces can be approved straight from the thread.',
+      },
+    ],
+  },
+]
+
+type Allowed = boolean
+const roles = ['Admin', 'Lead', 'Designer', 'Viewer'] as const
+const permissions: { action: string; allowed: [Allowed, Allowed, Allowed, Allowed] }[] = [
+  { action: 'Ask and redirect the agent', allowed: [true, true, true, false] },
+  { action: 'Comment', allowed: [true, true, true, false] },
+  { action: 'Upload references or a final', allowed: [true, true, true, false] },
+  { action: 'Approve a base or a final', allowed: [true, true, false, false] },
+  { action: 'Move a piece back one step', allowed: [true, true, true, false] },
+  { action: 'Manage keys and members', allowed: [true, false, false, false] },
+]
+
+const faq = [
+  {
+    q: 'Do we pay Tink for AI usage?',
+    a: 'No. Tink doesn’t resell AI usage. Your workspace uses its own API keys, and you pay each provider directly, at their prices.',
+  },
+  {
+    q: 'Does Tink edit our Photoshop files?',
+    a: 'No. Finishing stays in the designer’s own tools. The designer uploads the final back to the piece for review and approval.',
+  },
+  {
+    q: 'Which computers does it run on?',
+    a: 'The first version of the app is for macOS.',
+  },
+  {
+    q: 'Can I use Tink on my own?',
+    a: 'Yes. Your first sign-in creates your own workspace with you as admin. Invite people whenever you’re ready.',
+  },
+]
+---
+<Base
+  title="How it works"
+  description="How Tink works: set up your workspace once, then every campaign piece goes from request to approval in one shared thread."
+>
+  <section class="hero wrap" aria-labelledby="how-title">
+    <div class="intro">
+      <h1 id="how-title">How Tink works. <span class="rest">Set it up once, then every piece runs in one thread.</span></h1>
+      <p class="lede">
+        From the first request to the approved final, your team and the agent work in the same conversation, and each
+        piece shows where it stands.
+      </p>
+      <a class="big-cta" href="#waitlist">Join waitlist</a>
+    </div>
+
+    <PatternFrame pattern="checker" fill="var(--lilac)">
+      <div class="center">
+        <div class="piece-card" aria-hidden="true">
+          <p class="card-title">Example piece</p>
+          <ol class="track">
+            {lifecycle.flatMap((group) => group.steps).map((step, i) => (
+              <li class:list={{ done: i < 3, now: i === 3 }}>{step.status}</li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    </PatternFrame>
+  </section>
+
+  <section class="wrap" aria-labelledby="setup-title">
+    <h2 id="setup-title">Set up once. <span class="rest">Then the whole team is in.</span></h2>
+    <ol class="setup">
+      {setup.map((step, i) => (
+        <li>
+          <span class="num">{i + 1}</span>
+          <h3>{step.title}</h3>
+          <p>{step.text}</p>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section class="wrap" aria-labelledby="life-title">
+    <h2 id="life-title">One piece, start to finish.</h2>
+    <p class="lede">
+      A piece is one unit of work, like an Instagram banner. It can hold an image, copy or both, approved together.
+    </p>
+    <div class="phases">
+      {lifecycle.map((group) => (
+        <div class="phase">
+          <p class="phase-name">{group.phase}</p>
+          <ol>
+            {group.steps.map((step) => (
+              <li>
+                <h3>{step.status}</h3>
+                <p>{step.text}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="wrap routing" aria-labelledby="routing-title">
+    <div>
+      <h2 id="routing-title">Talk to the agent, or to each other.</h2>
+      <p class="lede">
+        Every message in a piece goes to the agent by default. Start it with <span class="at">@someone</span> and it
+        becomes a note between people: it notifies them and doesn’t call the agent or spend your keys.
+      </p>
+      <p class="lede">The message box shows where each message is going before you send it.</p>
+    </div>
+    <PatternFrame pattern="stripes" fill="var(--sky)">
+      <div class="center">
+        <div class="composer-demo" aria-hidden="true">
+          <div class="box">
+            <p>Lighter background, keep the bottle centered.</p>
+            <span class="to agent">To the agent</span>
+          </div>
+          <div class="box">
+            <p><span class="at">@Design lead</span> can you check the logo size?</p>
+            <span class="to person">To @Design lead · agent not called</span>
+          </div>
+        </div>
+      </div>
+    </PatternFrame>
+  </section>
+
+  <section class="wrap" aria-labelledby="roles-title">
+    <h2 id="roles-title">Clear roles. <span class="rest">The designer keeps the craft.</span></h2>
+    <p class="lede">Anyone can ask for versions, even when the designer isn’t around. Only the admin and the lead approve.</p>
+    <div class="scroller" role="region" aria-labelledby="roles-title" tabindex="0">
+      <table class="roles">
+        <caption class="visually-hidden">What each role can do in a workspace</caption>
+        <thead>
+          <tr>
+            <td></td>
+            {roles.map((role) => <th scope="col">{role}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {permissions.map((row) => (
+            <tr>
+              <th scope="row">{row.action}</th>
+              {row.allowed.map((yes) => (
+                <td>
+                  <span class:list={['icon', { yes }]} aria-hidden="true"></span>
+                  <span class="visually-hidden">{yes ? 'Yes' : 'No'}</span>
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="wrap" aria-labelledby="hood-title">
+    <h2 id="hood-title">What runs where.</h2>
+    <ul class="hood">
+      <li>
+        <svg class="shape" aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#2e221e" /></svg>
+        <h3>The agent runs on our servers</h3>
+        <p>It keeps working when someone closes their laptop, so nobody waits on another person’s computer.</p>
+      </li>
+      <li>
+        <svg class="shape" aria-hidden="true" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" fill="#e2924a" /></svg>
+        <h3>Keys stay on the server</h3>
+        <p>Stored encrypted and used only by the server. Never sent to the app or written to logs. After saving, they show masked.</p>
+      </li>
+      <li>
+        <svg class="shape" aria-hidden="true" viewBox="0 0 16 16"><path d="M8 .8c.7 4.1 2.4 6 6.5 7.2-4.1 1.2-5.8 3.1-6.5 7.2-.7-4.1-2.4-6-6.5-7.2C5.6 6.8 7.3 4.9 8 .8z" fill="#f7e14a" stroke="#2e221e" stroke-width="1" stroke-linejoin="round" /></svg>
+        <h3>Live for everyone</h3>
+        <p>New messages and versions reach the whole team as they happen. Join late and you still see the full history.</p>
+      </li>
+    </ul>
+  </section>
+
+  <section class="wrap" aria-labelledby="faq-title">
+    <h2 id="faq-title">Questions.</h2>
+    <div class="faq">
+      {faq.map((item) => (
+        <details>
+          <summary>{item.q}</summary>
+          <p>{item.a}</p>
+        </details>
+      ))}
+    </div>
+  </section>
+</Base>
+
+<style>
+  section.wrap {
+    padding-block: clamp(3rem, 2rem + 4vw, 6rem);
+  }
+
+  h2 {
+    max-width: 22ch;
+  }
+
+  h1 .rest,
+  h2 .rest {
+    color: var(--muted);
+  }
+
+  .center {
+    display: grid;
+    place-items: center;
+  }
+
+  .at {
+    color: var(--pencil);
+    font-weight: 600;
+  }
+
+  /* Hero: promise on the left, a piece's status track on the right. */
+  .hero {
+    display: grid;
+    gap: 2.5rem;
+    align-items: center;
+  }
+
+  .intro {
+    display: grid;
+    gap: 1.25rem;
+    justify-items: start;
+  }
+
+  h1 {
+    max-width: 16ch;
+  }
+
+  .intro .lede {
+    margin-top: 0;
+  }
+
+  .big-cta {
+    display: inline-flex;
+    align-items: center;
+    min-height: 3.5rem;
+    padding: 0.875rem 2.25rem;
+    border-radius: var(--radius-button);
+    background: var(--ink);
+    color: var(--paper);
+    font-size: clamp(1.125rem, 0.85rem + 0.8vw, 1.5rem);
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+  }
+
+  .big-cta:hover {
+    background: var(--pencil);
+  }
+
+  @media (min-width: 64rem) {
+    .hero {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: clamp(2rem, 5vw, 6rem);
+      min-height: min(calc(100svh - 5rem), 46rem);
+    }
+
+    h1 {
+      font-size: clamp(2.75rem, 0.8rem + 3.6vw, 5rem);
+    }
+  }
+
+  .piece-card {
+    width: min(100%, 20rem);
+    padding: 1.25rem;
+    border-radius: 12px;
+    background: var(--sheet);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 0.08), 0 14px 28px -12px rgb(0 0 0 / 0.35);
+    font-family: var(--ui);
+  }
+
+  .card-title {
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .track {
+    display: grid;
+    gap: 0.625rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .track li {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    color: var(--muted);
+    font-size: 0.9375rem;
+  }
+
+  .track li::before {
+    content: '';
+    flex: none;
+    width: 0.875rem;
+    height: 0.875rem;
+    border: 2px solid var(--rule);
+    border-radius: 50%;
+  }
+
+  .track li.done {
+    color: var(--ink);
+  }
+
+  .track li.done::before {
+    border-color: #1d6b34;
+    background: #1d6b34;
+  }
+
+  .track li.now {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .track li.now::before {
+    border-color: var(--pencil);
+    background: var(--highlight);
+  }
+
+  /* Setup */
+  .setup {
+    display: grid;
+    gap: 1rem;
+    margin: 2.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .setup li {
+    display: grid;
+    align-content: start;
+    gap: 0.5rem;
+    padding: 1.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    background: var(--sheet);
+  }
+
+  .num {
+    color: var(--muted);
+    font-family: var(--serif);
+    font-size: var(--step-1);
+  }
+
+  .setup p,
+  .phase p:not(.phase-name),
+  .hood p {
+    color: var(--muted);
+    font-size: 1rem;
+  }
+
+  @media (min-width: 52rem) {
+    .setup {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* Lifecycle: two phases, five statuses in order. */
+  .phases {
+    display: grid;
+    gap: 1.5rem;
+    margin-top: 2.5rem;
+  }
+
+  .phase {
+    padding: 1.5rem;
+    border-radius: 12px;
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+  }
+
+  .phase:first-child {
+    border: 2px solid var(--pencil);
+  }
+
+  .phase-name {
+    margin-bottom: 1rem;
+    color: var(--pencil);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .phase ol {
+    display: grid;
+    gap: 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .phase li {
+    display: grid;
+    gap: 0.25rem;
+    padding-left: 1.5rem;
+    border-left: 2px solid var(--rule);
+  }
+
+  @media (min-width: 64rem) {
+    .phases {
+      grid-template-columns: 2fr 3fr;
+    }
+
+    .phase:first-child ol {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .phase:last-child ol {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* Routing: text on the left, two example messages on the right. */
+  .routing {
+    display: grid;
+    gap: 2.5rem;
+    align-items: center;
+  }
+
+  @media (min-width: 64rem) {
+    .routing {
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      column-gap: clamp(2rem, 5vw, 6rem);
+    }
+  }
+
+  .composer-demo {
+    display: grid;
+    gap: 1rem;
+    width: min(100%, 26rem);
+    font-family: var(--ui);
+  }
+
+  .box {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem 1.125rem;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    background: var(--sheet);
+    box-shadow: 0 10px 24px -14px rgb(0 0 0 / 0.35);
+    font-size: 0.9375rem;
+  }
+
+  .to {
+    justify-self: start;
+    padding: 0.125rem 0.625rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .to.agent {
+    background: var(--brown);
+    color: var(--paper);
+  }
+
+  .to.person {
+    background: var(--pencil-wash);
+    color: var(--pencil);
+  }
+
+  /* Roles table */
+  .scroller {
+    margin-top: 2.5rem;
+    overflow-x: auto;
+  }
+
+  .roles {
+    width: 100%;
+    min-width: 36rem;
+    border-collapse: collapse;
+    font-size: 1rem;
+  }
+
+  .roles th,
+  .roles td {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid var(--rule);
+    text-align: center;
+  }
+
+  .roles th[scope='row'] {
+    font-weight: 500;
+    text-align: left;
+  }
+
+  .roles thead th {
+    font-weight: 600;
+  }
+
+  .icon {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border: 2px solid var(--rule);
+    border-radius: 50%;
+  }
+
+  .icon.yes {
+    border-color: #1d6b34;
+    background: #1d6b34;
+  }
+
+  /* What runs where */
+  .hood {
+    display: grid;
+    gap: 2rem;
+    margin: 2.5rem 0 0;
+    padding: 2.5rem 0 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+  }
+
+  .hood li {
+    display: grid;
+    gap: 0.375rem;
+    align-content: start;
+  }
+
+  .shape {
+    width: 0.875rem;
+    height: 0.875rem;
+    margin-bottom: 0.5rem;
+  }
+
+  @media (min-width: 52rem) {
+    .hood {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* FAQ */
+  .faq {
+    max-width: 48rem;
+    margin-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  details {
+    border-bottom: 1px solid var(--rule);
+  }
+
+  summary {
+    padding-block: 1.25rem;
+    font-size: var(--step-0);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  details p {
+    max-width: 40rem;
+    padding-bottom: 1.25rem;
+    color: var(--muted);
+  }
+</style>

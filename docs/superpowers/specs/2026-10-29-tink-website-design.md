@@ -36,7 +36,7 @@ A funcionalidade principal, a conversa compartilhada entre o time e os agentes, 
 O site passou a se inspirar em capturas de tela do site Dewbloom, enviadas pelo fundador. O layout Figma do hero (título, colagem no centro, formulário à direita) foi mantido.
 
 - **Paleta da referência:** fundo off-white quente `#f7f5f0`, texto marrom quase preto, lilás `#dca8f2`, laranja `#e2924a`, marrom `#2e221e`, taupe `#9c8473` e azul claro `#cad4e4`. O amarelo da Tink fica só nos destaques. O traço à mão passou a ser laranja queimado `#a8501c`.
-- **Títulos `h1` e `h2`:** Inter peso 650, a mesma fonte do texto corrido, só que mais pesada. A Bricolage foi testada e rejeitada pelo fundador.
+- **Títulos `h1` e `h2`:** Inter peso 650, a mesma fonte do texto corrido, só que mais pesada. A Bricolage foi testada e rejeitada pelo fundador. *(Revisão de 2026-10-31, por decisão do fundador: os títulos passaram para Inter peso 400, grandes e sem negrito, como na Figma. O tamanho marca a hierarquia, não o peso.)*
 - **Molduras com padrão (`PatternFrame.astro`):** borda laranja, faixa de padrão (listras, xadrez ou cubos isométricos), passe-partout taupe e painel. Aparecem no hero, no chat, nas chaves e no CTA final.
 - **Tabela comparativa (`Comparison.astro`):** "Chat app + AI tools" contra a Tink, com a coluna da Tink escura e uma legenda (Strong, Trade-off, Falls short). Todas as linhas vêm deste documento, inclusive uma em que a alternativa também é forte.
 - **Rodapé:** marrom escuro, com colunas de links e "Tink" gigante listrado embaixo.

@@ -7,54 +7,63 @@ import { PRODUCTS } from '../data/products.ts'
 const current = Astro.url.pathname.replace(/\/$/, '') || '/'
 const isCurrent = (href: string) => current.startsWith(href)
 ---
-<header class="nav wrap">
-  <Logo />
-  <nav aria-label="Main">
-    <button class="toggle" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
-    <ul id="nav-links">
-      {PRIMARY_NAV.map((item) =>
-        item.href === '/products' ? (
-          <li class="has-menu">
-            <button class="menu-button" type="button" aria-expanded="false" aria-controls="products-menu">
-              Products
-              <svg aria-hidden="true" viewBox="0 0 10 6" width="10" height="6"><path d="M1 1l4 4 4-4" /></svg>
-            </button>
-            <ul class="submenu" id="products-menu">
-              {PRODUCTS.map((product) => (
-                <li>
-                  {'soon' in product ? (
-                    <div class="item soon">
-                      <ProductIcon slug={product.slug} color={product.color} />
-                      <strong>{product.name} <em class="badge">Soon</em></strong>
-                      <span>{product.summary}</span>
-                    </div>
-                  ) : (
-                    <a class="item" href={`/products/${product.slug}`} aria-current={isCurrent(`/products/${product.slug}`) ? 'page' : undefined}>
-                      <ProductIcon slug={product.slug} color={product.color} />
-                      <strong>{product.name}</strong>
-                      <span>{product.summary}</span>
-                    </a>
-                  )}
-                </li>
-              ))}
-              <li class="all"><a href="/products">All products</a></li>
-            </ul>
-          </li>
-        ) : (
-          <li>
-            <a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>{item.label}</a>
-          </li>
-        ),
-      )}
-      <li class="cta"><a class="button" href="#waitlist">Join waitlist</a></li>
-    </ul>
-  </nav>
+<header class="nav">
+  <div class="wrap bar">
+    <Logo />
+    <nav aria-label="Main">
+      <button class="toggle" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
+      <ul id="nav-links">
+        {PRIMARY_NAV.map((item) =>
+          item.href === '/products' ? (
+            <li class="has-menu">
+              <button class="menu-button" type="button" aria-expanded="false" aria-controls="products-menu">
+                Products
+                <svg aria-hidden="true" viewBox="0 0 10 6" width="10" height="6"><path d="M1 1l4 4 4-4" /></svg>
+              </button>
+              <ul class="submenu" id="products-menu">
+                {PRODUCTS.map((product) => (
+                  <li>
+                    {'soon' in product ? (
+                      <div class="item soon">
+                        <ProductIcon slug={product.slug} color={product.color} />
+                        <strong>{product.name} <em class="badge">Soon</em></strong>
+                        <span>{product.summary}</span>
+                      </div>
+                    ) : (
+                      <a class="item" href={`/products/${product.slug}`} aria-current={isCurrent(`/products/${product.slug}`) ? 'page' : undefined}>
+                        <ProductIcon slug={product.slug} color={product.color} />
+                        <strong>{product.name}</strong>
+                        <span>{product.summary}</span>
+                      </a>
+                    )}
+                  </li>
+                ))}
+                <li class="all"><a href="/products">All products</a></li>
+              </ul>
+            </li>
+          ) : (
+            <li>
+              <a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>{item.label}</a>
+            </li>
+          ),
+        )}
+        <li class="cta"><a class="button" href="#waitlist">Join waitlist</a></li>
+      </ul>
+    </nav>
+  </div>
 </header>
 
 <style>
+  /* Stays pinned to the top while the page scrolls, full width, like Figma's bar. */
   .nav {
-    position: relative;
-    z-index: 5;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    border-bottom: 1px solid var(--rule);
+    background: var(--paper);
+  }
+
+  .bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -250,6 +259,9 @@ const isCurrent = (href: string) => current.startsWith(href)
       border-radius: 14px;
       background: var(--sheet);
       box-shadow: 0 12px 32px rgb(0 0 0 / 0.08);
+      /* The bar is pinned, so a long open menu scrolls inside itself instead of running off screen. */
+      max-height: calc(100svh - 5rem);
+      overflow-y: auto;
     }
 
     /* Without JS the list stays open, so every link is still reachable. */
