@@ -3,13 +3,15 @@ import { useEffect, useState, type ReactNode } from 'react'
 import {
   displayNameOf, finishOAuth, oauthUrl, saveDisplayName, sendLoginCode, verifyLoginCode,
 } from '../data/auth.ts'
+import { resolveRoute } from '../data/campaigns.ts'
 import { friendlyError } from '../data/errors.ts'
 import { acceptInvites, createWorkspace, loadMyMemberships, type Membership } from '../data/team.ts'
-import { parseAuthCallback } from '../lib/link.ts'
+import { parseAuthCallback, parseLink, type Route } from '../lib/link.ts'
+import { loadStoredWorkspace, pickWorkspace, storeWorkspace } from '../lib/workspace.ts'
 import { onDeepLink, openExternal } from '../native.ts'
 import { LoginScreen } from './LoginScreen.tsx'
 import { Onboarding } from './Onboarding.tsx'
-import { ThemePicker } from './ThemePicker.tsx'
+import { Shell } from './Shell.tsx'
 
 // What the app knows about the signed-in person's workspaces. `userId` ties it
 // to one person, so a later sign-in never shows the previous person's data.
@@ -19,12 +21,20 @@ type Workspaces =
   | { userId: string; step: 'none' }
   | { userId: string; step: 'ready'; memberships: Membership[] }
 
+const NO_ROUTE: Route = { campaignId: null, pieceId: null }
+
 export function App({ client }: { client: SupabaseClient }) {
   // undefined until the stored session is read.
   const [session, setSession] = useState<Session | null | undefined>(undefined)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [workspaces, setWorkspaces] = useState<Workspaces | null>(null)
   const [attempt, setAttempt] = useState(0)
+  // The workspace the person picked in this session; null falls back to the stored one.
+  const [chosenTeam, setChosenTeam] = useState<string | null>(null)
+  const [route, setRoute] = useState<Route>(NO_ROUTE)
+  // A share link waits here until the person is signed in and their workspaces are loaded.
+  const [pendingLink, setPendingLink] = useState<Route | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
     const { data } = client.auth.onAuthStateChange((_event, s) => {
@@ -35,14 +45,18 @@ export function App({ client }: { client: SupabaseClient }) {
     return () => data.subscription.unsubscribe()
   }, [client])
 
-  // Google and Apple come back through `sala://auth/callback`. Other links are navigation (Task 5).
+  // Google and Apple come back through `sala://auth/callback`. Share links open a campaign or piece.
   useEffect(() => {
     let active = true
     let stop: (() => void) | undefined
     onDeepLink((url) => {
       if (!active) return
       const callback = parseAuthCallback(url)
-      if (!callback) return
+      if (!callback) {
+        const link = parseLink(url)
+        if (link) setPendingLink(link)
+        return
+      }
       if ('code' in callback) {
         finishOAuth(client, callback.code, callback.flowId).catch((e: unknown) => setLoginError(friendlyError(e)))
       } else {
@@ -63,6 +77,47 @@ export function App({ client }: { client: SupabaseClient }) {
 
   const userId = session?.user.id
   const name = session ? displayNameOf(session.user) : null
+  const memberships = workspaces?.step === 'ready' && workspaces.userId === userId ? workspaces.memberships : null
+  const teamId = memberships ? pickWorkspace(memberships, chosenTeam ?? loadStoredWorkspace()) : null
+
+  // Another person signing in starts from their own stored workspace, with nothing open.
+  useEffect(() => {
+    setChosenTeam(null)
+    setRoute(NO_ROUTE)
+  }, [userId])
+
+  function openWorkspace(id: string) {
+    setChosenTeam(id)
+    storeWorkspace(id)
+    setRoute(NO_ROUTE)
+  }
+
+  // A share link opens once the workspaces are loaded, switching to the link's workspace.
+  useEffect(() => {
+    if (!pendingLink || !memberships) return
+    let active = true
+    resolveRoute(client, pendingLink).then(
+      (resolved) => {
+        if (!active) return
+        setPendingLink(null)
+        setNotice(resolved.notice)
+        if (resolved.teamId) {
+          openWorkspace(resolved.teamId)
+          // Added to that workspace after the list loaded: load it again.
+          if (!memberships.some((m) => m.teamId === resolved.teamId)) setAttempt((n) => n + 1)
+        }
+        setRoute(resolved.route)
+      },
+      (e: unknown) => {
+        if (!active) return
+        setPendingLink(null)
+        setNotice(friendlyError(e))
+      },
+    )
+    return () => {
+      active = false
+    }
+  }, [client, pendingLink, memberships])
 
   // On every app start and sign-in: accept pending invites, then load the workspaces.
   useEffect(() => {
@@ -87,8 +142,8 @@ export function App({ client }: { client: SupabaseClient }) {
     await openExternal(await oauthUrl(client, provider))
   }
 
-  async function createFirstWorkspace(workspaceName: string) {
-    await createWorkspace(client, workspaceName, name ?? '')
+  async function addWorkspace(workspaceName: string) {
+    openWorkspace(await createWorkspace(client, workspaceName, name ?? ''))
     // Reload through the effect, so a failed reload offers "Tentar de novo" instead of a second workspace.
     setAttempt((n) => n + 1)
   }
@@ -114,7 +169,7 @@ export function App({ client }: { client: SupabaseClient }) {
       />
     )
   } else if (!name) {
-    content = <Onboarding step="name" suggestedName="" onSaveName={saveName} onCreateWorkspace={createFirstWorkspace} />
+    content = <Onboarding step="name" suggestedName="" onSaveName={saveName} onCreateWorkspace={addWorkspace} />
   } else if (!workspaces || workspaces.userId !== userId || workspaces.step === 'loading') {
     content = <p>Carregando…</p>
   } else if (workspaces.step === 'failed') {
@@ -125,18 +180,27 @@ export function App({ client }: { client: SupabaseClient }) {
       </>
     )
   } else if (workspaces.step === 'none') {
-    content = <Onboarding step="workspace" suggestedName={name} onSaveName={saveName} onCreateWorkspace={createFirstWorkspace} />
+    content = <Onboarding step="workspace" suggestedName={name} onSaveName={saveName} onCreateWorkspace={addWorkspace} />
+  } else if (memberships && teamId) {
+    return (
+      <div className="app-shell">
+        {notice && (
+          <button type="button" className="notice" onClick={() => setNotice(null)}>{notice}</button>
+        )}
+        <Shell
+          client={client} memberships={memberships} teamId={teamId} route={route} onNavigate={setRoute}
+          onSwitchWorkspace={openWorkspace} onCreateWorkspace={addWorkspace}
+        />
+      </div>
+    )
   } else {
-    // The Shell (Task 5) replaces this line.
-    content = <p>{workspaces.memberships[0]?.teamName}</p>
+    content = <p>Carregando…</p>
   }
 
   return (
     <main className="app">
-      {/* The picker moves to the sidebar footer with the Shell (Task 5). */}
       <header className="app-header">
         <h1>Sala da Campanha</h1>
-        <ThemePicker />
       </header>
       {content}
     </main>

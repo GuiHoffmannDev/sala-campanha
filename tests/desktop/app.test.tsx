@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { randomUUID } from 'node:crypto'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createAppClient } from '../../packages/desktop/src/data/client.ts'
 import { saveDisplayName, sendLoginCode, verifyLoginCode } from '../../packages/desktop/src/data/auth.ts'
+import { createWorkspace } from '../../packages/desktop/src/data/team.ts'
 import { App } from '../../packages/desktop/src/ui/App.tsx'
-import { createTestTeam, env, loginCode, serviceClient } from '../helpers/supabase'
+import { createPieceFixture, createTestTeam, env, loginCode, serviceClient } from '../helpers/supabase'
 
 // Outside Tauri there are no sala:// links, so the tests deliver them by hand.
 const deepLink = vi.hoisted(() => ({ deliver: (_url: string): void => {} }))
@@ -15,6 +16,12 @@ vi.mock('../../packages/desktop/src/native.ts', () => ({
     return () => {}
   },
   openExternal: async () => {},
+  copyText: async () => {},
+}))
+// Node's WebSocket rejects jsdom's events; the live lists are tested in campaigns.test.ts.
+vi.mock('../../packages/desktop/src/data/campaigns.ts', async (original) => ({
+  ...(await original<typeof import('../../packages/desktop/src/data/campaigns.ts')>()),
+  subscribeLists: () => () => {},
 }))
 
 const appClient = () => createAppClient(env.url, env.anonKey)
@@ -104,4 +111,70 @@ it('a sign-in error does not come back after signing in and out', async () => {
   })
   expect(await screen.findByRole('button', { name: 'Entrar com Google' })).toBeTruthy()
   expect(screen.queryByRole('alert')).toBeNull()
+})
+
+/** A signed-in person with a name and a workspace of their own. */
+async function personWithWorkspace(name: string) {
+  const client = await signedIn(`app-${randomUUID()}@test.local`)
+  await saveDisplayName(client, name)
+  const teamId = await createWorkspace(client, `Workspace de ${name}`, name)
+  const { data: { user } } = await client.auth.getUser()
+  return { client, teamId, userId: user!.id }
+}
+
+it('a share link that arrives before sign-in opens after sign-in, in the workspace of the link', async () => {
+  const email = `app-link-${randomUUID()}@test.local`
+  const client = await signedIn(email)
+  await saveDisplayName(client, 'Duda')
+  await createWorkspace(client, 'Workspace de Duda', 'Duda')
+  const { data: { user } } = await client.auth.getUser()
+  const other = await createPieceFixture()
+  const { error } = await serviceClient().from('team_members')
+    .insert({ team_id: other.t.teamId, user_id: user!.id, role: 'espectador', display_name: 'Duda' })
+  expect(error).toBeNull()
+  await client.auth.signOut()
+
+  render(<App client={client} />)
+  await screen.findByRole('button', { name: 'Entrar com Google' })
+  act(() => deepLink.deliver(`sala://campanha/${other.campaignId}/peca/${other.pieceId.toUpperCase()}`))
+  // A second code request within a minute is refused, so the code comes straight from the admin API.
+  await act(async () => {
+    await verifyLoginCode(client, email, await loginCode(email))
+  })
+
+  expect(await screen.findByRole('heading', { name: 'Peça de teste' })).toBeTruthy()
+  expect((screen.getByLabelText('Workspace') as HTMLSelectElement).value).toBe(other.t.teamId)
+  expect(localStorage.getItem('sala.workspace')).toBe(other.t.teamId)
+})
+
+it('a link to a piece the person cannot see shows a notice that goes away on click', async () => {
+  const user = userEvent.setup()
+  const { client } = await personWithWorkspace('Eva')
+  const other = await createPieceFixture()
+  render(<App client={client} />)
+  await screen.findByText('Workspace de Eva')
+
+  act(() => deepLink.deliver(`sala://campanha/${other.campaignId}/peca/${other.pieceId}`))
+  await user.click(await screen.findByText('Peça não encontrada ou sem acesso.'))
+  expect(screen.queryByText('Peça não encontrada ou sem acesso.')).toBeNull()
+  expect(screen.getByText('Workspace de Eva')).toBeTruthy()
+})
+
+it('opens the remembered workspace and creates a new one from the sidebar', async () => {
+  const user = userEvent.setup()
+  const { client, userId } = await personWithWorkspace('Fábio')
+  const other = await createTestTeam('Agência Remota')
+  await serviceClient().from('team_members').insert({ team_id: other.teamId, user_id: userId, role: 'designer', display_name: 'Fábio' })
+  localStorage.setItem('sala.workspace', other.teamId)
+
+  render(<App client={client} />)
+  const select = (await screen.findByLabelText('Workspace')) as HTMLSelectElement
+  expect(select.value).toBe(other.teamId)
+
+  await user.click(screen.getByRole('button', { name: 'Novo workspace' }))
+  await user.type(screen.getByLabelText('Nome do workspace'), 'Estúdio Fábio')
+  await user.click(screen.getByRole('button', { name: 'Criar workspace' }))
+  const { data } = await serviceClient().from('teams').select('id').eq('name', 'Estúdio Fábio').single()
+  await waitFor(() => expect((screen.getByLabelText('Workspace') as HTMLSelectElement).value).toBe(data!.id))
+  expect(localStorage.getItem('sala.workspace')).toBe(data!.id)
 })

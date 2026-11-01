@@ -122,7 +122,8 @@ export async function createPieceFixture(t?: TestTeam, kind: PieceKind = 'imagem
 /** Uploads a tiny PNG to the `team-files` bucket with the service role and returns its path. */
 export async function uploadTeamFile(path: string): Promise<string> {
   const { error } = await serviceClient().storage.from('team-files')
-    .upload(path, new Blob(['png'], { type: 'image/png' }))
+    // Bytes plus an explicit type: under jsdom a Blob loses its type on the way to Node's fetch.
+    .upload(path, new TextEncoder().encode('png'), { contentType: 'image/png' })
   if (error) throw new Error(`upload ${path} failed: ${error.message}`)
   return path
 }

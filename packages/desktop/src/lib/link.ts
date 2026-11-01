@@ -22,3 +22,22 @@ export function parseAuthCallback(url: string): { code: string; flowId?: string 
   const error = read('error_description') || read('error')
   return error ? { error } : null
 }
+
+/** What the app shows: a campaign, and optionally one of its pieces. */
+export type Route = { campaignId: string | null; pieceId: string | null }
+
+const UUID = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+const SHARE_LINK = new RegExp(`^sala://campanha/(${UUID})(?:/peca/(${UUID}))?/?$`)
+
+/** `sala://campanha/<campaign_id>` or `sala://campanha/<campaign_id>/peca/<piece_id>`, lowercase. */
+export function buildLink(route: { campaignId: string; pieceId?: string | null }): string {
+  const campaign = `sala://campanha/${route.campaignId.toLowerCase()}`
+  return route.pieceId ? `${campaign}/peca/${route.pieceId.toLowerCase()}` : campaign
+}
+
+/** The route of a share link, with lowercase ids. Any other text returns null. */
+export function parseLink(url: string): Route | null {
+  const match = SHARE_LINK.exec(url)
+  if (!match) return null
+  return { campaignId: match[1]!.toLowerCase(), pieceId: match[2]?.toLowerCase() ?? null }
+}

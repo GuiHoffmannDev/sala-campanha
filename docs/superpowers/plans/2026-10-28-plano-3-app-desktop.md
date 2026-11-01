@@ -389,7 +389,7 @@ it('renders the app title', () => {
   - **`App`:** as URLs do `onDeepLink` (Task 4) que não são de login passam por `parseLink` e `resolveRoute`. Um link que chega sem sessão fica guardado e é aberto depois do login. O `notice` aparece num aviso que some ao clicar.
   - **`espectador`:** não vê "Nova campanha" nem "Nova peça".
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `link.test.ts`:
     - `builds and parses campaign and piece links`.
     - `lowercases ids and accepts a trailing slash`.
@@ -403,14 +403,15 @@ it('renders the app title', () => {
     - `thumbnails use the newest version with an image`: usar `createAgentVersion` duas vezes.
     - `a link to another team's piece resolves to no route with a notice`.
     - `a link to a campaign in another of my workspaces returns that workspace`.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/link.test.ts tests/desktop/workspace.test.ts tests/desktop/campaigns.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implementar.**
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 5: Conferir à mão.**
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/link.test.ts tests/desktop/workspace.test.ts tests/desktop/campaigns.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implementar.**
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
+- [x] **Step 5: Conferir à mão.**
   - Rodar `pnpm app`.
   - Criar uma campanha e uma peça.
   - Copiar o link e colar num editor. Deve sair `sala://campanha/<id>/peca/<id>`.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "feat(desktop): campaigns, pieces, navigation and share link"`
+  - *(Na execução: o build do Vite compila o app, e o caminho criar campanha, criar peça, abrir e "Compartilhar" roda em `tests/desktop/shell.test.tsx`, em jsdom contra o Supabase local, conferindo o texto copiado `sala://campanha/<id>/peca/<id>`. O clique na janela e a colagem num editor ficam para o fundador conferir, porque a sessão do agente não vê a tela.)*
+- [x] **Step 6: Commit.** `git add -A && git commit -m "feat(desktop): campaigns, pieces, navigation and share link"`
 
 ---
 
