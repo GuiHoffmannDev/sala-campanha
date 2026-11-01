@@ -24,29 +24,36 @@ type Props = {
   onCreateWorkspace(name: string): Promise<void>
 }
 
+type LoadName = 'members' | 'campaigns' | 'pieces'
+
 /** The main screen: campaigns on the left, the open piece in the middle, the campaign's pieces on the right. */
 export function Shell({ client, memberships, teamId, route, onNavigate, onSwitchWorkspace, onCreateWorkspace }: Props) {
   const role = memberships.find((m) => m.teamId === teamId)?.role
   const canWrite = role !== undefined && role !== 'espectador'
   const { campaignId, pieceId } = route
 
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
-  const [members, setMembers] = useState<Member[]>([])
-  // Tagged with their campaign, so a campaign never shows the previous campaign's pieces while loading.
+  // Campaigns and people are tagged with their workspace, and pieces with their campaign, so a switch
+  // never shows (or lets the person click) the previous workspace's or campaign's items while loading.
+  const [campaigns, setCampaigns] = useState<{ teamId: string | null; list: Campaign[] }>({ teamId: null, list: [] })
+  const [members, setMembers] = useState<{ teamId: string | null; list: Member[] }>({ teamId: null, list: [] })
   const [pieces, setPieces] = useState<{ campaignId: string | null; list: Piece[] }>({ campaignId: null, list: [] })
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   // Bumped by live changes and by the person's own writes, to reload the lists.
   const [changes, setChanges] = useState(0)
-  const [error, setError] = useState<string | null>(null)
+  // One slot per load. Each load clears its own slot when it runs again, so an old failure never sticks
+  // after a switch or a successful reload, and one load never hides another's failure.
+  const [errors, setErrors] = useState<Record<LoadName, string | null>>({ members: null, campaigns: null, pieces: null })
+  const report = (load: LoadName, message: string | null) => setErrors((e) => ({ ...e, [load]: message }))
   const reload = () => setChanges((n) => n + 1)
 
   useEffect(() => subscribeLists(client, teamId, campaignId, reload), [client, teamId, campaignId])
 
   useEffect(() => {
     let active = true
+    report('members', null)
     loadMembers(client, teamId).then(
-      (list) => active && setMembers(list),
-      (e: unknown) => active && setError(friendlyError(e)),
+      (list) => active && setMembers({ teamId, list }),
+      (e: unknown) => active && report('members', friendlyError(e)),
     )
     return () => {
       active = false
@@ -55,9 +62,10 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
 
   useEffect(() => {
     let active = true
+    report('campaigns', null)
     loadCampaigns(client, teamId).then(
-      (list) => active && setCampaigns(list),
-      (e: unknown) => active && setError(friendlyError(e)),
+      (list) => active && setCampaigns({ teamId, list }),
+      (e: unknown) => active && report('campaigns', friendlyError(e)),
     )
     return () => {
       active = false
@@ -65,6 +73,7 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
   }, [client, teamId, changes])
 
   useEffect(() => {
+    report('pieces', null)
     if (!campaignId) {
       setPieces({ campaignId: null, list: [] })
       setThumbnails({})
@@ -73,7 +82,7 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
     let active = true
     loadPieces(client, campaignId).then(
       (list) => active && setPieces({ campaignId, list }),
-      (e: unknown) => active && setError(friendlyError(e)),
+      (e: unknown) => active && report('pieces', friendlyError(e)),
     )
     loadThumbnails(client, campaignId)
       .then(async (paths) => {
@@ -89,7 +98,10 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
     }
   }, [client, campaignId, changes])
 
-  const campaign = campaigns.find((c) => c.id === campaignId) ?? null
+  const campaignList = campaigns.teamId === teamId ? campaigns.list : []
+  const memberList = members.teamId === teamId ? members.list : []
+  const error = errors.members ?? errors.campaigns ?? errors.pieces
+  const campaign = campaignList.find((c) => c.id === campaignId) ?? null
   const pieceList = pieces.campaignId === campaignId ? pieces.list : []
   const piece = pieceList.find((p) => p.id === pieceId) ?? null
 
@@ -115,7 +127,7 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
   return (
     <div className="shell">
       <CampaignSidebar
-        memberships={memberships} teamId={teamId} campaigns={campaigns} pieces={pieceList} members={members}
+        memberships={memberships} teamId={teamId} campaigns={campaignList} pieces={pieceList} members={memberList}
         route={route} canWrite={canWrite} onNavigate={onNavigate} onSwitchWorkspace={onSwitchWorkspace}
         onCreateWorkspace={onCreateWorkspace} onCreateCampaign={addCampaign}
       />

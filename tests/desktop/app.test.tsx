@@ -4,6 +4,7 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createAppClient } from '../../packages/desktop/src/data/client.ts'
 import { saveDisplayName, sendLoginCode, verifyLoginCode } from '../../packages/desktop/src/data/auth.ts'
+import { createCampaign } from '../../packages/desktop/src/data/campaigns.ts'
 import { createWorkspace } from '../../packages/desktop/src/data/team.ts'
 import { App } from '../../packages/desktop/src/ui/App.tsx'
 import { createPieceFixture, createTestTeam, env, loginCode, serviceClient } from '../helpers/supabase'
@@ -149,13 +150,21 @@ it('a share link that arrives before sign-in opens after sign-in, in the workspa
 
 it('a link to a piece the person cannot see shows a notice that goes away on click', async () => {
   const user = userEvent.setup()
-  const { client } = await personWithWorkspace('Eva')
+  const { client, teamId } = await personWithWorkspace('Eva')
+  const mine = await createCampaign(client, teamId, 'Campanha da Eva')
   const other = await createPieceFixture()
   render(<App client={client} />)
   await screen.findByText('Workspace de Eva')
+  act(() => deepLink.deliver(`sala://campanha/${mine.id}`))
+  expect(await screen.findByRole('heading', { name: 'Campanha da Eva' })).toBeTruthy()
 
   act(() => deepLink.deliver(`sala://campanha/${other.campaignId}/peca/${other.pieceId}`))
-  await user.click(await screen.findByText('Peça não encontrada ou sem acesso.'))
+  const notice = await screen.findByText('Peça não encontrada ou sem acesso.')
+  // Announced to screen readers, and the campaign the person had open stays open.
+  expect(screen.getByRole('alert').contains(notice)).toBe(true)
+  expect(screen.getByRole('heading', { name: 'Campanha da Eva' })).toBeTruthy()
+
+  await user.click(notice)
   expect(screen.queryByText('Peça não encontrada ou sem acesso.')).toBeNull()
   expect(screen.getByText('Workspace de Eva')).toBeTruthy()
 })

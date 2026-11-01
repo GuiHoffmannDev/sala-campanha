@@ -126,6 +126,19 @@ it('an espectador sees the work and the people but cannot create or rename', asy
   expect(screen.getByRole('button', { name: 'Compartilhar' })).toBeTruthy()
 })
 
+it("a workspace switch never shows the previous workspace's campaigns", async () => {
+  const f = await createPieceFixture()
+  const b = await createTestTeam()
+  const client = f.t.members.designer.client
+  const memberships = [membership(f.t.teamId, 'designer', 'Agência A'), membership(b.teamId, 'designer', 'Agência B')]
+  const { rerender } = render(<Host client={client} memberships={memberships} teamId={f.t.teamId} />)
+  expect(await screen.findByRole('button', { name: 'Campanha de teste' })).toBeTruthy()
+
+  // Checked right after the switch, before the new workspace's lists load.
+  rerender(<Host client={client} memberships={memberships} teamId={b.teamId} />)
+  expect(screen.queryByRole('button', { name: 'Campanha de teste' })).toBeNull()
+})
+
 it('switches between workspaces and creates a new one', async () => {
   const user = userEvent.setup()
   const a = await createTestTeam()

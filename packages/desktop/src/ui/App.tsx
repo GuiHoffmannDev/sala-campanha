@@ -80,10 +80,11 @@ export function App({ client }: { client: SupabaseClient }) {
   const memberships = workspaces?.step === 'ready' && workspaces.userId === userId ? workspaces.memberships : null
   const teamId = memberships ? pickWorkspace(memberships, chosenTeam ?? loadStoredWorkspace()) : null
 
-  // Another person signing in starts from their own stored workspace, with nothing open.
+  // Another person signing in starts from their own stored workspace, with nothing open and no old notice.
   useEffect(() => {
     setChosenTeam(null)
     setRoute(NO_ROUTE)
+    setNotice(null)
   }, [userId])
 
   function openWorkspace(id: string) {
@@ -101,6 +102,8 @@ export function App({ client }: { client: SupabaseClient }) {
         if (!active) return
         setPendingLink(null)
         setNotice(resolved.notice)
+        // A link the person cannot open leaves what they had open in place.
+        if (resolved.notice) return
         if (resolved.teamId) {
           openWorkspace(resolved.teamId)
           // Added to that workspace after the list loaded: load it again.
@@ -184,9 +187,12 @@ export function App({ client }: { client: SupabaseClient }) {
   } else if (memberships && teamId) {
     return (
       <div className="app-shell">
-        {notice && (
-          <button type="button" className="notice" onClick={() => setNotice(null)}>{notice}</button>
-        )}
+        {/* Always present, so screen readers announce a notice as soon as it appears. */}
+        <div role="alert">
+          {notice && (
+            <button type="button" className="notice" onClick={() => setNotice(null)}>{notice}</button>
+          )}
+        </div>
         <Shell
           client={client} memberships={memberships} teamId={teamId} route={route} onNavigate={setRoute}
           onSwitchWorkspace={openWorkspace} onCreateWorkspace={addWorkspace}

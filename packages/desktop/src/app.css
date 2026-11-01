@@ -273,6 +273,7 @@ select:focus {
 }
 
 .notice {
+  display: block;
   margin: 8px auto 0;
   border-color: var(--border);
   background: var(--panel);
