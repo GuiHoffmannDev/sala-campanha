@@ -456,7 +456,7 @@ it('renders the app title', () => {
   - Rola para o fim quando chega item novo.
   - O card do agente mostra a imagem (`signedUrls`), a legenda e o botão "Ver prompt", que começa recolhido.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `timeline.test.ts`:
     - `mergeEvents dedupes, keeps order and applies updates`.
     - `timelineItems writes the exact text for each event kind`: uma linha por regra acima, incluindo o esforço e as referências cortadas, no singular e no plural.
@@ -464,10 +464,10 @@ it('renders the app title', () => {
     - `loadEvents returns only events after the given id, in order`.
     - `subscribePiece delivers new events and delivery updates`: um post do gestor e depois um update de `delivery` para `claimed` pela service role.
     - `gap fill after resubscribe misses nothing`: assinar, cancelar, postar 2 mensagens, assinar de novo. No `onSubscribed`, `loadEvents(after)` traz as 2, e `mergeEvents` não duplica.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/timeline.test.ts tests/desktop/events.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implementar.**
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git add -A && git commit -m "feat(desktop): live piece conversation with gap fill after reconnect"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/timeline.test.ts tests/desktop/events.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implementar.**
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
+- [x] **Step 5: Commit.** `git add -A && git commit -m "feat(desktop): live piece conversation with gap fill after reconnect"`
 
 ---
 

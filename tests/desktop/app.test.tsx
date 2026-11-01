@@ -19,6 +19,12 @@ vi.mock('../../packages/desktop/src/native.ts', () => ({
   openExternal: async () => {},
   copyText: async () => {},
 }))
+// Node's WebSocket rejects jsdom's events; the piece channel is tested in events.test.ts.
+vi.mock('../../packages/desktop/src/data/events.ts', async (original) => ({
+  ...(await original<typeof import('../../packages/desktop/src/data/events.ts')>()),
+  subscribePiece: () => () => {},
+}))
+
 // Node's WebSocket rejects jsdom's events; the live lists are tested in campaigns.test.ts.
 vi.mock('../../packages/desktop/src/data/campaigns.ts', async (original) => ({
   ...(await original<typeof import('../../packages/desktop/src/data/campaigns.ts')>()),

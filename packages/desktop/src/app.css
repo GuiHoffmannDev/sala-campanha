@@ -459,6 +459,9 @@ select:focus {
 .shell-center {
   flex: 1;
   display: grid;
+  /* One row as tall as the panel, so the chat scrolls inside it instead of growing. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   place-items: center;
   min-height: 0;
   overflow-y: auto;
@@ -511,4 +514,120 @@ select:focus {
 .status-base_em_revisao,
 .status-final_em_revisao {
   color: var(--warning);
+}
+
+/* Piece conversation. */
+.chat {
+  align-self: stretch;
+  justify-self: stretch;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 16px;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chat-bubble {
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.chat-message.mine .chat-bubble {
+  background: var(--surface);
+}
+
+.chat-bubble p,
+.agent-card p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-author {
+  font-size: 13px;
+}
+
+.delivery {
+  font-size: 12px;
+}
+
+.delivery-pending {
+  color: var(--text-muted);
+}
+
+.delivery-failed,
+.agent-error-text {
+  color: var(--danger);
+}
+
+.chat-system {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.agent-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.agent-card.agent-error {
+  border-color: var(--danger);
+}
+
+.agent-card img {
+  max-width: 100%;
+  max-height: 480px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.agent-title {
+  font-weight: 600;
+}
+
+.agent-prompt {
+  margin: 0;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  white-space: pre-wrap;
+  font-size: 12px;
 }

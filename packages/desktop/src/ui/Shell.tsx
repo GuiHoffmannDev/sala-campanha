@@ -10,6 +10,7 @@ import { signedUrls } from '../data/files.ts'
 import { loadMembers, type Member, type Membership } from '../data/team.ts'
 import type { Route } from '../lib/link.ts'
 import { CampaignSidebar } from './CampaignSidebar.tsx'
+import { Chat } from './Chat.tsx'
 import { PieceHeader } from './PieceHeader.tsx'
 import { PieceList } from './PieceList.tsx'
 
@@ -135,8 +136,9 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
         <PieceHeader campaign={campaign} piece={piece} canWrite={canWrite} onRename={rename} />
         {error && <p role="alert">{error}</p>}
         <main className="shell-center">
-          {/* The piece chat replaces this (Task 6). */}
-          {!piece && <p className="shell-empty">Escolha uma peça</p>}
+          {piece
+            ? <Chat key={piece.id} client={client} pieceId={piece.id} members={memberList} />
+            : <p className="shell-empty">Escolha uma peça</p>}
         </main>
       </div>
       {campaignId && (
