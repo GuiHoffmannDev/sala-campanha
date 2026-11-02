@@ -430,12 +430,15 @@ it('renders the app title', () => {
   - `EFFORT_LABELS`: `minimal` "mínimo", `low` "baixo", `medium` "médio", `high` "alto", `xhigh` "muito alto", `max` "máximo".
 - Produces (`data`):
   - `type Version = { id: string; piece_id: string; number: number; origin: VersionOrigin; phase: VersionPhase; image_path: string | null; caption: string | null; author_id: string | null; created_at: string }`. `loadVersions(client, pieceId): Promise<Version[]>`, por `number`.
-  - `loadEvents(client, pieceId, afterId = 0): Promise<SessionEvent[]>`: `EVENT_COLUMNS`, `id > afterId`, por `id`, passado por `parseEvent`. As linhas nulas são descartadas.
+  - `loadEvents(client, pieceId, afterId = 0, since?: string): Promise<SessionEvent[]>`: `EVENT_COLUMNS`, `id > afterId`, por `id`, passado por `parseEvent`. As linhas nulas são descartadas. Com `since`, também traz `created_at >= since` (revisão de 2026-11-01).
   - `subscribePiece(client, pieceId, h: { onEvent(e: SessionEvent): void; onVersion(): void; onComment(): void; onPiece(): void; onSubscribed(): void }): () => void`.
-    - Um canal `piece:<id>` com `postgres_changes`: `session_events` INSERT e UPDATE, `piece_versions` INSERT, `comments` INSERT e UPDATE (`piece_id=eq.`) e `pieces` UPDATE (`id=eq.`).
+    - Um canal `piece:<id>:<uuid>`, novo a cada chamada, com `postgres_changes`: `session_events` INSERT e UPDATE, `piece_versions` INSERT, `comments` INSERT e UPDATE (`piece_id=eq.`) e `pieces` UPDATE (`id=eq.`).
     - `onSubscribed` roda a cada `SUBSCRIBED`, inclusive ao reconectar.
+    - O tópico leva um `uuid` porque o supabase-js devolve o canal que já existe com o mesmo tópico, e o React pode remontar antes de o antigo sair (revisão de 2026-11-01).
 - Produces (`timeline.ts`):
   - `mergeEvents(current: SessionEvent[], incoming: SessionEvent[]): SessionEvent[]`: por `id`, ordem crescente. A cópia que chega depois substitui a anterior (UPDATE de `delivery`).
+  - `gapFillAfter(events): number`: o último `id`, ou o anterior à mensagem mais antiga ainda `queued` ou `claimed`.
+  - `gapFillSince(events): string | undefined`: o `created_at` mais recente menos 30 s, em ISO. O `id` é reservado no insert e a linha aparece no commit, então um `id` menor pode chegar depois de um maior. Sem horário legível, devolve `undefined` (revisão de 2026-11-01).
   - `type TimelineItem` com três formas:
     - `{ type: 'message'; id: number; author: string; text: string; mine: boolean; deliveryLabel: string }`
     - `{ type: 'agent'; id: number; text: string; prompt: string | null; version: Version | null; error: boolean }`
@@ -452,8 +455,10 @@ it('renders the app title', () => {
 - UI:
   - Cada mensagem mostra o autor e um avatar com as iniciais do nome.
   - `Chat` carrega membros, versões e eventos e assina `subscribePiece`.
-  - Em `onSubscribed`, chama `loadEvents(afterId = último id)` e junta com `mergeEvents`.
-  - Rola para o fim quando chega item novo.
+  - Em `onSubscribed`, chama `loadEvents(client, pieceId, gapFillAfter(eventos), gapFillSince(eventos))` e junta com `mergeEvents`. Também recarrega as versões (revisão de 2026-11-01).
+  - Os eventos ao vivo que chegam enquanto uma busca carrega são aplicados de novo por cima do resultado: são mais novos que ela.
+  - Se a busca falha, o `Chat` mostra o erro e tenta de novo a cada 3 s, até conseguir.
+  - Rola para o fim quando chega item novo. Quando uma imagem termina de carregar, rola só se a pessoa estava no fim.
   - O card do agente mostra a imagem (`signedUrls`), a legenda e o botão "Ver prompt", que começa recolhido.
 
 - [x] **Step 1: Write the failing tests.**
@@ -809,7 +814,7 @@ it('renders the app title', () => {
 | Distribuição | `.dmg` sem assinatura para os testes, com um guia de instalação (decisão do fundador, 2026-10-28). Assinatura e notarização são obrigatórias antes de abrir o download ao público. A atualização automática fica para depois |
 | Navegação | Estado React com `Route`, sem roteador. O link `sala://` vira `Route` |
 | Estado | Hooks e props, sem biblioteca de estado. A camada de dados recebe o client por parâmetro |
-| Tempo real | Um canal por peça (`piece:<id>`) e um por time (presença, menções e listas). A cada `SUBSCRIBED`, o app busca o que perdeu |
+| Tempo real | Um canal por peça (`piece:<id>:<uuid>`, novo a cada assinatura) e um por time (presença, menções e listas). A cada `SUBSCRIBED`, o app busca o que perdeu por `id` e pelos últimos 30 s de `created_at`, e recarrega as versões. Uma busca que falha é repetida a cada 3 s (revisão de 2026-11-01) |
 | Presença | Canal privado `team:<id>`, autorizado por policy em `realtime.messages`. Um membro de outro time não entra |
 | Escolha de modelo | O app sempre manda uma escolha explícita. O valor inicial do seletor segue a mesma herança por capacidade do executor (`inheritedModel` no shared) |
 | Imagens | URLs assinadas de 1 h. Baixar abre uma URL assinada com `download` no navegador padrão |

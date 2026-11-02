@@ -4,13 +4,19 @@ import { EVENT_COLUMNS, parseEvent, type SessionEvent } from '@sala/shared/event
 // PostgREST returns at most this many rows per request (max_rows), so longer histories are read in pages.
 const PAGE = 1000
 
-/** The piece's events with `id > afterId`, by id. Rows the app cannot read are left out. */
-export async function loadEvents(client: SupabaseClient, pieceId: string, afterId = 0): Promise<SessionEvent[]> {
+/**
+ * The piece's events with `id > afterId`, or also `created_at >= since` when given (rows that committed
+ * after a higher id), by id. Rows the app cannot read are left out.
+ */
+export async function loadEvents(client: SupabaseClient, pieceId: string, afterId = 0, since?: string): Promise<SessionEvent[]> {
   const events: SessionEvent[] = []
-  let after = afterId
+  // With `since`, rows below afterId can match, so pages start from the bottom.
+  let after = since ? 0 : afterId
   for (;;) {
-    const { data, error } = await client.from('session_events').select(EVENT_COLUMNS)
-      .eq('piece_id', pieceId).gt('id', after).order('id').limit(PAGE)
+    let query = client.from('session_events').select(EVENT_COLUMNS).eq('piece_id', pieceId).gt('id', after)
+    // toISOString keeps the value free of the commas and parentheses `or` uses as syntax.
+    if (since) query = query.or(`id.gt.${afterId},created_at.gte.${new Date(since).toISOString()}`)
+    const { data, error } = await query.order('id').limit(PAGE)
     if (error) throw error
     for (const row of data) {
       const event = parseEvent(row)

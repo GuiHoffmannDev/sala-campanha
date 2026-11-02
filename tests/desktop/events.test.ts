@@ -3,9 +3,9 @@ import type { SessionEvent } from '../../packages/shared/src/events.ts'
 import { renamePiece } from '../../packages/desktop/src/data/campaigns.ts'
 import { loadEvents, subscribePiece } from '../../packages/desktop/src/data/events.ts'
 import { loadVersions } from '../../packages/desktop/src/data/versions.ts'
-import { gapFillAfter, mergeEvents } from '../../packages/desktop/src/lib/timeline.ts'
+import { gapFillAfter, gapFillSince, mergeEvents } from '../../packages/desktop/src/lib/timeline.ts'
 import { closeChannels, listen, waitFor, warmUpRealtime } from '../helpers/realtime'
-import { createAgentVersion, createPieceFixture, serviceClient, type PieceFixture } from '../helpers/supabase'
+import { createAgentVersion, createPieceFixture, dbClient, serviceClient, type PieceFixture } from '../helpers/supabase'
 
 async function post(client: SupabaseClient, pieceId: string, text: string): Promise<number> {
   const { data, error } = await client.rpc('post_message', { p_piece: pieceId, p_text: text })
@@ -224,4 +224,34 @@ describe('live piece', () => {
     expect(state.map((e) => e.id)).toEqual(missed)
     stop()
   }, 60_000)
+})
+
+it('gap fill finds an event that committed after a higher id', async () => {
+  const f = await createPieceFixture()
+  const designer = f.t.members.designer.client
+  const db = await dbClient()
+  try {
+    // M takes its id first but commits last.
+    await db.query('begin')
+    const { rows } = await db.query<{ id: string }>(
+      `insert into public.session_events (piece_id, team_id, author_id, kind, body, to_agent, delivery)
+       values ($1, $2, $3, 'user_message', $4, false, 'not_applicable') returning id`,
+      [f.pieceId, f.t.teamId, f.t.members.gestor.userId, { text: 'Atrasada', model: null, reference_asset_ids: [] }],
+    )
+    // pg returns bigint as text.
+    const m = Number(rows[0]!.id)
+    const h = await post(f.t.members.gestor.client, f.pieceId, 'Primeira a chegar')
+    expect(h).toBeGreaterThan(m)
+    const state = await loadEvents(designer, f.pieceId)
+    expect(state.map((e) => e.id)).toEqual([h])
+    await db.query('commit')
+
+    // The id cursor alone skips M for good.
+    expect((await loadEvents(designer, f.pieceId, gapFillAfter(state))).map((e) => e.id)).not.toContain(m)
+    const filled = await loadEvents(designer, f.pieceId, gapFillAfter(state), gapFillSince(state))
+    expect(filled.map((e) => e.id)).toContain(m)
+  } finally {
+    await db.query('rollback').catch(() => {})
+    await db.end()
+  }
 })

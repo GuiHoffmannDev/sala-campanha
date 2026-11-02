@@ -1,6 +1,6 @@
 import type { SessionEvent } from '../../packages/shared/src/events.ts'
 import type { Version } from '../../packages/desktop/src/data/versions.ts'
-import { gapFillAfter, initials, mergeEvents, timelineItems } from '../../packages/desktop/src/lib/timeline.ts'
+import { gapFillAfter, gapFillSince, initials, mergeEvents, timelineItems } from '../../packages/desktop/src/lib/timeline.ts'
 
 const ANA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const BIA = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
@@ -151,4 +151,25 @@ it('gapFillAfter starts before the oldest message still waiting on the agent', (
   const claimed = message('d', { id: 23, to_agent: true, delivery: 'claimed' })
   expect(gapFillAfter([done, plain, queued, claimed, message('e', { id: 30 })])).toBe(21)
   expect(gapFillAfter([done, claimed])).toBe(22)
+})
+
+it('gapFillSince looks back from the latest event', () => {
+  expect(gapFillSince([])).toBeUndefined()
+  // A lower id can commit later, so the latest time wins over the last id.
+  const later = message('a', { id: 40, created_at: '2026-11-01T12:00:45+00:00' })
+  const last = message('b', { id: 41, created_at: '2026-11-01T12:00:40+00:00' })
+  expect(gapFillSince([later, last])).toBe('2026-11-01T12:00:15.000Z')
+})
+
+it('gapFillSince reads every timestamp form the DB sends and skips the rest', () => {
+  const at = (created_at: string) => message('x', { created_at })
+  // Postgres text output, as Realtime can pass timestamptz through.
+  expect(gapFillSince([at('2026-11-01 12:00:45.123456+00')])).toBe('2026-11-01T12:00:15.123Z')
+  expect(gapFillSince([at('2026-11-01T12:00:45.123456+00')])).toBe('2026-11-01T12:00:15.123Z')
+  // PostgREST, and the live channel as observed.
+  expect(gapFillSince([at('2026-11-01T12:00:45.881847+00:00')])).toBe('2026-11-01T12:00:15.881Z')
+  expect(gapFillSince([at('2026-11-01 09:00:45-03')])).toBe('2026-11-01T12:00:15.000Z')
+  expect(gapFillSince([at('2026-11-01T12:00:45Z')])).toBe('2026-11-01T12:00:15.000Z')
+  expect(gapFillSince([at('ontem'), at('2026-11-01 12:00:45+00')])).toBe('2026-11-01T12:00:15.000Z')
+  expect(gapFillSince([at('ontem'), at('')])).toBeUndefined()
 })

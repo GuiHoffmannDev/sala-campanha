@@ -33,6 +33,32 @@ export function gapFillAfter(events: SessionEvent[]): number {
   return pending ? pending.id - 1 : (events.at(-1)?.id ?? 0)
 }
 
+// Ids are taken at insert but rows show up at commit, so a lower id can appear after a higher one.
+// shortcut: assumes a writer's transaction lasts under 30 s; track commit order (e.g. a commit sequence) if longer ones appear.
+const GAP_LOOKBACK_MS = 30_000
+
+// Postgres timestamptz text (`T` or space, any fraction, `Z`, `±HH` or `±HH:MM`).
+const DB_TIME = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}(?::?\d{2})?)$/
+
+/** Milliseconds of a DB timestamp, or NaN. Rewritten as strict ISO first: WKWebView's Date.parse is stricter than V8's. */
+function dbTimeMs(value: string): number {
+  const m = DB_TIME.exec(value)
+  if (!m) return NaN
+  const [, date, time, fraction = '', zone = ''] = m
+  const offset = zone === 'Z' ? 'Z' : `${zone.slice(0, 3)}:${zone.length > 3 ? zone.slice(-2) : '00'}`
+  return Date.parse(`${date}T${time}.${fraction.padEnd(3, '0').slice(0, 3)}${offset}`)
+}
+
+/**
+ * The `since` to load after a (re)join: the latest `created_at` seen minus the lookback. Undefined when no
+ * time can be read, so the fill falls back to the id cursor.
+ */
+export function gapFillSince(events: SessionEvent[]): string | undefined {
+  const times = events.map((e) => dbTimeMs(e.created_at)).filter((t) => !Number.isNaN(t))
+  if (!times.length) return undefined
+  return new Date(times.reduce((a, b) => Math.max(a, b)) - GAP_LOOKBACK_MS).toISOString()
+}
+
 /** Up to two letters for an avatar: the first and last names' first letters. */
 export function initials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean)

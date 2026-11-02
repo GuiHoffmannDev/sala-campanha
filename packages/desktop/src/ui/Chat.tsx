@@ -6,8 +6,13 @@ import { loadEvents, subscribePiece } from '../data/events.ts'
 import { signedUrls } from '../data/files.ts'
 import type { Member } from '../data/team.ts'
 import { loadVersions, type Version } from '../data/versions.ts'
-import { gapFillAfter, mergeEvents, timelineItems } from '../lib/timeline.ts'
+import { gapFillAfter, gapFillSince, mergeEvents, timelineItems } from '../lib/timeline.ts'
 import { Timeline } from './Timeline.tsx'
+
+// How long a failed gap fill waits before it tries again.
+const RETRY_MS = 3_000
+// Within this distance of the end, the list counts as following the conversation.
+const BOTTOM_SLACK_PX = 40
 
 type Props = {
   client: SupabaseClient
@@ -28,6 +33,8 @@ export function Chat({ client, pieceId, members }: Props) {
   // The join callback outlives renders; it reads the latest events from here.
   const latest = useRef<SessionEvent[]>([])
   const list = useRef<HTMLDivElement>(null)
+  // Whether the person is at the end; a late image only scrolls the list then.
+  const pinned = useRef(true)
 
   useEffect(() => {
     latest.current = events
@@ -36,28 +43,59 @@ export function Chat({ client, pieceId, members }: Props) {
   useEffect(() => {
     let active = true
     void client.auth.getSession().then(({ data }) => active && setMe(data.session?.user.id ?? ''))
+    // Live events received while a fill is loading. Realtime keeps commit order, so they are at
+    // least as new as the fill's snapshot and must win over it (a delivery can also go back to queued).
+    let liveLog: SessionEvent[] = []
+    let pendingFills = 0
+    let retry: ReturnType<typeof setTimeout> | undefined
     const fill = () => {
-      loadEvents(client, pieceId, gapFillAfter(latest.current)).then(
+      const start = liveLog.length
+      pendingFills += 1
+      const settle = () => {
+        const liveSince = liveLog.slice(start)
+        pendingFills -= 1
+        if (!pendingFills) liveLog = []
+        return liveSince
+      }
+      loadEvents(client, pieceId, gapFillAfter(latest.current), gapFillSince(latest.current)).then(
         (loaded) => {
+          const liveSince = settle()
           if (!active) return
           setError(null)
-          setEvents((current) => mergeEvents(current, loaded))
+          setEvents((current) => mergeEvents(mergeEvents(current, loaded), liveSince))
         },
-        (e: unknown) => active && setError(friendlyError(e)),
+        (e: unknown) => {
+          settle()
+          if (!active) return
+          setError(friendlyError(e))
+          // Realtime never resends what the gap hid, and the next join may not come: try again.
+          retry ??= setTimeout(() => {
+            retry = undefined
+            fill()
+          }, RETRY_MS)
+        },
       )
     }
     // The first load does not wait for the channel: the history shows even if Realtime is down.
     fill()
     const stop = subscribePiece(client, pieceId, {
-      onEvent: (e) => setEvents((current) => mergeEvents(current, [e])),
+      onEvent: (e) => {
+        if (pendingFills) liveLog.push(e)
+        setEvents((current) => mergeEvents(current, [e]))
+      },
       onVersion: () => setVersionChanges((n) => n + 1),
       // Comments and the piece header are drawn elsewhere.
       onComment() {},
       onPiece() {},
-      onSubscribed: fill,
+      // Versions created while offline send no onVersion, so a (re)join reloads them too.
+      onSubscribed: () => {
+        fill()
+        setVersionChanges((n) => n + 1)
+      },
     })
     return () => {
       active = false
+      clearTimeout(retry)
       stop()
     }
   }, [client, pieceId])
@@ -84,16 +122,25 @@ export function Chat({ client, pieceId, members }: Props) {
     me,
   }), [events, members, versions, me])
 
-  // Follow the conversation down as items arrive.
-  useEffect(() => {
+  const toBottom = () => {
     const el = list.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [items.length])
+  }
+
+  // Follow the conversation down as items arrive.
+  useEffect(toBottom, [items.length])
 
   return (
-    <div className="chat" ref={list}>
+    <div
+      className="chat"
+      ref={list}
+      onScroll={(e) => {
+        const el = e.currentTarget
+        pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_SLACK_PX
+      }}
+    >
       {error && <p role="alert">{error}</p>}
-      <Timeline items={items} imageUrls={imageUrls} />
+      <Timeline items={items} imageUrls={imageUrls} onImageLoad={() => pinned.current && toBottom()} />
     </div>
   )
 }
