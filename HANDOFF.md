@@ -464,8 +464,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 4 do plano
 ```
 
 ### Tarefa 5 — Campanhas, peças, navegação e link de compartilhamento
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
@@ -477,8 +477,8 @@ cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 5 do plano
 ```
 
 ### Tarefa 6 — Conversa ao vivo
-- [ ] Implementada
-- [ ] Revisada
+- [x] Implementada
+- [x] Revisada
 
 **Implementar:**
 ```
