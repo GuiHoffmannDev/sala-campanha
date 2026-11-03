@@ -408,7 +408,7 @@ Pré-requisitos:
 Nenhuma chave real de provedor é necessária: a partir da Tarefa 12, `pnpm fake-agent` responde no lugar do agente, só no Supabase local. Para ver o app, use `pnpm app`. Os códigos de login chegam no Mailpit (`http://127.0.0.1:55324`).
 
 *Revisão de 2026-10-28:* o app ficou aberto ao público, como o Conductor. Qualquer pessoa entra com Google, Apple ou código no e-mail, cria o próprio workspace, cadastra as próprias chaves e convida outras pessoas. Detalhes no topo do plano e no spec (objetivo 10 e seção 11a).
-- Para testar Google e Apple de ponta a ponta (Tarefa 13), é preciso o app empacotado (`pnpm --filter @sala/desktop tauri build --debug`) e as credenciais OAuth em `supabase/.env`, que nunca vai para o git.
+- Para testar Google e Apple de ponta a ponta (Tarefa 14), é preciso o app empacotado (`pnpm --filter @sala/desktop tauri build --debug`) e as credenciais OAuth em `supabase/.env`, que nunca vai para o git.
 - O login com Apple precisa de uma conta Apple Developer. Ela também é necessária para assinar o app antes do download público.
 
 ### Tarefa 1 — Pacote do app: Tauri, React e testes de interface
@@ -567,17 +567,30 @@ cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia do
 cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 12 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 12, Global Constraints e Review Focus. Foque em a chave nunca voltar ao app (só ...last4 e o campo limpo depois de salvar), nos convites (convidar, listar e cancelar só pelo admin), nas telas só para admin e no fake-agent recusar um Supabase que não seja local. Só reporte problemas, com arquivo:linha. Não edite nada."
 ```
 
-### Tarefa 13 — Build, DMG e verificação final
+### Tarefa 13 — Interface integralmente em inglês
 - [ ] Implementada
 - [ ] Revisada
 
 **Implementar:**
 ```
-cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 13. O checklist manual do Step 3 eu faço junto: me diga cada item e espere minha resposta. Google e Apple precisam das credenciais OAuth em supabase/.env; sem elas, registre como pendência. Ao terminar: suite passando, checkboxes da Task 13 marcados no plano, commit feito."
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 13, seguindo os passos com TDD. Troque todo texto controlado pelo app para inglês, inclusive erros, timeline, notificações e nomes acessíveis, sem adicionar i18n nem alterar contratos internos. Ao terminar: suite passando, auditoria de copy feita, checkboxes da Task 13 marcados no plano e commit feito. Não comece outra task."
+```
+**Revisar:**
+```
+cd ~/Documents/sala-campanha && claude "Revise o último commit (Task 13 do plano docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra a Task 13 e Global Constraints. Foque em qualquer texto controlado pelo app ainda em português, incluindo erros, timeline, notificações, confirmações, estados vazios e nomes acessíveis. Confira que enums, RPCs, eventos, URLs sala:// e dados da pessoa não foram traduzidos. Só reporte problemas, com arquivo:linha. Não edite nada."
+```
+
+### Tarefa 14 — Build, DMG e verificação final
+- [ ] Implementada
+- [ ] Revisada
+
+**Implementar:**
+```
+cd ~/Documents/sala-campanha && claude "Use superpowers:executing-plans. Leia docs/superpowers/specs/2026-10-21-sala-campanha-design.md e docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md. Execute SOMENTE a Task 14. O checklist manual do Step 3 eu faço junto: me diga cada item e espere minha resposta. Google e Apple precisam das credenciais OAuth em supabase/.env; sem elas, registre como pendência. Ao terminar: suite passando, checkboxes da Task 14 marcados no plano, commit feito."
 ```
 **Revisar (revisão final do Plano 3 inteiro):**
 ```
-cd ~/Documents/sala-campanha && claude "Faça a revisão final de todo o Plano 3 (docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra o spec docs/superpowers/specs/2026-10-21-sala-campanha-design.md e as interfaces dos Planos 1 e 2. Confira cobertura de cada task, os 5 itens de Review Focus, o checklist manual da Task 13, e que nenhuma chave de provedor ou service role aparece no app, no build ou no diretório de dados do app. Rode pnpm db:reset && pnpm test && pnpm typecheck. Só reporte problemas, com arquivo:linha. Não edite nada."
+cd ~/Documents/sala-campanha && claude "Faça a revisão final de todo o Plano 3 (docs/superpowers/plans/2026-10-28-plano-3-app-desktop.md) contra o spec docs/superpowers/specs/2026-10-21-sala-campanha-design.md e as interfaces dos Planos 1 e 2. Confira cobertura de cada task, os 5 itens de Review Focus, o checklist manual da Task 14, que todo texto controlado pelo app está em inglês e que nenhuma chave de provedor ou service role aparece no app, no build ou no diretório de dados do app. Rode pnpm db:reset && pnpm test && pnpm typecheck. Só reporte problemas, com arquivo:linha. Não edite nada."
 ```
 
 ---
