@@ -27,25 +27,25 @@
 - Arquivos: só `image/png`, `image/jpeg` e `image/webp`, até `26_214_400` bytes. Caminho `<team_id>/<pasta>/<uuid>.<png|jpg|webp>`, em minúsculas. Referências usam a pasta `<campaign_id>`, e versões finais usam `<piece_id>`.
 - Trechos de legenda contam code points (`Array.from(caption)`), nunca unidades UTF-16.
 - Link: `sala://campanha/<campaign_id>` e `sala://campanha/<campaign_id>/peca/<piece_id>`, com uuids em minúsculas. O retorno do login é `sala://auth/callback`.
-- Toda a interface em português do Brasil, com os rótulos exatos da Task 6 (`labels.ts`) e as mensagens exatas da Task 4 (`errors.ts`).
+- A versão final do app usa inglês em todo texto controlado pelo produto: conteúdo visível, acessível (`aria-label`, `alt` e anúncios), mensagens de erro, confirmações, notificações e texto da timeline. As Tasks 1–12 preservam os textos históricos em pt-BR; a Task 13 os substitui antes do build final. O nome próprio "Sala da Campanha", conteúdo criado pela pessoa e identificadores compatíveis (`sala://campanha/.../peca/...`) não são traduzidos. Não adicionar biblioteca de i18n enquanto existir só um idioma.
 - Visual *(revisão de 2026-10-31; spec, seção 4, "Tema visual")*:
   - Cores só pelos tokens de `src/app.css` (`--bg`, `--panel`, `--surface`, `--text`, `--text-muted`, `--border`, `--accent`, `--accent-bg`, `--on-accent`, `--accent-soft`, `--success`, `--warning`, `--danger`, `--shadow`). Nenhum hex nos componentes. Token novo entra nos três blocos de `app.css` (claro, escuro do sistema e `data-theme="dark"`), e `tests/desktop/theme-contrast.test.ts` confere o contraste.
-  - Cores semânticas só para status e alertas: `Aprovada` e confirmações em `--success`; `Base em revisão` e `Final em revisão` em `--warning`; `agent_error`, entrega `falhou` e erros em `--danger`; "na fila" em `--text-muted`.
+  - Cores semânticas só para status e alertas: `Approved` e confirmações em `--success`; `Base under review` e `Final under review` em `--warning`; `agent_error`, entrega `failed` e erros em `--danger`; "queued" em `--text-muted`.
   - Item selecionado (campanha, peça) com fundo `--accent-soft`; não lido em negrito com selo `--accent-soft`; campo focado com borda `--accent`; carregamento em `--text-muted`.
   - Painéis separados por `--panel` e `--border` (a sombra `--shadow` só existe no claro). Acabamento conforme `docs/superpowers/specs/assets/2026-10-31-referencia-visual-app.png`, só como referência visual.
 - Dependências novas só estas.
   - Runtime de `@sala/desktop`: `react`, `react-dom`, `@tauri-apps/api` e os 4 plugins. Também `@sala/shared`, `@supabase/supabase-js` e `zod`, que já estão no repositório.
   - Dev: `@tauri-apps/cli`, `vite`, `@vitejs/plugin-react`, `@types/react`, `@types/react-dom`, `@testing-library/react`, `@testing-library/user-event` e `jsdom`.
   - Sem roteador, biblioteca de estado, kit de UI ou framework de CSS.
-- Testes: a lógica e a camada de dados são automatizadas. A janela Tauri é conferida à mão (não há WebDriver para macOS), no checklist da Task 13.
+- Testes: a lógica e a camada de dados são automatizadas. A janela Tauri é conferida à mão (não há WebDriver para macOS), no checklist da Task 14.
 
 ## Review Focus
 
 1. **Realtime cai e volta** (Mac dormiu, Wi-Fi caiu): o chat busca `id > último visto` a cada `SUBSCRIBED` e não perde nem duplica evento. Teste na Task 6: `gap fill after resubscribe misses nothing`.
 2. **Presença vaza entre times:** um membro de outro time que conhece o `team_id` não entra no canal de presença. Teste na Task 2: `members of another team cannot join the team presence channel`.
 3. **Convite aceito por quem não é dono do e-mail:** com o cadastro aberto, só quem confirmou o e-mail convidado entra no workspace. Uma conta com o mesmo e-mail ainda não confirmado não entra. Teste na Task 2: `an invite is accepted only by the verified owner of the email`. (Os botões por papel continuam testados na Task 9, em `pieceActions follows the permission table`.)
-4. **Rótulo de destino diferente do roteamento real:** "Para o agente" ou "Para @Nome" bate com o que `post_message` grava em `to_agent`. Teste na Task 8: `post_message routes the same way as messageTarget`.
-5. **Link para peça inexistente ou de outro time:** o app abre sem travar e avisa "Peça não encontrada ou sem acesso.". Teste na Task 5: `a link to another team's piece resolves to no route with a notice`.
+4. **Rótulo de destino diferente do roteamento real:** `To the agent` ou `To @Name` bate com o que `post_message` grava em `to_agent`. Teste na Task 8: `post_message routes the same way as messageTarget`; a Task 13 troca apenas o copy.
+5. **Link para peça inexistente ou de outro time:** o app abre sem travar e avisa `Piece not found or access denied.`. Teste na Task 5: `a link to another team's piece resolves to no route with a notice`; a Task 13 troca apenas o copy.
 
 ---
 
@@ -345,7 +345,7 @@ it('renders the app title', () => {
   - Rodar `pnpm app` com `packages/desktop/.env.local` apontando para o Supabase local.
   - Entrar com um e-mail novo pelo código, que chega no Mailpit (`http://127.0.0.1:55324`).
   - Dar o nome e criar o workspace.
-  - Google e Apple são conferidos na Task 13, com o app empacotado: o link `sala://` só funciona assim no macOS.
+  - Google e Apple são conferidos na Task 14, com o app empacotado: o link `sala://` só funciona assim no macOS.
   - *(Na execução: `pnpm app` abriu a janela, e o e-mail real do código chegou no Mailpit. O caminho do código até o workspace roda em `tests/desktop/app.test.tsx`, em jsdom contra o Supabase local. O clique na janela fica para o fundador conferir, porque a sessão do agente não vê a tela.)*
 - [x] **Step 6: Commit.** `git add -A && git commit -m "feat(desktop): Google, Apple and email code sign-in with workspace onboarding"`
 
@@ -501,7 +501,7 @@ it('renders the app title', () => {
   - Cada arquivo recusado mostra o nome e o motivo.
   - Com `selectable`, mostra caixas de seleção e o botão "Usar selecionadas".
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `files.test.ts`:
     - `rejects files the bucket refuses`: `application/pdf`, `image/heic` e PNG com `26_214_401` bytes, cada um com o texto exato.
     - `accepts a PNG at the limit`.
@@ -510,10 +510,10 @@ it('renders the app title', () => {
     - `designer uploads a reference and everyone in the team lists it`.
     - `espectador cannot upload`.
     - `another team cannot list it`.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/files.test.ts tests/desktop/references.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implementar.**
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git add -A && git commit -m "feat(desktop): campaign reference library and image upload checks"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/files.test.ts tests/desktop/references.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implementar.**
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
+- [x] **Step 5: Commit.** `git add -A && git commit -m "feat(desktop): campaign reference library and image upload checks"`
 
 ---
 
@@ -766,7 +766,37 @@ it('renders the app title', () => {
 
 ---
 
-### Task 13: Build, DMG e verificação final
+### Task 13: Interface integralmente em inglês
+
+**Files:**
+- Modify: `packages/desktop/index.html`, todo arquivo em `packages/desktop/src/` com texto para a pessoa, `supabase/templates/codigo.html`, `scripts/fake-agent.ts` e os testes afetados em `tests/desktop/`
+- Test: `tests/desktop/english-ui.test.ts`; testes existentes com copy exata
+
+**Interfaces:**
+- `packages/desktop/index.html` usa `lang="en"`.
+- Todo texto controlado pelo produto fica em inglês: login e onboarding, e-mail com código, navegação, biblioteca de referências, conversa, seletor de modelo e esforço, versões, comentários, presença, notificações, configurações, confirmações, estados vazios, carregamento, erros, nomes acessíveis e respostas visíveis do agente falso.
+- `STATUS_LABELS`, `KIND_LABELS`, `DELIVERY_LABELS`, `EFFORT_LABELS`, `timelineItems`, `friendlyError`, `mentionNotice` e demais funções que produzem texto para a interface retornam inglês.
+- Papéis aparecem como `Admin`, `Manager`, `Designer` e `Viewer`; os valores persistidos (`admin`, `gestor`, `designer`, `espectador`) não mudam.
+- O nome próprio "Sala da Campanha" permanece. Nomes de pessoas, workspaces, campanhas, peças, arquivos, prompts e legendas são conteúdo da pessoa e não são traduzidos.
+- Contratos internos e compatibilidade permanecem: enums, chaves de evento, mensagens SQL usadas para mapear erros e links `sala://campanha/<id>/peca/<id>` não mudam.
+- Não criar camada de tradução, catálogo de mensagens ou dependência de i18n. Com um idioma, os textos continuam próximos dos componentes e helpers atuais.
+
+- [ ] **Step 1: Write the failing tests.**
+  - Atualizar as expectativas de copy em todos os testes desktop, sem relaxar asserts exatos.
+  - `english-ui.test.ts`:
+    - `uses English as the document language`.
+    - `central labels and friendly errors are English`: cobre todos os valores de `STATUS_LABELS`, `KIND_LABELS`, `DELIVERY_LABELS`, `EFFORT_LABELS` e cada mapeamento público de `friendlyError`.
+    - `main flows render only English product copy`: usa os testes de componente existentes para cobrir login, onboarding, shell, referências, conversa, versões, comentários e configurações, incluindo texto visível e nomes acessíveis. Dados de fixture podem continuar em português para provar que conteúdo da pessoa não é alterado.
+- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop`. Expected: FAIL nos textos ainda em pt-BR.
+- [ ] **Step 3: Implementar.** Traduzir o copy existente em um único passe, preservando lógica, permissões e payloads. Não renomear símbolos, enums, colunas, RPCs, rotas ou chaves de storage.
+- [ ] **Step 4: Audit the source.** Run: `rg -n "[À-ÿ]|\b(agente|arquivo|campanha|carregando|chave|código|comentário|convid|erro|esforço|legenda|membro|mensagem|peça|referência|salvar|tema|versão|você)\b" packages/desktop/src packages/desktop/index.html supabase/templates/codigo.html scripts/fake-agent.ts tests/desktop`. Expected: cada ocorrência restante é conteúdo de fixture, comentário técnico, identificador compatível ou mensagem interna do servidor; nenhum texto controlado pelo produto permanece em português.
+- [ ] **Step 5: Run.** Run: `pnpm test && pnpm typecheck`. Expected: PASS.
+- [ ] **Step 6: Conferir à mão.** Rodar `pnpm app` e percorrer login, onboarding, campanha, referências, conversa, versões, comentários e configurações em Light, Dark e System. Conferir texto visível, alertas, confirmações, notificações, estados vazios, foco por Tab e nomes anunciados pelo VoiceOver. O seletor de arquivos nativo segue o idioma do macOS; todo rótulo ao redor dele pertence ao app e fica em inglês.
+- [ ] **Step 7: Commit.** `git add -A && git commit -m "feat(desktop): switch the app interface to English"`
+
+---
+
+### Task 14: Build, DMG e verificação final
 
 **Files:**
 - Create: `docs/instalar-no-mac.md`
@@ -785,16 +815,17 @@ it('renders the app title', () => {
 - [ ] **Step 2: Build.** Run: `pnpm --filter @sala/desktop tauri build`, com `.env.local` do Supabase local. Expected: o `.app` e o `.dmg` são gerados.
 - [ ] **Step 3: Conferir à mão** (instalar o `.app` em `/Applications`, com o Supabase local):
   - [ ] Entrar com um e-mail novo pelo código do Mailpit, dar o nome e criar o workspace; fechar e abrir o app mantém a sessão.
-  - [ ] Google: com um cliente OAuth do tipo Web (redirect `http://127.0.0.1:55321/auth/v1/callback`) e as variáveis em `supabase/.env`, "Entrar com Google" abre o navegador e volta ao app por `sala://auth/callback`, já logado. Também com outro login iniciado no meio: clicar "Entrar com Google", pedir um código por e-mail no app e só então terminar o Google no navegador. O app entra pelo Google.
+  - [ ] Google: com um cliente OAuth do tipo Web (redirect `http://127.0.0.1:55321/auth/v1/callback`) e as variáveis em `supabase/.env`, "Continue with Google" abre o navegador e volta ao app por `sala://auth/callback`, já logado. Também com outro login iniciado no meio: clicar "Continue with Google", pedir um código por e-mail no app e só então terminar o Google no navegador. O app entra pelo Google.
   - [ ] Apple: o mesmo, com o Services ID e a chave da conta Apple Developer. Sem a conta, o item fica pendente no `HANDOFF.md`.
   - [ ] Um convite para o e-mail de uma segunda conta: no login dela, o workspace aparece com o papel convidado.
   - [ ] Criar campanha e peça; subir 2 referências; um PDF é recusado com a mensagem.
   - [ ] `open 'sala://campanha/<id>/peca/<id>'` abre a peça, com o app aberto e com o app fechado.
-  - [ ] Sem o `fake-agent`, a mensagem ao agente fica "na fila"; `@Nome` notifica a outra pessoa, que está no navegador.
+  - [ ] Sem o `fake-agent`, a mensagem ao agente fica "queued"; `@Nome` notifica a outra pessoa, que está no navegador.
   - [ ] Com `pnpm fake-agent` rodando e chaves falsas cadastradas, pedir uma peça e receber a versão; aprovar, enviar a final, comentar no ponto e no trecho, e aprovar a final.
   - [ ] Como espectador, nenhum botão de escrita aparece.
   - [ ] As configurações (só admin) salvam a chave e mostram só `...last4`; convidar e cancelar convite funcionam.
-  - [ ] Tema: alternar Claro, Escuro e Sistema; com Sistema, trocar a aparência do macOS muda o app na hora; fechar e reabrir mantém a escolha; navegar só com Tab mostra o foco em todos os controles.
+  - [ ] Tema: alternar Light, Dark e System; com System, trocar a aparência do macOS muda o app na hora; fechar e reabrir mantém a escolha; navegar só com Tab mostra o foco em todos os controles.
+  - [ ] Percorrer todas as telas sem encontrar copy em português; o nome "Sala da Campanha", conteúdo criado pela pessoa e os links `sala://` são as exceções previstas.
   - [ ] `grep -r` por um trecho da chave salva no diretório de dados do app (`~/Library/WebKit/app.salacampanha.desktop`, `~/Library/Application Support/app.salacampanha.desktop`) não acha nada.
 - [ ] **Step 4: Registrar.**
   - Preencher "Verificado" neste plano.
@@ -818,6 +849,7 @@ it('renders the app title', () => {
 | Presença | Canal privado `team:<id>`, autorizado por policy em `realtime.messages`. Um membro de outro time não entra |
 | Escolha de modelo | O app sempre manda uma escolha explícita. O valor inicial do seletor segue a mesma herança por capacidade do executor (`inheritedModel` no shared) |
 | Imagens | URLs assinadas de 1 h. Baixar abre uma URL assinada com `download` no navegador padrão |
+| Idioma | O release final usa inglês em todo texto controlado pelo produto. O nome "Sala da Campanha", conteúdo da pessoa e identificadores compatíveis permanecem. Sem camada de i18n enquanto existir só um idioma |
 | Tema | Claro, Escuro e Sistema (`src/lib/theme.ts`, `ui/ThemePicker.tsx`). Sistema não grava atributo e segue o macOS pela media query; a escolha explícita vai em `data-theme` no `<html>` e em `localStorage` (`sala.theme`), com `try/catch`. Tokens em `app.css` (revisão de 2026-10-31) |
 | Vários workspaces | Seletor na lateral; o último workspace usado fica no `localStorage`; um link de outro workspace da pessoa troca para ele (revisão de 2026-10-28: antes, usava o primeiro time) |
 | Teste sem chaves | `pnpm fake-agent` roda o worker do Plano 2 com provedores falsos, só contra o Supabase local. O fluxo inteiro do app pode ser testado antes de existir chave de provedor |
@@ -853,4 +885,4 @@ it('renders the app title', () => {
 
 ### Verificado
 
-(preenchido na Task 13)
+(preenchido na Task 14)

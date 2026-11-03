@@ -5,14 +5,16 @@ import {
   createCampaign, createPiece, loadCampaigns, loadPieces, loadThumbnails, renamePiece, subscribeLists,
   type Campaign, type Piece,
 } from '../data/campaigns.ts'
-import { friendlyError } from '../data/errors.ts'
+import { friendlyError, UserFacingError } from '../data/errors.ts'
 import { signedUrls } from '../data/files.ts'
+import { addReference, loadReferences, type Reference } from '../data/references.ts'
 import { loadMembers, type Member, type Membership } from '../data/team.ts'
 import type { Route } from '../lib/link.ts'
 import { CampaignSidebar } from './CampaignSidebar.tsx'
 import { Chat } from './Chat.tsx'
 import { PieceHeader } from './PieceHeader.tsx'
 import { PieceList } from './PieceList.tsx'
+import { ReferenceLibrary } from './ReferenceLibrary.tsx'
 
 type Props = {
   client: SupabaseClient
@@ -32,6 +34,9 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
   const role = memberships.find((m) => m.teamId === teamId)?.role
   const canWrite = role !== undefined && role !== 'espectador'
   const { campaignId, pieceId } = route
+  const referenceScope = `${teamId}:${campaignId}:${pieceId}`
+  const [openReferences, setOpenReferences] = useState<string | null>(null)
+  const showingReferences = openReferences === referenceScope
 
   // Campaigns and people are tagged with their workspace, and pieces with their campaign, so a switch
   // never shows (or lets the person click) the previous workspace's or campaign's items while loading.
@@ -106,6 +111,11 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
   const pieceList = pieces.campaignId === campaignId ? pieces.list : []
   const piece = pieceList.find((p) => p.id === pieceId) ?? null
 
+  function navigate(next: Route) {
+    setOpenReferences(null)
+    onNavigate(next)
+  }
+
   async function addCampaign(name: string) {
     const created = await createCampaign(client, teamId, name)
     reload()
@@ -129,14 +139,22 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
     <div className="shell">
       <CampaignSidebar
         memberships={memberships} teamId={teamId} campaigns={campaignList} pieces={pieceList} members={memberList}
-        route={route} canWrite={canWrite} onNavigate={onNavigate} onSwitchWorkspace={onSwitchWorkspace}
+        route={route} canWrite={canWrite} onNavigate={navigate} onSwitchWorkspace={onSwitchWorkspace}
         onCreateWorkspace={onCreateWorkspace} onCreateCampaign={addCampaign}
       />
       <div className="shell-main">
         <PieceHeader campaign={campaign} piece={piece} canWrite={canWrite} onRename={rename} />
+        {campaign && <div className="campaign-tools">
+          <button type="button" aria-expanded={showingReferences}
+            onClick={() => setOpenReferences(showingReferences ? null : referenceScope)}>
+            {showingReferences ? (piece ? 'Voltar à peça' : 'Voltar à campanha') : 'Referências'}
+          </button>
+        </div>}
         {error && <p role="alert">{error}</p>}
         <main className="shell-center">
-          {piece
+          {showingReferences && campaign
+            ? <CampaignReferences key={referenceScope} client={client} teamId={teamId} campaignId={campaign.id} canUpload={canWrite} />
+            : piece
             ? <Chat key={piece.id} client={client} pieceId={piece.id} members={memberList} />
             : <p className="shell-empty">Escolha uma peça</p>}
         </main>
@@ -144,9 +162,55 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
       {campaignId && (
         <PieceList
           pieces={pieceList} thumbnails={thumbnails} selectedId={pieceId} canWrite={canWrite}
-          onSelect={(id) => onNavigate({ campaignId, pieceId: id })} onCreatePiece={addPiece}
+          onSelect={(id) => navigate({ campaignId, pieceId: id })} onCreatePiece={addPiece}
         />
       )}
     </div>
   )
+}
+
+function CampaignReferences({ client, teamId, campaignId, canUpload }: {
+  client: SupabaseClient; teamId: string; campaignId: string; canUpload: boolean
+}) {
+  const [references, setReferences] = useState<Reference[]>([])
+  const [urls, setUrls] = useState<Record<string, string>>({})
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [changes, setChanges] = useState(0)
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    setError(null)
+    loadReferences(client, campaignId).then(async (list) => {
+      // shortcut: URLs are renewed when the library opens or uploads; add a timer if sessions exceed 1 h.
+      const signed = await signedUrls(client, list.map((reference) => reference.storage_path))
+      if (active) {
+        setReferences(list)
+        setUrls(signed)
+      }
+    }).catch((e: unknown) => active && setError(friendlyError(e)))
+      .finally(() => active && setLoading(false))
+    return () => { active = false }
+  }, [client, campaignId, changes])
+
+  async function upload(files: File[]) {
+    const errors: string[] = []
+    for (const file of files) {
+      try {
+        await addReference(client, { teamId, campaignId, file })
+      } catch (e) {
+        errors.push(`${file.name}: ${friendlyError(e)}`)
+      }
+    }
+    setChanges((n) => n + 1)
+    if (errors.length) throw new UserFacingError(errors.join('\n'))
+  }
+
+  return <div className="campaign-references">
+    {loading && <p role="status">Carregando referências…</p>}
+    {error && <p role="alert">{error}</p>}
+    <ReferenceLibrary references={references} urls={urls} canUpload={canUpload} selectable={false}
+      selected={[]} onUpload={upload} onSelect={() => {}} />
+  </div>
 }

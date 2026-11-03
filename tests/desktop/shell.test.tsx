@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
+import { File as NodeFile } from 'node:buffer'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Membership } from '../../packages/desktop/src/data/team.ts'
 import type { Route } from '../../packages/desktop/src/lib/link.ts'
 import { Shell } from '../../packages/desktop/src/ui/Shell.tsx'
+import { addReference, loadReferences } from '../../packages/desktop/src/data/references.ts'
 import { createAgentVersion, createPieceFixture, createTestTeam, serviceClient } from '../helpers/supabase'
 
 const copied = vi.hoisted(() => ({ texts: [] as string[] }))
@@ -47,6 +49,61 @@ function Host(props: {
 
 const membership = (teamId: string, role: Membership['role'], teamName = 'Agência'): Membership =>
   ({ teamId, teamName, role, displayName: role })
+
+it('opens campaign references for an espectador and returns to the piece', async () => {
+  const user = userEvent.setup()
+  const f = await createPieceFixture()
+  await addReference(f.t.members.designer.client, {
+    teamId: f.t.teamId, campaignId: f.campaignId,
+    file: new NodeFile(['png'], 'Produto.png', { type: 'image/png' }) as File,
+  })
+  render(<Host client={f.t.members.espectador.client} memberships={[membership(f.t.teamId, 'espectador')]}
+    teamId={f.t.teamId} route={{ campaignId: f.campaignId, pieceId: f.pieceId }} />)
+  await user.click(await screen.findByRole('button', { name: 'Referências' }))
+  const image = await screen.findByRole('img', { name: 'Produto.png' })
+  expect(image.getAttribute('src')).toContain('/storage/v1/object/sign/team-files/')
+  expect(screen.queryByLabelText('Enviar fotos')).toBeNull()
+  await user.click(screen.getByRole('button', { name: 'Voltar à peça' }))
+  expect(await screen.findByRole('list', { name: 'Conversa' })).toBeTruthy()
+})
+
+it('a designer uploads multiple campaign photos and a campaign switch hides them', async () => {
+  const user = userEvent.setup()
+  const f = await createPieceFixture()
+  const other = await createPieceFixture(f.t)
+  const memberships = [membership(f.t.teamId, 'designer')]
+  const props = { client: f.t.members.designer.client, memberships, teamId: f.t.teamId,
+    onNavigate: () => {}, onSwitchWorkspace: () => {}, onCreateWorkspace: async () => {} }
+  const { rerender } = render(<Shell {...props} route={{ campaignId: f.campaignId, pieceId: null }} />)
+  await user.click(await screen.findByRole('button', { name: 'Referências' }))
+  // Use Node Files at the fetch boundary: jsdom's File is not a native Node Blob.
+  fireEvent.change(screen.getByLabelText('Enviar fotos'), { target: { files: [
+    new NodeFile(['png'], 'Produto.png', { type: 'image/png' }),
+    new NodeFile(['jpg'], 'Detalhe.jpg', { type: 'image/jpeg' }),
+  ] } })
+  expect(await screen.findByRole('img', { name: 'Produto.png' })).toBeTruthy()
+  expect(await screen.findByRole('img', { name: 'Detalhe.jpg' })).toBeTruthy()
+  expect(await loadReferences(f.t.members.espectador.client, f.campaignId)).toHaveLength(2)
+
+  rerender(<Shell {...props} route={{ campaignId: other.campaignId, pieceId: null }} />)
+  expect(screen.queryByRole('img', { name: 'Produto.png' })).toBeNull()
+  await user.click(screen.getByRole('button', { name: 'Referências' }))
+  expect(await screen.findByText('Nenhuma referência nesta campanha.')).toBeTruthy()
+  expect(screen.queryByRole('img', { name: 'Detalhe.jpg' })).toBeNull()
+})
+
+it('opening a piece from the list closes the reference library', async () => {
+  const user = userEvent.setup()
+  const f = await createPieceFixture()
+  render(<Host client={f.t.members.designer.client} memberships={[membership(f.t.teamId, 'designer')]}
+    teamId={f.t.teamId} route={{ campaignId: f.campaignId, pieceId: null }} />)
+  await user.click(await screen.findByRole('button', { name: 'Referências' }))
+  const pieces = screen.getByRole('region', { name: 'Peças da campanha' })
+  await user.click(await within(pieces).findByRole('button', { name: /Peça de teste/ }))
+  expect(await screen.findByLabelText('Título da peça')).toHaveProperty('value', 'Peça de teste')
+  expect(screen.queryByRole('region', { name: 'Biblioteca de referências' })).toBeNull()
+  expect(screen.getByRole('list', { name: 'Conversa' })).toBeTruthy()
+})
 
 it('a designer creates a campaign and a piece, opens it and copies its link', async () => {
   const user = userEvent.setup()
