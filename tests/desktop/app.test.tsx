@@ -178,6 +178,8 @@ it('a link to a piece the person cannot see shows a notice that goes away on cli
 it('opens the remembered workspace and creates a new one from the sidebar', async () => {
   const user = userEvent.setup()
   const { client, userId } = await personWithWorkspace('Fábio')
+  // Workspace names can repeat across people, including fixtures from earlier runs.
+  await createTestTeam('Estúdio Fábio')
   const other = await createTestTeam('Agência Remota')
   await serviceClient().from('team_members').insert({ team_id: other.teamId, user_id: userId, role: 'designer', display_name: 'Fábio' })
   localStorage.setItem('sala.workspace', other.teamId)
@@ -189,7 +191,9 @@ it('opens the remembered workspace and creates a new one from the sidebar', asyn
   await user.click(screen.getByRole('button', { name: 'Novo workspace' }))
   await user.type(screen.getByLabelText('Nome do workspace'), 'Estúdio Fábio')
   await user.click(screen.getByRole('button', { name: 'Criar workspace' }))
-  const { data } = await serviceClient().from('teams').select('id').eq('name', 'Estúdio Fábio').single()
+  await screen.findByRole('option', { name: 'Estúdio Fábio' })
+  const { data, error } = await client.from('teams').select('id').eq('name', 'Estúdio Fábio').single()
+  expect(error).toBeNull()
   await waitFor(() => expect((screen.getByLabelText('Workspace') as HTMLSelectElement).value).toBe(data!.id))
   expect(localStorage.getItem('sala.workspace')).toBe(data!.id)
 })
