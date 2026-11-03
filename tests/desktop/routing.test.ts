@@ -12,6 +12,9 @@ const cases = [
   { text: '  @Ana oi', mentions: [ana], toAgent: false },
   { text: 'Oi @Ana', mentions: [ana], toAgent: true },
   { text: '\u00a0\u200b@Ana oi', mentions: [ana], toAgent: false },
+  ...['\u001c', '\u001d', '\u001e', '\u001f', '\u0085'].map((space) => ({
+    text: `${space}@Ana oi`, mentions: [ana], toAgent: false,
+  })),
 ]
 
 it('messageTarget mirrors the SQL routing rule', () => {

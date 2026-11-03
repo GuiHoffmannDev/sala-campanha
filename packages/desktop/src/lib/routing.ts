@@ -17,7 +17,8 @@ export function mentionedIn(text: string, members: Mention[]): Mention[] {
 
 export function messageTarget(text: string, mentioned: Mention[]): { toAgent: boolean; label: string } {
   // Match post_message's leading whitespace, including the zero-width space omitted by JS trim.
-  const toAgent = !(text.replace(/^[\s\u200b]+/u, '').startsWith('@') && mentioned.length > 0)
+  // PostgreSQL also treats U+001C–U+001F and U+0085 as whitespace.
+  const toAgent = !(text.replace(/^[\s\u001c-\u001f\u0085\u200b]+/u, '').startsWith('@') && mentioned.length > 0)
   const names = mentioned.map((m) => `@${m.name}`)
   const people = names.length > 1 ? `${names.slice(0, -1).join(', ')} e ${names.at(-1)}` : names[0]
   return { toAgent, label: toAgent ? 'Para o agente' : `Para ${people}` }

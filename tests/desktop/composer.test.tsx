@@ -50,6 +50,18 @@ it('a message to a person carries no model', async () => {
   expect(posted).toEqual([{ pieceId: 'piece', text: '@Ana Souza oi', mentionUserIds: ['ana'], model: null, referenceAssetIds: [] }])
 })
 
+it.each(['\u001c', '\u001d', '\u001e', '\u001f', '\u0085'])('sends a person message after SQL whitespace %j without a text key', async (space) => {
+  const user = userEvent.setup()
+  const posted: PostInput[] = []
+  render(<Composer {...props()} keyed={[]} onPost={async (input) => { posted.push(input) }} />)
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: `${space}@Ana Souza oi` } })
+  expect(screen.getByText('Para @Ana Souza')).toBeTruthy()
+  expect(screen.queryByLabelText('Modelo de texto')).toBeNull()
+  await user.click(screen.getByRole('button', { name: 'Enviar' }))
+  expect(posted).toEqual([{ pieceId: 'piece', text: `${space}@Ana Souza oi`,
+    mentionUserIds: ['ana'], model: null, referenceAssetIds: [] }])
+})
+
 it('effort select appears only for models with efforts', async () => {
   const user = userEvent.setup()
   render(<Composer {...props()} onPost={async () => {}} />)
