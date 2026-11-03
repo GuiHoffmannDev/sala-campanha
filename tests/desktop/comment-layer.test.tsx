@@ -58,6 +58,28 @@ it('uses caption selection with code point offsets and clears an empty selection
   expect(screen.queryByRole('button', { name: 'Comentar trecho' })).toBeNull()
 })
 
+it.each([
+  { caption: 'Oi\r\n👋 mundo', start: 6, end: 11, textStart: 6, textEnd: 11, quote: 'mundo' },
+  { caption: 'Oi\r\n👋 mundo', start: 0, end: 5, textStart: 0, textEnd: 5, quote: 'Oi\r\n👋' },
+  { caption: '👋\r\nOi\r\nmundo', start: 6, end: 11, textStart: 7, textEnd: 12, quote: 'mundo' },
+  { caption: 'Oi\rmundo', start: 0, end: 8, textStart: 0, textEnd: 8, quote: 'Oi\rmundo' },
+])('preserves the original caption when textarea line endings normalize: $caption', async ({ caption: text, start, end, textStart, textEnd, quote }) => {
+  const user = userEvent.setup()
+  const onAddComment = vi.fn(async () => {})
+  render(<VersionViewer {...props} versions={[{ ...version, caption: text }]} role="designer" comments={[]}
+    onAddComment={onAddComment} onSetResolved={async () => {}} />)
+  const caption = screen.getByLabelText('Legenda da versão') as HTMLTextAreaElement
+  expect(caption.value).toBe(text.replace(/\r\n?/g, '\n'))
+  caption.focus()
+  caption.setSelectionRange(start, end)
+  fireEvent.select(caption)
+  await user.click(screen.getByRole('button', { name: 'Comentar trecho' }))
+  await user.type(screen.getByLabelText('Comentário'), 'Trocar trecho')
+  await user.click(screen.getByRole('button', { name: 'Enviar comentário' }))
+  expect(onAddComment).toHaveBeenCalledWith({ versionId: 'v1', body: 'Trocar trecho',
+    target: { text_start: textStart, text_end: textEnd, quote }, parentId: null })
+})
+
 it('disables comment actions while saving the caption and keeps the comment draft', async () => {
   const user = userEvent.setup()
   let finish!: () => void

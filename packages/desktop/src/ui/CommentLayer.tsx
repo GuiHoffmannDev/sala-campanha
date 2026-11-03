@@ -40,7 +40,14 @@ export function CommentLayer({ version, title, imageUrl, comments, canComment, b
 
   function selectExcerpt() {
     if (!canComment || !caption.current) return
-    setExcerpt(captionExcerpt(version.caption ?? '', caption.current.selectionStart, caption.current.selectionEnd))
+    const original = version.caption ?? ''
+    // Textarea offsets omit the CR in each CRLF; the server keeps the original caption.
+    const originalOffset = (textareaOffset: number) => {
+      let offset = 0
+      for (let i = 0; i < textareaOffset; i++) offset += original.startsWith('\r\n', offset) ? 2 : 1
+      return offset
+    }
+    setExcerpt(captionExcerpt(original, originalOffset(caption.current.selectionStart), originalOffset(caption.current.selectionEnd)))
   }
 
   async function run(action: () => Promise<void>) {
@@ -80,7 +87,7 @@ export function CommentLayer({ version, title, imageUrl, comments, canComment, b
       </div>
       : <p role="status">Imagem indisponível.</p>)}
     {version.caption !== null && <textarea ref={caption} className="version-caption" aria-label="Legenda da versão"
-      readOnly value={version.caption} onSelect={selectExcerpt} />}
+      readOnly value={version.caption.replace(/\r\n?/g, '\n')} onSelect={selectExcerpt} />}
     <section aria-label="Comentários da versão" className="comment-layer">
       {canComment && <div className="dialog-actions">
         <button type="button" disabled={busy} onClick={() => start(null)}>Comentar na versão</button>

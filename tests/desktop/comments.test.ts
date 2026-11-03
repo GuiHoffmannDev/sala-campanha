@@ -18,6 +18,24 @@ it('pins a comment on the image and replies to it', async () => {
   expect(events).toEqual([{ to_agent: false, delivery: 'not_applicable' }, { to_agent: false, delivery: 'not_applicable' }])
 })
 
+it('loads all comments and replies past the 1000-row page limit in stable order', async () => {
+  const f = await createPieceFixture()
+  const version = await createAgentVersion(f)
+  const client = f.t.members.designer.client
+  const input = { teamId: f.t.teamId, pieceId: f.pieceId, versionId: version.id, target: null, parentId: null }
+  const root = await addComment(client, { ...input, body: 'Raiz' })
+  const { data, error } = await client.from('comments').insert(Array.from({ length: 1_000 }, () => ({
+    team_id: f.t.teamId, piece_id: f.pieceId, version_id: version.id, body: 'Outro comentário',
+  }))).select('id')
+  expect(error).toBeNull()
+  const ids = data!.map((comment: { id: string }) => comment.id).sort()
+  const reply = await addComment(client, { ...input, body: 'Resposta após o limite', parentId: root.id })
+
+  const comments = await loadComments(f.t.members.espectador.client, f.pieceId)
+  expect(comments.map((comment) => comment.id)).toEqual([root.id, ...ids, reply.id])
+  expect(comments.at(-1)).toEqual(reply)
+})
+
 it('comments a caption excerpt with an emoji before it', async () => {
   const f = await createPieceFixture()
   const v = await createAgentVersion(f, { caption: 'Oi 👋 mundo' })

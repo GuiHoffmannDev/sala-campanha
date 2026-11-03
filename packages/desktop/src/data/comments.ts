@@ -11,11 +11,18 @@ export type CommentTarget = { x: number; y: number } | { text_start: number; tex
 export type NewComment = { versionId: string; body: string; target: CommentTarget; parentId: string | null }
 
 const COLUMNS = 'id, version_id, piece_id, author_id, body, x, y, text_start, text_end, quote, parent_id, resolved, created_at'
+// PostgREST caps each response at max_rows, so read the piece's comments in pages.
+const PAGE = 1000
 
 export async function loadComments(client: SupabaseClient, pieceId: string): Promise<Comment[]> {
-  const { data, error } = await client.from('comments').select(COLUMNS).eq('piece_id', pieceId).order('created_at').order('id')
-  if (error) throw error
-  return data as Comment[]
+  const comments: Comment[] = []
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await client.from('comments').select(COLUMNS).eq('piece_id', pieceId)
+      .order('created_at').order('id').range(offset, offset + PAGE - 1)
+    if (error) throw error
+    comments.push(...data as Comment[])
+    if (data.length < PAGE) return comments
+  }
 }
 
 export async function addComment(
