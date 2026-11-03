@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { SessionEvent } from '../../packages/shared/src/events.ts'
 import { loadEvents, type PieceHandlers } from '../../packages/desktop/src/data/events.ts'
-import { loadVersions } from '../../packages/desktop/src/data/versions.ts'
+import { loadVersions, type Version } from '../../packages/desktop/src/data/versions.ts'
 import { loadPieces } from '../../packages/desktop/src/data/campaigns.ts'
 import { addComment, loadComments, setResolved } from '../../packages/desktop/src/data/comments.ts'
 import { Chat } from '../../packages/desktop/src/ui/Chat.tsx'
@@ -68,8 +68,8 @@ it('shows messages with author and initials, and the agent card with image, capt
   expect(within(answered).getByText('Gil Prado')).toBeTruthy()
   expect(within(answered).getByText('o agente está trabalhando')).toBeTruthy()
 
-  const card = (await screen.findByText('Versão 1')).closest('li')!
-  const image = await within(card).findByRole('img', { name: 'Versão 1' })
+  const image = await screen.findByRole('img', { name: 'Versão 1' })
+  const card = image.closest('li')!
   expect(image.getAttribute('src')).toMatch(/token=/)
   expect(within(card).getByText('Promoção de Natal')).toBeTruthy()
   const toggle = within(card).getByRole('button', { name: 'Ver prompt' })
@@ -126,13 +126,19 @@ it('a gap fill never overwrites a newer live update', async () => {
   expect(within(message).queryByText('o agente está trabalhando')).toBeNull()
 })
 
-it('a rejoin reloads the versions it missed', async () => {
+it.each(['events arrive first', 'versions arrive first'])('a rejoin reloads the versions it missed when %s', async (order) => {
+  const user = userEvent.setup()
   const f = await createPieceFixture()
+  const client = f.t.members.designer.client
+  vi.mocked(loadEvents).mockClear()
   vi.mocked(loadVersions).mockClear()
-  render(<Chat client={f.t.members.designer.client}
-    piece={(await loadPieces(f.t.members.designer.client, f.campaignId))[0]!} role="designer" members={[]} />)
+  render(<Chat client={client}
+    piece={(await loadPieces(client, f.campaignId))[0]!} role="designer" members={[]} />)
   // The mount's version list is read before the version exists.
-  await act(() => vi.mocked(loadVersions).mock.results[0]!.value)
+  await act(async () => {
+    await Promise.all([vi.mocked(loadVersions).mock.results[0]!.value,
+      ...vi.mocked(loadEvents).mock.results.map((result) => result.value)])
+  })
 
   // Created while the app is offline: no onVersion arrives.
   const version = await createAgentVersion(f, { caption: 'Promoção de Natal' })
@@ -144,10 +150,30 @@ it('a rejoin reloads the versions it missed', async () => {
   })
   expect(error).toBeNull()
 
+  const missedEvents = await vi.mocked(loadEvents).getMockImplementation()!(client, f.pieceId)
+  const missedVersions = await vi.mocked(loadVersions).getMockImplementation()!(client, f.pieceId)
+  let resolveEvents!: (events: SessionEvent[]) => void
+  let resolveVersions!: (versions: Version[]) => void
+  vi.mocked(loadEvents).mockImplementationOnce(() => new Promise((resolve) => { resolveEvents = resolve }))
+  vi.mocked(loadVersions).mockImplementationOnce(() => new Promise((resolve) => { resolveVersions = resolve }))
   act(() => live.handlers!.onSubscribed())
-  const card = (await screen.findByText('Versão 1')).closest('li')!
-  expect(await within(card).findByRole('img', { name: 'Versão 1' })).toBeTruthy()
+  if (order === 'events arrive first') {
+    await act(async () => resolveEvents(missedEvents))
+    expect(screen.getByText('Versão 1')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Abrir versão 1' })).toBeNull()
+    await act(async () => resolveVersions(missedVersions))
+  } else {
+    await act(async () => resolveVersions(missedVersions))
+    expect(screen.queryByText('Versão 1')).toBeNull()
+    await act(async () => resolveEvents(missedEvents))
+  }
+  const image = await screen.findByRole('img', { name: 'Versão 1' })
+  const card = image.closest('li')!
+  expect(image.getAttribute('src')).toMatch(/token=/)
   expect(within(card).getByText('Promoção de Natal')).toBeTruthy()
+  await user.click(within(card).getByRole('button', { name: 'Abrir versão 1' }))
+  const dialog = screen.getByRole('dialog', { name: 'Peça de teste — Versão 1' })
+  expect(within(dialog).getByLabelText('Legenda da versão')).toHaveProperty('value', 'Promoção de Natal')
 })
 
 it('a failed gap fill is retried until it succeeds', async () => {
