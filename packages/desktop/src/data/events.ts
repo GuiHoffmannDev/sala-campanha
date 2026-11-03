@@ -1,5 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { EVENT_COLUMNS, parseEvent, type SessionEvent } from '@sala/shared/events'
+import type { ModelChoice } from '@sala/shared/agent'
+
+export type PostInput = {
+  pieceId: string; text: string; mentionUserIds: string[]; model: ModelChoice | null; referenceAssetIds: string[]
+}
+
+export async function postMessage(client: SupabaseClient, input: PostInput): Promise<void> {
+  const { error } = await client.rpc('post_message', {
+    p_piece: input.pieceId, p_text: input.text, p_mention_user_ids: input.mentionUserIds,
+    p_model: input.model, p_reference_asset_ids: input.referenceAssetIds,
+  })
+  if (error) throw error
+}
 
 // PostgREST returns at most this many rows per request (max_rows), so longer histories are read in pages.
 const PAGE = 1000

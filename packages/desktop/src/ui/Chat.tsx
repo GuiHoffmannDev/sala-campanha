@@ -1,13 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Provider, Role } from '@sala/shared'
 import type { SessionEvent } from '@sala/shared/events'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { friendlyError } from '../data/errors.ts'
-import { loadEvents, subscribePiece } from '../data/events.ts'
+import type { Piece } from '../data/campaigns.ts'
+import { loadEvents, postMessage, subscribePiece } from '../data/events.ts'
 import { signedUrls } from '../data/files.ts'
+import { loadKeyedProviders } from '../data/keys.ts'
+import { loadReferences, type Reference } from '../data/references.ts'
 import type { Member } from '../data/team.ts'
 import { loadVersions, type Version } from '../data/versions.ts'
 import { gapFillAfter, gapFillSince, mergeEvents, timelineItems } from '../lib/timeline.ts'
 import { Timeline } from './Timeline.tsx'
+import { Composer } from './Composer.tsx'
 
 // How long a failed gap fill waits before it tries again.
 const RETRY_MS = 3_000
@@ -16,18 +21,27 @@ const BOTTOM_SLACK_PX = 40
 
 type Props = {
   client: SupabaseClient
-  /** Mount with `key={pieceId}`: the state belongs to one piece. */
-  pieceId: string
+  /** Mount with `key={piece.id}`: the state belongs to one piece. */
+  piece: Piece
+  role: Role
   members: Member[]
 }
 
 /** The live conversation of one piece. */
-export function Chat({ client, pieceId, members }: Props) {
+export function Chat({ client, piece, role, members }: Props) {
+  const pieceId = piece.id
   const [events, setEvents] = useState<SessionEvent[]>([])
   const [versions, setVersions] = useState<Version[]>([])
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
   const [me, setMe] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [composerData, setComposerData] = useState<{
+    keyed: Provider[]; references: Reference[]; urls: Record<string, string>
+  } | null>(null)
+  const [composerError, setComposerError] = useState<string | null>(null)
+  const [composerChanges, setComposerChanges] = useState(0)
+  const [historyLoaded, setHistoryLoaded] = useState(false)
+  const refresh = useRef<() => void>(() => {})
   // Bumped by a new version, to reload the list.
   const [versionChanges, setVersionChanges] = useState(0)
   // The join callback outlives renders; it reads the latest events from here.
@@ -63,6 +77,7 @@ export function Chat({ client, pieceId, members }: Props) {
           if (!active) return
           setError(null)
           setEvents((current) => mergeEvents(mergeEvents(current, loaded), liveSince))
+          setHistoryLoaded(true)
         },
         (e: unknown) => {
           settle()
@@ -77,6 +92,7 @@ export function Chat({ client, pieceId, members }: Props) {
       )
     }
     // The first load does not wait for the channel: the history shows even if Realtime is down.
+    refresh.current = fill
     fill()
     const stop = subscribePiece(client, pieceId, {
       onEvent: (e) => {
@@ -91,14 +107,30 @@ export function Chat({ client, pieceId, members }: Props) {
       onSubscribed: () => {
         fill()
         setVersionChanges((n) => n + 1)
+        setComposerChanges((n) => n + 1)
       },
     })
     return () => {
       active = false
+      refresh.current = () => {}
       clearTimeout(retry)
       stop()
     }
   }, [client, pieceId])
+
+  useEffect(() => {
+    if (role === 'espectador') return
+    let active = true
+    setComposerError(null)
+    Promise.all([loadKeyedProviders(client, piece.team_id), loadReferences(client, piece.campaign_id)])
+      .then(async ([keyed, references]) => {
+        // shortcut: reference URLs renew on mount or reconnect; add a timer if sessions exceed 1 h.
+        const urls = await signedUrls(client, references.map((r) => r.storage_path))
+        if (active) setComposerData({ keyed, references, urls })
+      })
+      .catch((e: unknown) => active && setComposerError(friendlyError(e)))
+    return () => { active = false }
+  }, [client, piece.team_id, piece.campaign_id, role, composerChanges])
 
   useEffect(() => {
     let active = true
@@ -130,7 +162,10 @@ export function Chat({ client, pieceId, members }: Props) {
   // Follow the conversation down as items arrive.
   useEffect(toBottom, [items.length])
 
+  const choices = events.flatMap((e) => e.kind === 'user_message' && e.to_agent ? [e.body.model] : [])
+
   return (
+    <section className="piece-chat" aria-label="Chat da peça">
     <div
       className="chat"
       ref={list}
@@ -142,5 +177,17 @@ export function Chat({ client, pieceId, members }: Props) {
       {error && <p role="alert">{error}</p>}
       <Timeline items={items} imageUrls={imageUrls} onImageLoad={() => pinned.current && toBottom()} />
     </div>
+    {role === 'espectador'
+      ? <p className="shell-empty">Você acompanha esta peça como espectador.</p>
+      : <>
+        {composerError && <div><p role="alert">{composerError}</p>
+          <button type="button" onClick={() => setComposerChanges((n) => n + 1)}>Tentar de novo</button></div>}
+        {!composerData || !historyLoaded
+          ? <p className="shell-empty" role="status">Carregando modelos e referências…</p>
+          : <Composer piece={piece} members={members.map((m) => ({ userId: m.userId, name: m.displayName }))}
+            keyed={composerData.keyed} choices={choices} references={composerData.references} urls={composerData.urls}
+            onPost={async (input) => { await postMessage(client, input); refresh.current() }} />}
+      </>}
+    </section>
   )
 }

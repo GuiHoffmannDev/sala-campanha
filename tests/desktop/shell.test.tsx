@@ -50,6 +50,45 @@ function Host(props: {
 const membership = (teamId: string, role: Membership['role'], teamName = 'Agência'): Membership =>
   ({ teamId, teamName, role, displayName: role })
 
+it('posts the inherited model and campaign references through the piece composer', async () => {
+  const user = userEvent.setup()
+  const f = await createPieceFixture()
+  const client = f.t.members.designer.client
+  const { error: keyError } = await f.t.members.admin.client.rpc('set_provider_key', {
+    p_team: f.t.teamId, p_provider: 'openai', p_key: 'local-test-key-for-task-eight',
+  })
+  expect(keyError).toBeNull()
+  await client.rpc('post_message', { p_piece: f.pieceId, p_text: 'Pedido anterior',
+    p_model: { text: { provider: 'openai', model: 'gpt-6-astra', effort: 'high' } } })
+  const reference = await addReference(client, { teamId: f.t.teamId, campaignId: f.campaignId,
+    file: new NodeFile(['png'], 'Produto.png', { type: 'image/png' }) as File })
+  render(<Host client={client} memberships={[membership(f.t.teamId, 'designer')]} teamId={f.t.teamId}
+    route={{ campaignId: f.campaignId, pieceId: f.pieceId }} />)
+  const input = await screen.findByRole('textbox', { name: 'Mensagem' })
+  await waitFor(() => expect(screen.getByLabelText('Esforço de texto')).toHaveProperty('value', 'high'))
+  await user.type(input, 'Gere outra versão')
+  await user.click(screen.getByRole('button', { name: 'Anexar referência' }))
+  await user.click(await screen.findByRole('checkbox', { name: 'Produto.png' }))
+  await user.click(screen.getByRole('button', { name: 'Usar selecionadas' }))
+  await user.click(screen.getByRole('button', { name: 'Enviar' }))
+  await waitFor(async () => {
+    const { data, error } = await client.from('session_events').select('body, to_agent, delivery')
+      .eq('piece_id', f.pieceId).order('id', { ascending: false }).limit(1).single()
+    expect(error).toBeNull()
+    expect(data).toEqual({ body: { text: 'Gere outra versão', model: { text: {
+      provider: 'openai', model: 'gpt-6-astra', effort: 'high',
+    } }, reference_asset_ids: [reference.id] }, to_agent: true, delivery: 'queued' })
+  })
+})
+
+it('shows an espectador notice instead of the composer', async () => {
+  const f = await createPieceFixture()
+  render(<Host client={f.t.members.espectador.client} memberships={[membership(f.t.teamId, 'espectador')]}
+    teamId={f.t.teamId} route={{ campaignId: f.campaignId, pieceId: f.pieceId }} />)
+  expect(await screen.findByText('Você acompanha esta peça como espectador.')).toBeTruthy()
+  expect(screen.queryByRole('textbox', { name: 'Mensagem' })).toBeNull()
+})
+
 it('opens campaign references for an espectador and returns to the piece', async () => {
   const user = userEvent.setup()
   const f = await createPieceFixture()

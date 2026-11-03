@@ -155,7 +155,7 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
           {showingReferences && campaign
             ? <CampaignReferences key={referenceScope} client={client} teamId={teamId} campaignId={campaign.id} canUpload={canWrite} />
             : piece
-            ? <Chat key={piece.id} client={client} pieceId={piece.id} members={memberList} />
+            ? <Chat key={piece.id} client={client} piece={piece} role={role ?? 'espectador'} members={memberList} />
             : <p className="shell-empty">Escolha uma peça</p>}
         </main>
       </div>

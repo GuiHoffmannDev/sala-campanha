@@ -551,7 +551,7 @@ it('renders the app title', () => {
     - As `choices` vêm do `body.model` das mensagens ao agente da peça.
   - Para `espectador`, `Chat` mostra "Você acompanha esta peça como espectador." no lugar do `Composer`.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `routing.test.ts`:
     - `messageTarget mirrors the SQL routing rule`. Casos: texto simples; `'@Ana oi'` com Ana; `'@algo'` sem menção; `'  @Ana oi'`; `'Oi @Ana'`.
     - `lists several people in the label`.
@@ -565,13 +565,20 @@ it('renders the app title', () => {
     - `a message to a person carries no model`.
     - `effort select appears only for models with efforts`.
     - `blocks agent messages when no text key`.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/routing.test.ts tests/desktop/models.test.ts tests/desktop/composer.test.tsx`. Expected: FAIL.
-- [ ] **Step 3: Implementar.**
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 5: Conferir à mão.** Rodar `pnpm app`.
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/routing.test.ts tests/desktop/models.test.ts tests/desktop/composer.test.tsx`. Expected: FAIL.
+- [x] **Step 3: Implementar.**
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
+- [x] **Step 5: Conferir à mão.** Rodar `pnpm app`.
   - Uma mensagem simples fica "na fila". Sem executor rodando, ela não sai daí.
   - `@Nome oi` aparece sem rótulo de fila.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "feat(desktop): message composer with routing label, mentions, model and effort"`
+- [x] **Step 6: Commit.** `git add -A && git commit -m "feat(desktop): message composer with routing label, mentions, model and effort"`
+
+**Validação da Task 8 (2026-11-02):**
+- Os três arquivos de teste novos falharam antes da implementação. Os testes de integração do Shell também falharam antes de conectar o Composer.
+- `pnpm db:reset && pnpm test && pnpm typecheck`: 436 testes passaram, 7 permaneceram ignorados pela configuração existente, e o TypeScript passou.
+- O build do Vite passou. `pnpm app` iniciou o Tauri; a ferramenta de UI selecionava um bundle antigo, então a conferência foi concluída no bundle debug reconstruído com o código atual. Na janela macOS, uma mensagem simples permaneceu “na fila” sem executor, e `@Ana oi` apareceu sem fila. O autocompletar por teclado e o rótulo “Para @Ana” também foram conferidos.
+- A integração passou a fornecer a peça e o papel pelo Shell. `data/keys.ts` contém somente a leitura dos nomes de provedores necessária ao seletor, sem acesso às chaves ou implementação das configurações da Task 12.
+- `messageTarget` também ignora o espaço de largura zero antes de `@`, como a RPC existente. O teste local cobre essa diferença em relação a `String.trim()`, sem alterar migrations.
 
 ---
 

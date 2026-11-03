@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import type { SessionEvent } from '../../packages/shared/src/events.ts'
 import { loadEvents, type PieceHandlers } from '../../packages/desktop/src/data/events.ts'
 import { loadVersions } from '../../packages/desktop/src/data/versions.ts'
+import { loadPieces } from '../../packages/desktop/src/data/campaigns.ts'
 import { Chat } from '../../packages/desktop/src/ui/Chat.tsx'
 import { createAgentVersion, createPieceFixture, serviceClient, TEST_EXECUTOR } from '../helpers/supabase'
 
@@ -49,7 +50,8 @@ it('shows messages with author and initials, and the agent card with image, capt
     { userId: gestor.userId, displayName: 'Gil Prado', role: 'gestor' as const },
     { userId: f.t.members.designer.userId, displayName: 'Dora', role: 'designer' as const },
   ]
-  render(<Chat client={f.t.members.designer.client} pieceId={f.pieceId} members={members} />)
+  render(<Chat client={f.t.members.designer.client} piece={(await loadPieces(gestor.client, f.campaignId))[0]!}
+    role="designer" members={members} />)
 
   const latest = (await screen.findByText('Agora mais claro')).closest('li')!
   expect(within(latest).getByText('Gil Prado')).toBeTruthy()
@@ -83,7 +85,8 @@ it('shows an agent error in its own card', async () => {
   })
   expect(error).toBeNull()
 
-  render(<Chat client={f.t.members.espectador.client} pieceId={f.pieceId} members={[]} />)
+  render(<Chat client={f.t.members.espectador.client}
+    piece={(await loadPieces(f.t.members.espectador.client, f.campaignId))[0]!} role="espectador" members={[]} />)
   const card = (await screen.findByText('O provedor demorou demais.')).closest('li')!
   expect(card.className).toContain('agent-error')
   // No prompt was sent, so there is nothing to show.
@@ -99,7 +102,7 @@ it('a gap fill never overwrites a newer live update', async () => {
     .update({ delivery: 'claimed', claimed_by: TEST_EXECUTOR, claimed_at: new Date().toISOString() }).eq('id', msg.id)
   const client = f.t.members.designer.client
 
-  render(<Chat client={client} pieceId={f.pieceId} members={[]} />)
+  render(<Chat client={client} piece={(await loadPieces(client, f.campaignId))[0]!} role="designer" members={[]} />)
   const message = (await screen.findByText('Gerar')).closest('li')!
   expect(within(message).getByText('o agente está trabalhando')).toBeTruthy()
 
@@ -120,7 +123,8 @@ it('a gap fill never overwrites a newer live update', async () => {
 it('a rejoin reloads the versions it missed', async () => {
   const f = await createPieceFixture()
   vi.mocked(loadVersions).mockClear()
-  render(<Chat client={f.t.members.designer.client} pieceId={f.pieceId} members={[]} />)
+  render(<Chat client={f.t.members.designer.client}
+    piece={(await loadPieces(f.t.members.designer.client, f.campaignId))[0]!} role="designer" members={[]} />)
   // The mount's version list is read before the version exists.
   await act(() => vi.mocked(loadVersions).mock.results[0]!.value)
 
@@ -143,7 +147,8 @@ it('a rejoin reloads the versions it missed', async () => {
 it('a failed gap fill is retried until it succeeds', async () => {
   const f = await createPieceFixture()
   vi.mocked(loadEvents).mockClear()
-  render(<Chat client={f.t.members.designer.client} pieceId={f.pieceId} members={[]} />)
+  render(<Chat client={f.t.members.designer.client}
+    piece={(await loadPieces(f.t.members.designer.client, f.campaignId))[0]!} role="designer" members={[]} />)
   await act(() => vi.mocked(loadEvents).mock.results[0]!.value)
   // Posted while the app is away: only a fill can bring it in.
   await f.t.members.gestor.client.rpc('post_message', { p_piece: f.pieceId, p_text: 'Chegou depois' })
@@ -176,7 +181,8 @@ it('an image that loads keeps the chat at the bottom', async () => {
     p_body: { message_ids: [source!.id], round: 1, version_id: version.id, version_number: 1, image_prompt: null },
   })
   expect(error).toBeNull()
-  const { container } = render(<Chat client={f.t.members.designer.client} pieceId={f.pieceId} members={[]} />)
+  const { container } = render(<Chat client={f.t.members.designer.client}
+    piece={(await loadPieces(f.t.members.designer.client, f.campaignId))[0]!} role="designer" members={[]} />)
   const image = await screen.findByRole('img', { name: 'Versão 1' })
 
   // jsdom has no layout: give the list a size it can scroll in.
