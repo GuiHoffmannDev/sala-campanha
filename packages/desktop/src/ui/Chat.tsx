@@ -115,6 +115,7 @@ export function Chat({ client, piece, role, members, onChange, uploadFinalOpen, 
       // Versions created while offline send no onVersion, so a (re)join reloads them too.
       onSubscribed: () => {
         fill()
+        onChange?.()
         setVersionChanges((n) => n + 1)
         setComposerChanges((n) => n + 1)
       },
@@ -178,6 +179,7 @@ export function Chat({ client, piece, role, members, onChange, uploadFinalOpen, 
   const choices = events.flatMap((e) => e.kind === 'user_message' && e.to_agent ? [e.body.model] : [])
   const approvedIds = approvedVersionIds(events)
   const selectedVersion = versions.find((v) => v.id === versionId)
+  const approvedVersion = versions.find((v) => v.id === piece.approved_version_id)
 
   function changed() {
     refresh.current()
@@ -224,7 +226,8 @@ export function Chat({ client, piece, role, members, onChange, uploadFinalOpen, 
         await openExternal(await downloadUrl(client, version.image_path, `${piece.title} v${version.number}.${extension}`))
       }} />}
     {uploadFinalOpen && onCloseUpload && versionsLoaded && pieceActions(role, piece, null).uploadFinal &&
-      <UploadFinalDialog piece={piece} initialCaption={versions.find((v) => v.id === piece.approved_version_id)?.caption ?? null}
+      (piece.kind !== 'imagem_texto' || approvedVersion) &&
+      <UploadFinalDialog piece={piece} initialCaption={approvedVersion?.caption ?? null}
         onClose={onCloseUpload} onUpload={async (file, caption) => {
           await uploadFinalVersion(client, { piece, file, caption })
           changed()
