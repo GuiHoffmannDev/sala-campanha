@@ -23,6 +23,12 @@ vi.mock('../../packages/desktop/src/native.ts', () => ({
 vi.mock('../../packages/desktop/src/data/events.ts', async (original) => ({
   ...(await original<typeof import('../../packages/desktop/src/data/events.ts')>()),
   subscribePiece: () => () => {},
+  subscribeMentions: () => () => {},
+}))
+
+// Presence sockets are exercised against the real server in presence.test.ts.
+vi.mock('../../packages/desktop/src/data/presence.ts', () => ({
+  joinTeamPresence: async () => ({ setPiece: async () => {}, leave: async () => {} }),
 }))
 
 // Node's WebSocket rejects jsdom's events; the live lists are tested in campaigns.test.ts.

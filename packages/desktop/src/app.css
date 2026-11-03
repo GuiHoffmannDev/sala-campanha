@@ -370,6 +370,10 @@ select:focus {
   background: var(--border);
 }
 
+.presence-dot.online {
+  background: var(--success);
+}
+
 .person-role {
   margin-left: auto;
   color: var(--text-muted);
@@ -446,6 +450,22 @@ select:focus {
 
 .piece-avatars {
   flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.piece-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
 }
 
 .piece-share {

@@ -11,7 +11,13 @@ vi.mock('../../packages/desktop/src/native.ts', () => ({ copyText: async () => {
 // Exercise explicit refresh after writes without relying on a live WebSocket in jsdom.
 vi.mock('../../packages/desktop/src/data/events.ts', async (original) => ({
   ...(await original<typeof import('../../packages/desktop/src/data/events.ts')>()), subscribePiece: () => () => {},
+  subscribeMentions: () => () => {},
 }))
+// Presence sockets are exercised against the real server in presence.test.ts.
+vi.mock('../../packages/desktop/src/data/presence.ts', () => ({
+  joinTeamPresence: async () => ({ setPiece: async () => {}, leave: async () => {} }),
+}))
+
 vi.mock('../../packages/desktop/src/data/campaigns.ts', async (original) => ({
   ...(await original<typeof import('../../packages/desktop/src/data/campaigns.ts')>()), subscribeLists: () => () => {},
 }))

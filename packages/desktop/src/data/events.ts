@@ -72,3 +72,16 @@ export function subscribePiece(client: SupabaseClient, pieceId: string, h: Piece
     void client.removeChannel(channel)
   }
 }
+
+/** Workspace-wide events, so a mention can notify someone reading a different piece. */
+export function subscribeMentions(client: SupabaseClient, teamId: string, onEvent: (event: SessionEvent) => void): () => void {
+  const channel = client.channel(`mentions:${teamId}:${crypto.randomUUID()}`)
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'session_events', filter: `team_id=eq.${teamId}`,
+    }, (payload) => {
+      const event = parseEvent(payload.new)
+      if (event) onEvent(event)
+    })
+    .subscribe()
+  return () => { void client.removeChannel(channel) }
+}

@@ -694,20 +694,29 @@ it('renders the app title', () => {
   - Avatares (iniciais do nome) no topo para `usersInPiece`.
   - `notify` com `mentionNotice` quando `shouldNotify`, mesmo em outra peça.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `presence-logic.test.ts`:
     - `onlineUsers and usersInPiece read the presence state`.
     - `notifies only mentions of me by someone else`.
     - `mentionNotice truncates long messages`.
   - `presence.test.ts` (local): `team members see each other online and in the same piece`, com dois clients do mesmo time e `setPiece` em um deles.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/presence-logic.test.ts tests/desktop/presence.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implementar.**
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 5: Conferir à mão.**
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/presence-logic.test.ts tests/desktop/presence.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implementar.**
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
+- [x] **Step 5: Conferir à mão.**
   - Rodar o app (`pnpm app`) com um usuário e o navegador (`pnpm --filter @sala/desktop dev`, em `http://localhost:1420`) com outro.
   - Os dois aparecem online.
   - Um `@Nome` do navegador gera a notificação no app.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "feat(desktop): team presence and mention notifications"`
+
+**Verificação da Task 11 (2026-11-03):**
+
+- TDD: os testes de lógica e integração falharam pela ausência dos módulos; os testes da interface falharam pela ausência da integração no Shell. Depois da implementação, todos passaram.
+- `pnpm db:reset && pnpm test && pnpm typecheck`: passou após autorização explícita do reset local. Resultado: 493 testes passaram e 7 permaneceram ignorados pela configuração existente.
+- A cobertura inclui deduplicação de usuários, atualização e saída da peça, reconexão após queda do socket, recusa de outro workspace, menções entre peças do mesmo workspace e encerramento das assinaturas.
+- Conferência manual: `pnpm app` iniciou o executável de desenvolvimento e o Vite em `http://localhost:1420`. Para a automação controlar a janela atual, foi gerado um bundle com `pnpm --filter @sala/desktop tauri build --debug --bundles app`, sem DMG. Ana Desktop entrou no app e Bruno Browser no navegador. Ambos apareceram online e com avatares na mesma peça; Ana mudou de peça antes de Bruno enviar a menção.
+- As notificações do app estavam desativadas no macOS e foram ativadas com autorização explícita. O log de `usernoted` confirmou a entrega nativa às 11:47:05 (`app.salacampanha.desktop`, registro `2E74-0383`, destino `.notificationCenter`). O banner não pôde ser confirmado visualmente: o macOS registrou `interruptionSuppression: silence; resolutionReason: display shared`. A preferência global de notificações durante compartilhamento não foi alterada.
+
+- [x] **Step 6: Commit.** `git add -A && git commit -m "feat(desktop): team presence and mention notifications"`
 
 ---
 

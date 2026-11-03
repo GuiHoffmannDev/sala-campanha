@@ -1,16 +1,20 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { PieceKind } from '@sala/shared'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   createCampaign, createPiece, loadCampaigns, loadPieces, loadThumbnails, renamePiece, subscribeLists,
   type Campaign, type Piece,
 } from '../data/campaigns.ts'
 import { friendlyError, UserFacingError } from '../data/errors.ts'
+import { subscribeMentions } from '../data/events.ts'
+import { joinTeamPresence } from '../data/presence.ts'
 import { signedUrls } from '../data/files.ts'
 import { addReference, loadReferences, type Reference } from '../data/references.ts'
 import { loadMembers, type Member, type Membership } from '../data/team.ts'
 import { stepBack } from '../data/versions.ts'
 import type { Route } from '../lib/link.ts'
+import { mentionNotice, onlineUsers, shouldNotify, usersInPiece, type PresenceMeta } from '../lib/presence.ts'
+import { notify } from '../native.ts'
 import { CampaignSidebar } from './CampaignSidebar.tsx'
 import { Chat } from './Chat.tsx'
 import { PieceHeader } from './PieceHeader.tsx'
@@ -28,7 +32,7 @@ type Props = {
   onCreateWorkspace(name: string): Promise<void>
 }
 
-type LoadName = 'members' | 'campaigns' | 'pieces'
+type LoadName = 'members' | 'campaigns' | 'pieces' | 'presence'
 
 /** The main screen: campaigns on the left, the open piece in the middle, the campaign's pieces on the right. */
 export function Shell({ client, memberships, teamId, route, onNavigate, onSwitchWorkspace, onCreateWorkspace }: Props) {
@@ -46,15 +50,70 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
   const [members, setMembers] = useState<{ teamId: string | null; list: Member[] }>({ teamId: null, list: [] })
   const [pieces, setPieces] = useState<{ campaignId: string | null; list: Piece[] }>({ campaignId: null, list: [] })
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
+  const [presence, setPresence] = useState<{ teamId: string; state: Record<string, PresenceMeta[]> } | null>(null)
+  const presenceHandle = useRef<{ teamId: string; joined: Awaited<ReturnType<typeof joinTeamPresence>> } | null>(null)
+  const presenceTask = useRef(Promise.resolve())
+  const latestPiece = useRef(pieceId)
+  latestPiece.current = pieceId
+  const memberNames = useRef<Record<string, string>>({})
   // Bumped by live changes and by the person's own writes, to reload the lists.
   const [changes, setChanges] = useState(0)
   // One slot per load. Each load clears its own slot when it runs again, so an old failure never sticks
   // after a switch or a successful reload, and one load never hides another's failure.
-  const [errors, setErrors] = useState<Record<LoadName, string | null>>({ members: null, campaigns: null, pieces: null })
+  const [errors, setErrors] = useState<Record<LoadName, string | null>>({ members: null, campaigns: null, pieces: null, presence: null })
   const report = (load: LoadName, message: string | null) => setErrors((e) => ({ ...e, [load]: message }))
   const reload = useCallback(() => setChanges((n) => n + 1), [])
 
   useEffect(() => subscribeLists(client, teamId, campaignId, reload), [client, teamId, campaignId])
+
+  useEffect(() => {
+    let active = true
+    let joined: Awaited<ReturnType<typeof joinTeamPresence>> | undefined
+    let stopMentions: (() => void) | undefined
+    const seen = new Set<number>()
+    report('presence', null)
+
+    // A fixed private topic must finish leaving before the same client joins it again.
+    presenceTask.current = presenceTask.current.then(async () => {
+      if (!active) return
+      const { data: { session }, error } = await client.auth.getSession()
+      if (error) throw error
+      if (!active || !session) return
+      await client.realtime.setAuth()
+      if (!active) return
+      stopMentions = subscribeMentions(client, teamId, (event) => {
+        if (!active || !shouldNotify(event, session.user.id) || seen.has(event.id)) return
+        seen.add(event.id)
+        void (async () => {
+          const { data, error } = await client.from('pieces').select('title').eq('id', event.piece_id).single()
+          if (error) throw error
+          if (!active) return
+          const notice = mentionNotice(event, memberNames.current, data.title)
+          await notify(notice.title, notice.body)
+        })().catch((e: unknown) => { if (active) console.error('could not notify mention', e) })
+      })
+      joined = await joinTeamPresence(client, teamId, { user_id: session.user.id, piece_id: latestPiece.current },
+        (state) => { if (active) setPresence({ teamId, state }) })
+      if (!active) { await joined.leave(); return }
+      presenceHandle.current = { teamId, joined }
+      await joined.setPiece(latestPiece.current)
+    }).catch((e: unknown) => { if (active) report('presence', friendlyError(e)) })
+
+    return () => {
+      active = false
+      stopMentions?.()
+      presenceHandle.current = null
+      presenceTask.current = presenceTask.current.then(async () => { await joined?.leave() })
+        .catch((e: unknown) => console.error('could not leave presence', e))
+    }
+  }, [client, teamId])
+
+  useEffect(() => {
+    const handle = presenceHandle.current
+    if (handle?.teamId === teamId) {
+      void handle.joined.setPiece(pieceId).catch((e: unknown) => report('presence', friendlyError(e)))
+    }
+  }, [teamId, pieceId])
 
   useEffect(() => {
     let active = true
@@ -108,7 +167,11 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
 
   const campaignList = campaigns.teamId === teamId ? campaigns.list : []
   const memberList = members.teamId === teamId ? members.list : []
-  const error = errors.members ?? errors.campaigns ?? errors.pieces
+  memberNames.current = Object.fromEntries(memberList.map((m) => [m.userId, m.displayName]))
+  const presenceState = presence?.teamId === teamId ? presence.state : {}
+  const online = onlineUsers(presenceState)
+  const inPiece = new Set(pieceId ? usersInPiece(presenceState, pieceId) : [])
+  const error = errors.members ?? errors.campaigns ?? errors.pieces ?? errors.presence
   const campaign = campaignList.find((c) => c.id === campaignId) ?? null
   const pieceList = pieces.campaignId === campaignId ? pieces.list : []
   const piece = pieceList.find((p) => p.id === pieceId) ?? null
@@ -140,12 +203,13 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
   return (
     <div className="shell">
       <CampaignSidebar
-        memberships={memberships} teamId={teamId} campaigns={campaignList} pieces={pieceList} members={memberList}
+        memberships={memberships} teamId={teamId} campaigns={campaignList} pieces={pieceList} members={memberList} online={online}
         route={route} canWrite={canWrite} onNavigate={navigate} onSwitchWorkspace={onSwitchWorkspace}
         onCreateWorkspace={onCreateWorkspace} onCreateCampaign={addCampaign}
       />
       <div className="shell-main">
         <PieceHeader key={pieceId} campaign={campaign} piece={piece} canWrite={canWrite} role={role ?? 'espectador'} onRename={rename}
+          membersInPiece={memberList.filter((m) => inPiece.has(m.userId))}
           onStepBack={async () => { if (pieceId) { await stepBack(client, pieceId); reload() } }}
           onUploadFinal={() => { setOpenReferences(null); setUploadPieceId(pieceId) }} />
         {campaign && <div className="campaign-tools">

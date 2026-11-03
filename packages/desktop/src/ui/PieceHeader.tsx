@@ -1,6 +1,7 @@
 import { useEffect, useState, type KeyboardEvent } from 'react'
 import { PIECE_STATUSES, type Role } from '@sala/shared'
 import type { Campaign, Piece } from '../data/campaigns.ts'
+import type { Member } from '../data/team.ts'
 import { friendlyError } from '../data/errors.ts'
 import { buildLink } from '../lib/link.ts'
 import { copyText } from '../native.ts'
@@ -12,6 +13,7 @@ type Props = {
   piece: Piece | null
   canWrite: boolean
   role: Role
+  membersInPiece?: Member[]
   onRename(title: string): Promise<void>
   onStepBack(): Promise<void>
   onUploadFinal(): void
@@ -19,7 +21,7 @@ type Props = {
 
 const COPIED_MS = 2_000
 
-export function PieceHeader({ campaign, piece, canWrite, role, onRename, onStepBack, onUploadFinal }: Props) {
+export function PieceHeader({ campaign, piece, canWrite, role, membersInPiece = [], onRename, onStepBack, onUploadFinal }: Props) {
   const [draft, setDraft] = useState(piece?.title ?? '')
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -100,7 +102,13 @@ export function PieceHeader({ campaign, piece, canWrite, role, onRename, onStepB
       </div>
       {piece && <span className={`status status-${piece.status}`}>{STATUS_LABELS[piece.status]}</span>}
       {/* Avatars of who is on the piece now (Task 11). */}
-      <div className="piece-avatars" />
+      <div className="piece-avatars" role={piece ? 'group' : undefined} aria-label={piece ? 'Nesta peça' : undefined}>
+        {piece && membersInPiece.map((m) => (
+          <span key={m.userId} className="piece-avatar" role="img" aria-label={m.displayName} title={m.displayName}>
+            {m.displayName.trim().split(/\s+/u).slice(0, 2).map((name) => Array.from(name)[0] ?? '').join('').toLocaleUpperCase('pt-BR')}
+          </span>
+        ))}
+      </div>
       <div className="piece-share">
         {actions?.stepBack && <button type="button" disabled={busy} onClick={() => void back()}>Voltar uma etapa</button>}
         {actions?.uploadFinal && <button type="button" disabled={busy} onClick={onUploadFinal}>Enviar versão final</button>}

@@ -12,6 +12,7 @@ type Props = {
   /** The pieces of the open campaign. */
   pieces: Piece[]
   members: Member[]
+  online?: Set<string>
   route: Route
   canWrite: boolean
   onNavigate(route: Route): void
@@ -97,7 +98,8 @@ export function CampaignSidebar(props: Props) {
           {members.map((m) => (
             <li key={m.userId}>
               {/* The online dot is lit by presence (Task 11). */}
-              <span className="presence-dot" aria-hidden="true" />
+              <span className={`presence-dot${props.online?.has(m.userId) ? ' online' : ''}`}
+                role="img" aria-label={`${m.displayName}: ${props.online?.has(m.userId) ? 'online' : 'offline'}`} />
               <span className="person-name">{m.displayName}</span>
               <span className="person-role">{m.role}</span>
             </li>
