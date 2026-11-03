@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { randomUUID } from 'node:crypto'
+import { AuthError } from '@supabase/supabase-js'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createAppClient } from '../../packages/desktop/src/data/client.ts'
 import { saveDisplayName, sendLoginCode, verifyLoginCode } from '../../packages/desktop/src/data/auth.ts'
 import { createCampaign } from '../../packages/desktop/src/data/campaigns.ts'
 import { createWorkspace } from '../../packages/desktop/src/data/team.ts'
+import * as teamData from '../../packages/desktop/src/data/team.ts'
 import { App } from '../../packages/desktop/src/ui/App.tsx'
 import { createPieceFixture, createTestTeam, env, loginCode, serviceClient } from '../helpers/supabase'
 
@@ -48,7 +50,11 @@ async function signedIn(email: string) {
 }
 
 // Each client keeps its session in the jsdom localStorage, as the app does.
-afterEach(() => localStorage.clear())
+afterEach(() => {
+  localStorage.clear()
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
 
 it('renders the app title', () => {
   render(<App client={appClient()} />)
@@ -58,6 +64,13 @@ it('renders the app title', () => {
 it('shows the login screen without a session', async () => {
   render(<App client={appClient()} />)
   expect(await screen.findByRole('button', { name: 'Entrar com Google' })).toBeTruthy()
+})
+
+it('does not interpret a session lookup error as an empty membership list', async () => {
+  const client = appClient()
+  const error = new AuthError('session unavailable')
+  vi.spyOn(client.auth, 'getSession').mockResolvedValueOnce({ data: { session: null }, error })
+  await expect(teamData.loadMyMemberships(client)).rejects.toBe(error)
 })
 
 it('a new person names themselves, creates a workspace and sees it', async () => {
@@ -216,4 +229,88 @@ it('refreshes workspace permissions after the admin changes their own role', asy
   await user.selectOptions(screen.getByLabelText('Papel de admin'), 'espectador')
   await waitFor(() => expect(screen.queryByRole('button', { name: 'Configurações do workspace' })).toBeNull())
   expect(screen.queryByRole('button', { name: 'Nova campanha' })).toBeNull()
+})
+
+it.each(['demote', 'remove'] as const)('closes settings and discards cached invites after another admin acts (%s)', async (action) => {
+  const user = userEvent.setup()
+  const t = await createTestTeam()
+  const client = t.members.admin.client
+  await saveDisplayName(client, 'Ana')
+  expect((await client.rpc('set_member_role', { p_team: t.teamId, p_user: t.members.gestor.userId, p_role: 'admin' })).error).toBeNull()
+  const email = `pending-${randomUUID()}@test.local`
+  expect((await client.rpc('invite_member', { p_team: t.teamId, p_email: email, p_role: 'designer' })).error).toBeNull()
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+  render(<App client={client} />)
+  await user.click(await screen.findByRole('button', { name: 'Configurações do workspace' }))
+  await user.type(await screen.findByLabelText('Chave Anthropic'), 'unsaved-secret')
+  await user.click(screen.getByRole('tab', { name: 'Membros' }))
+  expect(screen.getByText(`${email} — designer`)).toBeTruthy()
+
+  const result = action === 'demote'
+    ? await t.members.gestor.client.rpc('set_member_role', { p_team: t.teamId, p_user: t.members.admin.userId, p_role: 'espectador' })
+    : await t.members.gestor.client.rpc('remove_member', { p_team: t.teamId, p_user: t.members.admin.userId })
+  expect(result.error).toBeNull()
+  await act(async () => { await vi.advanceTimersByTimeAsync(3_000) })
+
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Configurações do workspace' })).toBeNull())
+  expect(screen.queryByLabelText('Chave Anthropic')).toBeNull()
+  expect(screen.queryByText(`${email} — designer`)).toBeNull()
+})
+
+it('preserves unsaved settings during an unchanged permission refresh and discovers an external promotion on focus', async () => {
+  const user = userEvent.setup()
+  const t = await createTestTeam()
+  const client = t.members.admin.client
+  await saveDisplayName(client, 'Ana')
+  expect((await client.rpc('set_member_role', { p_team: t.teamId, p_user: t.members.gestor.userId, p_role: 'admin' })).error).toBeNull()
+  const loads = vi.spyOn(teamData, 'loadMyMemberships')
+  render(<App client={client} />)
+  await user.click(await screen.findByRole('button', { name: 'Configurações do workspace' }))
+  const key = await screen.findByLabelText('Chave Anthropic')
+  await user.type(key, 'unsaved-secret')
+  const previousLoads = loads.mock.calls.length
+  await act(async () => { window.dispatchEvent(new Event('focus')) })
+  await waitFor(() => expect(loads.mock.calls.length).toBeGreaterThan(previousLoads))
+  await act(async () => { await loads.mock.results.at(-1)!.value })
+  expect(screen.getByLabelText('Chave Anthropic')).toBe(key)
+  expect(key).toHaveProperty('value', 'unsaved-secret')
+
+  loads.mockRejectedValueOnce(new Error('fetch failed'))
+  await act(async () => {
+    window.dispatchEvent(new Event('focus'))
+    await loads.mock.results.at(-1)!.value.catch(() => {})
+  })
+  expect(screen.getByLabelText('Chave Anthropic')).toBe(key)
+  expect(key).toHaveProperty('value', 'unsaved-secret')
+
+  expect((await t.members.gestor.client.rpc('set_member_role', { p_team: t.teamId, p_user: t.members.admin.userId, p_role: 'espectador' })).error).toBeNull()
+  await act(async () => { window.dispatchEvent(new Event('online')) })
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Configurações do workspace' })).toBeNull())
+  expect((await t.members.gestor.client.rpc('set_member_role', { p_team: t.teamId, p_user: t.members.admin.userId, p_role: 'admin' })).error).toBeNull()
+  await act(async () => { window.dispatchEvent(new Event('focus')) })
+  await user.click(await screen.findByRole('button', { name: 'Configurações do workspace' }))
+  expect(await screen.findByLabelText('Chave Anthropic')).toHaveProperty('value', '')
+})
+
+it('clears the removed workspace route before falling back to another workspace', async () => {
+  const user = userEvent.setup()
+  const f = await createPieceFixture()
+  const client = f.t.members.admin.client
+  await saveDisplayName(client, 'Ana')
+  await createWorkspace(client, 'Outro workspace', 'Ana')
+  expect((await client.rpc('set_member_role', { p_team: f.t.teamId, p_user: f.t.members.gestor.userId, p_role: 'admin' })).error).toBeNull()
+  localStorage.setItem('sala.workspace', f.t.teamId)
+  render(<App client={client} />)
+  await screen.findByLabelText('Workspace')
+  act(() => deepLink.deliver(`sala://campanha/${f.campaignId}/peca/${f.pieceId}`))
+  expect(await screen.findByLabelText('Título da peça')).toHaveProperty('value', 'Peça de teste')
+  await user.click(screen.getByRole('button', { name: 'Configurações do workspace' }))
+  await screen.findByLabelText('Chave Anthropic')
+
+  expect((await f.t.members.gestor.client.rpc('remove_member', { p_team: f.t.teamId, p_user: f.t.members.admin.userId })).error).toBeNull()
+  await act(async () => { window.dispatchEvent(new Event('focus')) })
+  expect(await screen.findByRole('heading', { name: 'Outro workspace' })).toBeTruthy()
+  expect(screen.queryByLabelText('Título da peça')).toBeNull()
+  expect(screen.queryByRole('region', { name: 'Chat da peça' })).toBeNull()
+  expect(screen.getByText('Escolha uma peça')).toBeTruthy()
 })

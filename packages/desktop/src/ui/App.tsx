@@ -1,5 +1,5 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   displayNameOf, finishOAuth, oauthUrl, saveDisplayName, sendLoginCode, verifyLoginCode,
 } from '../data/auth.ts'
@@ -79,6 +79,8 @@ export function App({ client }: { client: SupabaseClient }) {
   const name = session ? displayNameOf(session.user) : null
   const memberships = workspaces?.step === 'ready' && workspaces.userId === userId ? workspaces.memberships : null
   const teamId = memberships ? pickWorkspace(memberships, chosenTeam ?? loadStoredWorkspace()) : null
+  const currentTeam = useRef(teamId)
+  currentTeam.current = teamId
 
   // Another person signing in starts from their own stored workspace, with nothing open and no old notice.
   useEffect(() => {
@@ -126,17 +128,46 @@ export function App({ client }: { client: SupabaseClient }) {
   useEffect(() => {
     if (!userId || !name) return
     let active = true
+    let refreshing = false
+    let loaded = false
     setWorkspaces({ userId, step: 'loading' })
-    acceptInvites(client, name)
-      .then(() => loadMyMemberships(client))
-      .then((memberships) => {
-        if (active) setWorkspaces(memberships.length ? { userId, step: 'ready', memberships } : { userId, step: 'none' })
-      })
-      .catch((e: unknown) => {
-        if (active) setWorkspaces({ userId, step: 'failed', message: friendlyError(e) })
-      })
+
+    const refresh = async () => {
+      if (refreshing) return
+      refreshing = true
+      try {
+        if (!loaded) await acceptInvites(client, name)
+        const memberships = await loadMyMemberships(client)
+        if (!active) return
+        if (currentTeam.current && !memberships.some((m) => m.teamId === currentTeam.current)) setRoute(NO_ROUTE)
+        setWorkspaces((previous) => {
+          if (previous?.userId === userId && previous.step === 'ready'
+            && JSON.stringify(previous.memberships) === JSON.stringify(memberships)) return previous
+          return memberships.length ? { userId, step: 'ready', memberships } : { userId, step: 'none' }
+        })
+        loaded = true
+      } catch (e) {
+        if (!active) return
+        if (!loaded) setWorkspaces({ userId, step: 'failed', message: friendlyError(e) })
+        else console.error('could not refresh workspace permissions', e)
+      } finally {
+        refreshing = false
+      }
+    }
+
+    const onVisible = () => { if (document.visibilityState === 'visible') void refresh() }
+    void refresh()
+    // shortcut: External membership changes wait for the next successful 3 s poll plus network latency; use server broadcasts if immediate updates are required.
+    const timer = setInterval(refresh, 3_000)
+    window.addEventListener('focus', refresh)
+    window.addEventListener('online', refresh)
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       active = false
+      clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('online', refresh)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [client, userId, name, attempt])
 

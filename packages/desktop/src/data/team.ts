@@ -50,7 +50,8 @@ export async function createWorkspace(client: SupabaseClient, name: string, disp
 
 /** The workspaces of the signed-in person, by workspace name. */
 export async function loadMyMemberships(client: SupabaseClient): Promise<Membership[]> {
-  const { data: { session } } = await client.auth.getSession()
+  const { data: { session }, error: sessionError } = await client.auth.getSession()
+  if (sessionError) throw sessionError
   if (!session) return []
   const { data, error } = await client.from('team_members')
     .select('team_id, role, display_name, teams(name)')
