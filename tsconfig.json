@@ -13,7 +13,7 @@
     "types": ["node", "vitest/globals"],
     "jsx": "react-jsx"
   },
-  "include": ["packages/*/src", "tests", "vitest.config.mts"],
+  "include": ["packages/*/src", "tests", "scripts", "vitest.config.mts"],
   // The website type-checks with Astro; its plain TS modules are still checked through the tests that import them.
   "exclude": ["packages/website"]
 }

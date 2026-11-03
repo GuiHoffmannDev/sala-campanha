@@ -3,6 +3,33 @@ import type { Role } from '@sala/shared'
 
 export type Membership = { teamId: string; teamName: string; role: Role; displayName: string }
 export type Member = { userId: string; displayName: string; role: Role }
+export type Invite = { email: string; role: Role; created_at: string }
+
+export async function inviteMember(client: SupabaseClient, teamId: string, email: string, role: Role): Promise<void> {
+  const { error } = await client.rpc('invite_member', { p_team: teamId, p_email: email, p_role: role })
+  if (error) throw error
+}
+
+export async function loadInvites(client: SupabaseClient, teamId: string): Promise<Invite[]> {
+  const { data, error } = await client.from('team_invites').select('email, role, created_at').eq('team_id', teamId).order('email')
+  if (error) throw error
+  return data as Invite[]
+}
+
+export async function revokeInvite(client: SupabaseClient, teamId: string, email: string): Promise<void> {
+  const { error } = await client.rpc('revoke_invite', { p_team: teamId, p_email: email })
+  if (error) throw error
+}
+
+export async function setMemberRole(client: SupabaseClient, teamId: string, userId: string, role: Role): Promise<void> {
+  const { error } = await client.rpc('set_member_role', { p_team: teamId, p_user: userId, p_role: role })
+  if (error) throw error
+}
+
+export async function removeMember(client: SupabaseClient, teamId: string, userId: string): Promise<void> {
+  const { error } = await client.rpc('remove_member', { p_team: teamId, p_user: userId })
+  if (error) throw error
+}
 
 // Sorted here, not in SQL, so accented names sort the way a Brazilian reader expects.
 const byName = (a: string, b: string) => a.localeCompare(b, 'pt-BR')

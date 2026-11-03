@@ -9,8 +9,12 @@ import { friendlyError, UserFacingError } from '../data/errors.ts'
 import { subscribeMentions } from '../data/events.ts'
 import { joinTeamPresence } from '../data/presence.ts'
 import { signedUrls } from '../data/files.ts'
+import { deleteKey, loadKeys, saveKey, type KeyRow } from '../data/keys.ts'
 import { addReference, loadReferences, type Reference } from '../data/references.ts'
-import { loadMembers, type Member, type Membership } from '../data/team.ts'
+import {
+  inviteMember, loadInvites, loadMembers, removeMember, revokeInvite, setMemberRole,
+  type Invite, type Member, type Membership,
+} from '../data/team.ts'
 import { stepBack } from '../data/versions.ts'
 import type { Route } from '../lib/link.ts'
 import { mentionNotice, onlineUsers, shouldNotify, usersInPiece, type PresenceMeta } from '../lib/presence.ts'
@@ -20,6 +24,7 @@ import { Chat } from './Chat.tsx'
 import { PieceHeader } from './PieceHeader.tsx'
 import { PieceList } from './PieceList.tsx'
 import { ReferenceLibrary } from './ReferenceLibrary.tsx'
+import { Settings } from './Settings.tsx'
 
 type Props = {
   client: SupabaseClient
@@ -30,19 +35,24 @@ type Props = {
   onNavigate(route: Route): void
   onSwitchWorkspace(teamId: string): void
   onCreateWorkspace(name: string): Promise<void>
+  onMembershipChange?(): void
 }
 
 type LoadName = 'members' | 'campaigns' | 'pieces' | 'presence'
 
 /** The main screen: campaigns on the left, the open piece in the middle, the campaign's pieces on the right. */
-export function Shell({ client, memberships, teamId, route, onNavigate, onSwitchWorkspace, onCreateWorkspace }: Props) {
+export function Shell({ client, memberships, teamId, route, onNavigate, onSwitchWorkspace, onCreateWorkspace, onMembershipChange }: Props) {
   const role = memberships.find((m) => m.teamId === teamId)?.role
   const canWrite = role !== undefined && role !== 'espectador'
   const { campaignId, pieceId } = route
   const referenceScope = `${teamId}:${campaignId}:${pieceId}`
   const [openReferences, setOpenReferences] = useState<string | null>(null)
   const [uploadPieceId, setUploadPieceId] = useState<string | null>(null)
+  const [settingsTeam, setSettingsTeam] = useState<string | null>(null)
+  const showingSettings = settingsTeam === teamId && role === 'admin'
   const showingReferences = openReferences === referenceScope
+
+  useEffect(() => setSettingsTeam(null), [teamId])
 
   // Campaigns and people are tagged with their workspace, and pieces with their campaign, so a switch
   // never shows (or lets the person click) the previous workspace's or campaign's items while loading.
@@ -127,7 +137,7 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
     return () => {
       active = false
     }
-  }, [client, teamId])
+  }, [client, teamId, changes])
 
   useEffect(() => {
     let active = true
@@ -180,6 +190,7 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
 
   function navigate(next: Route) {
     setOpenReferences(null)
+    setSettingsTeam(null)
     onNavigate(next)
   }
 
@@ -208,13 +219,15 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
         memberships={memberships} teamId={teamId} campaigns={campaignList} pieces={pieceList} members={memberList} online={online}
         route={route} canWrite={canWrite} onNavigate={navigate} onSwitchWorkspace={onSwitchWorkspace}
         onCreateWorkspace={onCreateWorkspace} onCreateCampaign={addCampaign}
+        onOpenSettings={() => { setOpenReferences(null); setSettingsTeam(teamId) }}
       />
       <div className="shell-main">
-        <PieceHeader key={pieceId} campaign={campaign} piece={piece} canWrite={canWrite} role={role ?? 'espectador'} onRename={rename}
+        {!showingSettings && <PieceHeader key={pieceId} campaign={campaign} piece={piece} canWrite={canWrite} role={role ?? 'espectador'} onRename={rename}
           membersInPiece={memberList.filter((m) => inPiece.has(m.userId))}
           onStepBack={async () => { if (pieceId) { await stepBack(client, pieceId); reload() } }}
-          onUploadFinal={() => { setOpenReferences(null); setUploadPieceId(pieceId) }} />
-        {campaign && <div className="campaign-tools">
+          onUploadFinal={() => { setOpenReferences(null); setUploadPieceId(pieceId) }} />}
+        {showingSettings && <button type="button" onClick={() => setSettingsTeam(null)}>Voltar às campanhas</button>}
+        {!showingSettings && campaign && <div className="campaign-tools">
           <button type="button" aria-expanded={showingReferences}
             onClick={() => setOpenReferences(showingReferences ? null : referenceScope)}>
             {showingReferences ? (piece ? 'Voltar à peça' : 'Voltar à campanha') : 'Referências'}
@@ -222,7 +235,9 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
         </div>}
         {error && <p role="alert">{error}</p>}
         <main className="shell-center">
-          {showingReferences && campaign
+          {showingSettings
+            ? <WorkspaceSettings key={teamId} client={client} teamId={teamId} onChange={reload} onMembershipChange={onMembershipChange} />
+            : showingReferences && campaign
             ? <CampaignReferences key={referenceScope} client={client} teamId={teamId} campaignId={campaign.id} canUpload={canWrite} />
             : piece
             ? <Chat key={piece.id} client={client} piece={piece} role={role ?? 'espectador'} members={memberList}
@@ -230,7 +245,7 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
             : <p className="shell-empty">Escolha uma peça</p>}
         </main>
       </div>
-      {campaignId && (
+      {!showingSettings && campaignId && (
         <PieceList
           pieces={pieceList} thumbnails={thumbnails} selectedId={pieceId} canWrite={canWrite}
           onSelect={(id) => navigate({ campaignId, pieceId: id })} onCreatePiece={addPiece}
@@ -238,6 +253,50 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
       )}
     </div>
   )
+}
+
+function WorkspaceSettings({ client, teamId, onChange, onMembershipChange }: {
+  client: SupabaseClient; teamId: string; onChange(): void; onMembershipChange?(): void
+}) {
+  const [data, setData] = useState<{ keys: KeyRow[]; members: Member[]; invites: Invite[]; me: string } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
+
+  async function load() {
+    const [keys, members, invites, { data: { session }, error }] = await Promise.all([
+      loadKeys(client, teamId), loadMembers(client, teamId), loadInvites(client, teamId), client.auth.getSession(),
+    ])
+    if (error) throw error
+    if (!session) throw new Error('not signed in')
+    return { keys, members, invites, me: session.user.id }
+  }
+
+  useEffect(() => {
+    let active = true
+    setError(null)
+    load().then((data) => { if (active) setData(data) })
+      .catch((e: unknown) => { if (active) setError(friendlyError(e)) })
+    return () => { active = false }
+  }, [client, teamId, attempt])
+
+  async function change(action: () => Promise<void>, userId?: string) {
+    await action()
+    onChange()
+    if (userId === data?.me && onMembershipChange) { onMembershipChange(); return }
+    setData(await load())
+  }
+
+  if (!data) return error
+    ? <div><p role="alert">{error}</p><button type="button" onClick={() => setAttempt((n) => n + 1)}>Tentar de novo</button></div>
+    : <p role="status">Carregando configurações…</p>
+
+  return <Settings teamId={teamId} {...data}
+    onSaveKey={(provider, key) => change(() => saveKey(client, teamId, provider, key))}
+    onDeleteKey={(provider) => change(() => deleteKey(client, teamId, provider))}
+    onInvite={(email, role) => change(() => inviteMember(client, teamId, email, role))}
+    onRevokeInvite={(email) => change(() => revokeInvite(client, teamId, email))}
+    onSetRole={(userId, role) => change(() => setMemberRole(client, teamId, userId, role), userId)}
+    onRemove={(userId) => change(() => removeMember(client, teamId, userId), userId)} />
 }
 
 function CampaignReferences({ client, teamId, campaignId, canUpload }: {

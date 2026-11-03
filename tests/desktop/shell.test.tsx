@@ -269,3 +269,37 @@ it('switches between workspaces and creates a new one', async () => {
   await user.click(screen.getByRole('button', { name: 'Criar workspace' }))
   await waitFor(() => expect(created).toEqual(['Agência C']))
 })
+
+it('an admin opens workspace settings and saving a key refreshes its mask', async () => {
+  const user = userEvent.setup()
+  const t = await createTestTeam()
+  render(<Host client={t.members.admin.client} teamId={t.teamId} memberships={[membership(t.teamId, 'admin')]} />)
+  await user.click(screen.getByRole('button', { name: 'Configurações do workspace' }))
+  const field = await screen.findByLabelText('Chave Anthropic')
+  await user.type(field, 'chave-falsa-local-0001')
+  await user.click(within(screen.getByRole('region', { name: 'Anthropic' })).getByRole('button', { name: 'Salvar' }))
+  expect(await screen.findByText('...0001')).toBeTruthy()
+  expect(field).toHaveProperty('value', '')
+  await user.click(screen.getByRole('button', { name: 'Voltar às campanhas' }))
+  expect(screen.queryByLabelText('Chave Anthropic')).toBeNull()
+})
+
+it.each(['gestor', 'designer', 'espectador'] as const)('%s cannot open workspace settings', async (role) => {
+  const t = await createTestTeam()
+  render(<Host client={t.members[role].client} teamId={t.teamId} memberships={[membership(t.teamId, role)]} />)
+  expect(await screen.findByRole('heading', { name: 'Agência' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Configurações do workspace' })).toBeNull()
+})
+
+it('switching workspaces closes settings and clears the typed key', async () => {
+  const user = userEvent.setup()
+  const a = await createTestTeam()
+  const b = await createTestTeam()
+  const props = { client: a.members.admin.client, memberships: [membership(a.teamId, 'admin'), membership(b.teamId, 'admin')],
+    route: { campaignId: null, pieceId: null }, onNavigate: () => {}, onSwitchWorkspace: () => {}, onCreateWorkspace: async () => {} }
+  const { rerender } = render(<Shell {...props} teamId={a.teamId} />)
+  await user.click(screen.getByRole('button', { name: 'Configurações do workspace' }))
+  await user.type(await screen.findByLabelText('Chave Anthropic'), 'pending-secret')
+  rerender(<Shell {...props} teamId={b.teamId} />)
+  expect(screen.queryByLabelText('Chave Anthropic')).toBeNull()
+})

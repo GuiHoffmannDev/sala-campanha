@@ -934,3 +934,43 @@ select:focus {
   white-space: pre-wrap;
   font-size: 12px;
 }
+
+.workspace-settings {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.workspace-settings [role="tablist"],
+.workspace-settings fieldset,
+.workspace-settings li {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.workspace-settings [role="tab"][aria-selected="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.workspace-settings fieldset {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.workspace-settings section {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.workspace-settings li {
+  margin: 8px 0;
+}
+
+.settings-confirmation {
+  color: var(--success);
+}

@@ -756,7 +756,7 @@ it('renders the app title', () => {
     - O formulário "Convidar" (e-mail e papel). Depois de convidar, aparece o texto "Convite criado. Avise a pessoa: baixe a Sala da Campanha e entre com <email>." e o botão "Copiar". O app não manda e-mail de convite.
     - Os convites pendentes, cada um com "Cancelar".
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `keys.test.ts` (local):
     - `admin saves a key and members load only the mask`: `JSON.stringify(await loadKeys(...))` não contém a chave.
     - `gestor gets the friendly admin-only message`.
@@ -771,14 +771,21 @@ it('renders the app title', () => {
   - `fake-agent.test.ts`:
     - `refuses a non-local Supabase URL`.
     - `fake providers answer with a plan parsePlan accepts and a real PNG`: `parsePlan` aceita o plano para os 3 tipos de peça, e `sniffType` do PNG dá `image/png`.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/keys.test.ts tests/desktop/team.test.ts tests/desktop/settings.test.tsx tests/desktop/fake-agent.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implementar.**
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 5: Conferir à mão.** Rodar `pnpm app` como admin.
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/keys.test.ts tests/desktop/team.test.ts tests/desktop/settings.test.tsx tests/desktop/fake-agent.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implementar.**
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
+- [x] **Step 5: Conferir à mão.** Rodar `pnpm app` como admin.
   - Cadastrar chaves falsas para Anthropic e Gemini.
   - Rodar `pnpm fake-agent` em outro terminal e pedir uma peça. A mensagem passa por "o agente está trabalhando" e vira uma versão com imagem colorida.
   - Uma segunda mensagem mandada durante os 3 s da imagem entra na rodada seguinte.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "feat(desktop): workspace settings for keys, members and invites, and a local fake agent"`
+- [x] **Step 6: Commit.** `git add -A && git commit -m "feat(desktop): workspace settings for keys, members and invites, and a local fake agent"`
+
+**Notas da execução (2026-11-03):**
+- Os testes novos falharam antes da implementação das interfaces de chaves, membros, configurações e agente falso. A integração com o Shell e a atualização das permissões após alterar o próprio papel também foram verificadas em ciclos RED/GREEN.
+- A tela foi integrada ao Shell e ao App, com acesso exclusivo do admin, tratamento de erros, navegação por teclado entre abas e limpeza dos campos de chave. A mudança do próprio papel ou a própria remoção recarrega os workspaces para aplicar as permissões atuais.
+- Verificação automatizada: `pnpm db:reset`, `pnpm test` (532 testes aprovados; 7 testes opcionais de provedores reais ignorados), `pnpm typecheck`, `pnpm --filter @sala/desktop build` e `pnpm --filter @sala/desktop tauri build --debug --bundles app` passaram. O Vite manteve o aviso de tamanho do bundle acima de 500 kB.
+- Conferência manual no macOS: abertura com `pnpm app` e conferência no bundle atualizado; login com código, criação de workspace como admin e cadastro de chaves falsas para Anthropic e Gemini. As máscaras apareceram e os campos foram limpos. Com `pnpm fake-agent`, a primeira mensagem passou por “o agente está trabalhando”; uma segunda mensagem enviada durante os três segundos de geração entrou na rodada seguinte. Duas versões com imagem colorida e legenda apareceram no app. Os processos de conferência foram encerrados.
+- Nenhuma dependência ou migration foi adicionada. Os textos desta task continuam em português, conforme as Global Constraints. Nenhuma outra task foi iniciada.
 
 ---
 

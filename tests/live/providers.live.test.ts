@@ -2,7 +2,7 @@
 // at the model's lowest reasoning effort when it has one. Each provider runs only when its
 // LIVE_<PROVIDER>_KEY is set; without any, the whole file is skipped and `pnpm test` makes
 // no network calls. The keys are never printed.
-import { crc32, deflateSync } from 'node:zlib'
+import { solidPng } from '../helpers/images.ts'
 import { MODEL_CATALOG, type CatalogModel } from '../../packages/shared/src/agent.ts'
 import type { Provider } from '../../packages/shared/src/domain.ts'
 import { MAX_OUTPUT_TOKENS, parsePlan } from '../../packages/executor/src/orchestrator.ts'
@@ -21,33 +21,6 @@ function liveKey(provider: Provider): string | undefined {
 /** The first (lowest) effort of the catalog list, or no effort when the model has no effort control. */
 function lowestEffort(model: CatalogModel): { effort?: string } {
   return model.efforts.length > 0 ? { effort: model.efforts[0] } : {}
-}
-
-/** A small solid-colour RGB PNG, built in memory so the test needs no fixture file. */
-function solidPng(size: number, [r, g, b]: [number, number, number]): Uint8Array {
-  const chunk = (type: string, data: Buffer) => {
-    const body = Buffer.concat([Buffer.from(type, 'ascii'), data])
-    const out = Buffer.alloc(body.length + 8)
-    out.writeUInt32BE(data.length, 0)
-    body.copy(out, 4)
-    out.writeUInt32BE(crc32(body), body.length + 4)
-    return out
-  }
-  const header = Buffer.alloc(13)
-  header.writeUInt32BE(size, 0)
-  header.writeUInt32BE(size, 4)
-  header[8] = 8 // bit depth
-  header[9] = 2 // colour type: RGB
-  const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(size * 3).map((_, i) => [r, g, b][i % 3]!)])
-  const pixels = Buffer.concat(Array.from({ length: size }, () => row))
-  return new Uint8Array(
-    Buffer.concat([
-      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-      chunk('IHDR', header),
-      chunk('IDAT', deflateSync(pixels)),
-      chunk('IEND', Buffer.alloc(0)),
-    ]),
-  )
 }
 
 type ReplyPart = { thought?: boolean; inlineData?: unknown; inline_data?: unknown }

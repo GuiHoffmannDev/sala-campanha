@@ -196,6 +196,7 @@ export function App({ client }: { client: SupabaseClient }) {
         <Shell
           client={client} memberships={memberships} teamId={teamId} route={route} onNavigate={setRoute}
           onSwitchWorkspace={openWorkspace} onCreateWorkspace={addWorkspace}
+          onMembershipChange={() => setAttempt((n) => n + 1)}
         />
       </div>
     )

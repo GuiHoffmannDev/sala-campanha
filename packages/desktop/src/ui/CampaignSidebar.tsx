@@ -19,6 +19,7 @@ type Props = {
   onSwitchWorkspace(teamId: string): void
   onCreateWorkspace(name: string): Promise<void>
   onCreateCampaign(name: string): Promise<void>
+  onOpenSettings(): void
 }
 
 export function CampaignSidebar(props: Props) {
@@ -108,6 +109,7 @@ export function CampaignSidebar(props: Props) {
       </section>
 
       <footer className="sidebar-footer">
+        {workspace?.role === 'admin' && <button type="button" onClick={props.onOpenSettings}>Configurações do workspace</button>}
         <ThemePicker />
       </footer>
     </nav>

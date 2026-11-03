@@ -203,3 +203,17 @@ it('opens the remembered workspace and creates a new one from the sidebar', asyn
   await waitFor(() => expect((screen.getByLabelText('Workspace') as HTMLSelectElement).value).toBe(data!.id))
   expect(localStorage.getItem('sala.workspace')).toBe(data!.id)
 })
+
+it('refreshes workspace permissions after the admin changes their own role', async () => {
+  const user = userEvent.setup()
+  const t = await createTestTeam()
+  const client = t.members.admin.client
+  await saveDisplayName(client, 'Ana')
+  await client.rpc('set_member_role', { p_team: t.teamId, p_user: t.members.gestor.userId, p_role: 'admin' })
+  render(<App client={client} />)
+  await user.click(await screen.findByRole('button', { name: 'Configurações do workspace' }))
+  await user.click(await screen.findByRole('tab', { name: 'Membros' }))
+  await user.selectOptions(screen.getByLabelText('Papel de admin'), 'espectador')
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Configurações do workspace' })).toBeNull())
+  expect(screen.queryByRole('button', { name: 'Nova campanha' })).toBeNull()
+})
