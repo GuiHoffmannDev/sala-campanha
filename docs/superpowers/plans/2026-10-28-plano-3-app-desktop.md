@@ -654,7 +654,7 @@ it('renders the app title', () => {
   - Uma lista de fios, com as respostas embaixo e o botão "Resolver" ou "Reabrir".
   - Sem `comment`, a lista aparece só para leitura.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `excerpt.test.ts`:
     - `counts code points, not UTF-16 units`: em `'Oi 👋 mundo'`, a seleção UTF-16 6..11 dá `{ text_start: 5, text_end: 10, quote: 'mundo' }`.
     - `an empty selection is null`.
@@ -664,10 +664,10 @@ it('renders the app title', () => {
     - `comments a caption excerpt with an emoji before it`: o trigger do servidor aceita os offsets de `captionExcerpt`.
     - `resolves a thread`.
     - `espectador gets the friendly error`.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/excerpt.test.ts tests/desktop/comments.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implementar.**
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git add -A && git commit -m "feat(desktop): comments pinned to the image and to caption excerpts"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/excerpt.test.ts tests/desktop/comments.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implementar.**
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
+- [x] **Step 5: Commit.** `git add -A && git commit -m "feat(desktop): comments pinned to the image and to caption excerpts"`
 
 ---
 

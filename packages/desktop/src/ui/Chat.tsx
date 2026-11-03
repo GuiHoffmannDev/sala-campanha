@@ -4,6 +4,7 @@ import type { SessionEvent } from '@sala/shared/events'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { friendlyError } from '../data/errors.ts'
 import type { Piece } from '../data/campaigns.ts'
+import { addComment, loadComments, setResolved, type Comment } from '../data/comments.ts'
 import { loadEvents, postMessage, subscribePiece } from '../data/events.ts'
 import { downloadUrl, signedUrls } from '../data/files.ts'
 import { loadKeyedProviders } from '../data/keys.ts'
@@ -41,6 +42,9 @@ export function Chat({ client, piece, role, members, onChange, uploadFinalOpen, 
   const [versions, setVersions] = useState<Version[]>([])
   const [versionsLoaded, setVersionsLoaded] = useState(false)
   const [versionId, setVersionId] = useState<string | null>(null)
+  const [comments, setComments] = useState<Comment[]>([])
+  const [commentChanges, setCommentChanges] = useState(0)
+  const [commentsError, setCommentsError] = useState<string | null>(null)
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
   const [me, setMe] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -109,8 +113,8 @@ export function Chat({ client, piece, role, members, onChange, uploadFinalOpen, 
         setEvents((current) => mergeEvents(current, [e]))
       },
       onVersion: () => setVersionChanges((n) => n + 1),
-      // Comments and the piece header are drawn elsewhere.
-      onComment() {},
+      // Comments are drawn in the version viewer; live changes reload its list.
+      onComment: () => setCommentChanges((n) => n + 1),
       onPiece: () => onChange?.(),
       // Versions created while offline send no onVersion, so a (re)join reloads them too.
       onSubscribed: () => {
@@ -118,6 +122,7 @@ export function Chat({ client, piece, role, members, onChange, uploadFinalOpen, 
         onChange?.()
         setVersionChanges((n) => n + 1)
         setComposerChanges((n) => n + 1)
+        setCommentChanges((n) => n + 1)
       },
     })
     return () => {
@@ -130,6 +135,15 @@ export function Chat({ client, piece, role, members, onChange, uploadFinalOpen, 
 
   // A local step back changes the header first, even if its Realtime event is delayed.
   useEffect(() => { refresh.current() }, [piece.status, piece.approved_version_id])
+
+  useEffect(() => {
+    if (!versionId) return
+    let active = true
+    loadComments(client, pieceId).then((loaded) => {
+      if (active) { setComments(loaded); setCommentsError(null) }
+    }, (e: unknown) => active && setCommentsError(friendlyError(e)))
+    return () => { active = false }
+  }, [client, pieceId, versionId, commentChanges])
 
   useEffect(() => {
     if (role === 'espectador') return
@@ -213,6 +227,16 @@ export function Chat({ client, piece, role, members, onChange, uploadFinalOpen, 
       </>}
     {selectedVersion && <VersionViewer piece={piece} role={role} versions={versions} versionId={selectedVersion.id}
       approvedIds={approvedIds} imageUrls={imageUrls} onSelectVersion={setVersionId} onClose={() => setVersionId(null)}
+      comments={comments} onAddComment={async (input) => {
+        const created = await addComment(client, { ...input, teamId: piece.team_id, pieceId })
+        setComments((current) => current.some((c) => c.id === created.id) ? current : [...current, created])
+        setCommentChanges((n) => n + 1)
+        refresh.current()
+      }} onSetResolved={async (id, resolved) => {
+        await setResolved(client, id, resolved)
+        setComments((current) => current.map((c) => c.id === id ? { ...c, resolved } : c))
+        setCommentChanges((n) => n + 1)
+      }}
       onApprove={async (id) => { await approveVersion(client, pieceId, id); changed() }}
       onSaveCaption={async (id, caption) => {
         const created = await updateCaption(client, id, caption)
@@ -224,7 +248,10 @@ export function Chat({ client, piece, role, members, onChange, uploadFinalOpen, 
         if (!version.image_path) return
         const extension = version.image_path.split('.').at(-1)!
         await openExternal(await downloadUrl(client, version.image_path, `${piece.title} v${version.number}.${extension}`))
-      }} />}
+      }}>
+      {commentsError && <div><p role="alert">{commentsError}</p>
+        <button type="button" onClick={() => setCommentChanges((n) => n + 1)}>Tentar de novo</button></div>}
+    </VersionViewer>}
     {uploadFinalOpen && onCloseUpload && versionsLoaded && pieceActions(role, piece, null).uploadFinal &&
       (piece.kind !== 'imagem_texto' || approvedVersion) &&
       <UploadFinalDialog piece={piece} initialCaption={approvedVersion?.caption ?? null}

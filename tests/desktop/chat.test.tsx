@@ -5,8 +5,14 @@ import type { SessionEvent } from '../../packages/shared/src/events.ts'
 import { loadEvents, type PieceHandlers } from '../../packages/desktop/src/data/events.ts'
 import { loadVersions } from '../../packages/desktop/src/data/versions.ts'
 import { loadPieces } from '../../packages/desktop/src/data/campaigns.ts'
+import { addComment, loadComments, setResolved } from '../../packages/desktop/src/data/comments.ts'
 import { Chat } from '../../packages/desktop/src/ui/Chat.tsx'
 import { createAgentVersion, createPieceFixture, serviceClient, TEST_EXECUTOR } from '../helpers/supabase'
+
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function () { this.open = true }
+  HTMLDialogElement.prototype.close = function () { this.open = false }
+})
 
 // The handlers Chat passed to the last subscribePiece, so a test can play the channel.
 const live = vi.hoisted(() => ({ handlers: null as PieceHandlers | null }))
@@ -203,4 +209,32 @@ it('an image that loads keeps the chat at the bottom', async () => {
   height = 2000
   fireEvent.load(image)
   expect(chat.scrollTop).toBe(100)
+})
+
+it('loads comments in the viewer, saves without Realtime and fills remote changes after reconnect', async () => {
+  const user = userEvent.setup()
+  const f = await createPieceFixture()
+  const version = await createAgentVersion(f)
+  const client = f.t.members.designer.client
+  const input = { teamId: f.t.teamId, pieceId: f.pieceId, versionId: version.id, target: null, parentId: null }
+  const root = await addComment(client, { ...input, body: 'Conferir o logo' })
+  render(<Chat client={client} piece={(await loadPieces(client, f.campaignId))[0]!} role="designer" members={[]} />)
+  await user.click(await screen.findByRole('button', { name: 'Abrir versão 1' }))
+  const dialog = screen.getByRole('dialog')
+  expect(await within(dialog).findByText('Conferir o logo')).toBeTruthy()
+  await user.click(within(dialog).getByRole('button', { name: 'Responder' }))
+  await user.type(within(dialog).getByLabelText('Comentário'), 'Já ajustei')
+  await user.click(within(dialog).getByRole('button', { name: 'Enviar comentário' }))
+  expect(await within(dialog).findByText('Já ajustei')).toBeTruthy()
+  expect((await loadComments(client, f.pieceId)).map((c) => c.body)).toEqual(['Conferir o logo', 'Já ajustei'])
+
+  await setResolved(f.t.members.gestor.client, root.id, true)
+  await act(async () => live.handlers!.onComment())
+  expect(await within(dialog).findByRole('button', { name: 'Reabrir' })).toBeTruthy()
+  await addComment(f.t.members.gestor.client, { ...input, body: 'Recebido durante a queda', parentId: root.id })
+  await act(async () => live.handlers!.onSubscribed())
+  expect(await within(dialog).findByText('Recebido durante a queda')).toBeTruthy()
+  await user.click(within(dialog).getByRole('button', { name: 'Reabrir' }))
+  expect(await within(dialog).findByRole('button', { name: 'Resolver' })).toBeTruthy()
+  expect((await loadComments(client, f.pieceId))[0]?.resolved).toBe(false)
 })
