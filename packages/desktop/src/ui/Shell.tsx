@@ -68,6 +68,7 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
 
   useEffect(() => {
     let active = true
+    const presenceAbort = new AbortController()
     let joined: Awaited<ReturnType<typeof joinTeamPresence>> | undefined
     let stopMentions: (() => void) | undefined
     const seen = new Set<number>()
@@ -93,7 +94,7 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
         })().catch((e: unknown) => { if (active) console.error('could not notify mention', e) })
       })
       joined = await joinTeamPresence(client, teamId, { user_id: session.user.id, piece_id: latestPiece.current },
-        (state) => { if (active) setPresence({ teamId, state }) })
+        (state) => { if (active) setPresence({ teamId, state }) }, presenceAbort.signal)
       if (!active) { await joined.leave(); return }
       presenceHandle.current = { teamId, joined }
       await joined.setPiece(latestPiece.current)
@@ -101,6 +102,7 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
 
     return () => {
       active = false
+      presenceAbort.abort()
       stopMentions?.()
       presenceHandle.current = null
       presenceTask.current = presenceTask.current.then(async () => { await joined?.leave() })
