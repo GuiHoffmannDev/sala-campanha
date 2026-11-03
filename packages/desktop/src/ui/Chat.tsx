@@ -5,14 +5,18 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { friendlyError } from '../data/errors.ts'
 import type { Piece } from '../data/campaigns.ts'
 import { loadEvents, postMessage, subscribePiece } from '../data/events.ts'
-import { signedUrls } from '../data/files.ts'
+import { downloadUrl, signedUrls } from '../data/files.ts'
 import { loadKeyedProviders } from '../data/keys.ts'
 import { loadReferences, type Reference } from '../data/references.ts'
 import type { Member } from '../data/team.ts'
-import { loadVersions, type Version } from '../data/versions.ts'
+import { approveVersion, loadVersions, updateCaption, uploadFinalVersion, type Version } from '../data/versions.ts'
+import { approvedVersionIds, pieceActions } from '../lib/actions.ts'
+import { openExternal } from '../native.ts'
 import { gapFillAfter, gapFillSince, mergeEvents, timelineItems } from '../lib/timeline.ts'
 import { Timeline } from './Timeline.tsx'
 import { Composer } from './Composer.tsx'
+import { VersionViewer } from './VersionViewer.tsx'
+import { UploadFinalDialog } from './UploadFinalDialog.tsx'
 
 // How long a failed gap fill waits before it tries again.
 const RETRY_MS = 3_000
@@ -25,13 +29,18 @@ type Props = {
   piece: Piece
   role: Role
   members: Member[]
+  onChange?: () => void
+  uploadFinalOpen?: boolean
+  onCloseUpload?: () => void
 }
 
 /** The live conversation of one piece. */
-export function Chat({ client, piece, role, members }: Props) {
+export function Chat({ client, piece, role, members, onChange, uploadFinalOpen, onCloseUpload }: Props) {
   const pieceId = piece.id
   const [events, setEvents] = useState<SessionEvent[]>([])
   const [versions, setVersions] = useState<Version[]>([])
+  const [versionsLoaded, setVersionsLoaded] = useState(false)
+  const [versionId, setVersionId] = useState<string | null>(null)
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
   const [me, setMe] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -102,7 +111,7 @@ export function Chat({ client, piece, role, members }: Props) {
       onVersion: () => setVersionChanges((n) => n + 1),
       // Comments and the piece header are drawn elsewhere.
       onComment() {},
-      onPiece() {},
+      onPiece: () => onChange?.(),
       // Versions created while offline send no onVersion, so a (re)join reloads them too.
       onSubscribed: () => {
         fill()
@@ -116,7 +125,10 @@ export function Chat({ client, piece, role, members }: Props) {
       clearTimeout(retry)
       stop()
     }
-  }, [client, pieceId])
+  }, [client, pieceId, onChange])
+
+  // A local step back changes the header first, even if its Realtime event is delayed.
+  useEffect(() => { refresh.current() }, [piece.status, piece.approved_version_id])
 
   useEffect(() => {
     if (role === 'espectador') return
@@ -138,6 +150,7 @@ export function Chat({ client, piece, role, members }: Props) {
       .then(async (loaded) => {
         if (!active) return
         setVersions(loaded)
+        setVersionsLoaded(true)
         // shortcut: URLs last 1 h and are signed again only when the list reloads; add a timer if long sessions show broken images.
         const urls = await signedUrls(client, loaded.flatMap((v) => (v.image_path ? [v.image_path] : [])))
         if (active) setImageUrls(urls)
@@ -146,7 +159,7 @@ export function Chat({ client, piece, role, members }: Props) {
     return () => {
       active = false
     }
-  }, [client, pieceId, versionChanges])
+  }, [client, pieceId, piece.status, piece.approved_version_id, versionChanges])
 
   const items = useMemo(() => timelineItems(events, {
     members: Object.fromEntries(members.map((m) => [m.userId, m.displayName])),
@@ -163,6 +176,14 @@ export function Chat({ client, piece, role, members }: Props) {
   useEffect(toBottom, [items.length])
 
   const choices = events.flatMap((e) => e.kind === 'user_message' && e.to_agent ? [e.body.model] : [])
+  const approvedIds = approvedVersionIds(events)
+  const selectedVersion = versions.find((v) => v.id === versionId)
+
+  function changed() {
+    refresh.current()
+    setVersionChanges((n) => n + 1)
+    onChange?.()
+  }
 
   return (
     <section className="piece-chat" aria-label="Chat da peça">
@@ -175,9 +196,9 @@ export function Chat({ client, piece, role, members }: Props) {
       }}
     >
       {error && <p role="alert">{error}</p>}
-      <Timeline items={items} imageUrls={imageUrls} onImageLoad={() => pinned.current && toBottom()} />
+      <Timeline items={items} imageUrls={imageUrls} onImageLoad={() => pinned.current && toBottom()} onOpenVersion={setVersionId} />
     </div>
-    {role === 'espectador'
+    {!pieceActions(role, piece, null).chat
       ? <p className="shell-empty">Você acompanha esta peça como espectador.</p>
       : <>
         {composerError && <div><p role="alert">{composerError}</p>
@@ -188,6 +209,26 @@ export function Chat({ client, piece, role, members }: Props) {
             keyed={composerData.keyed} choices={choices} references={composerData.references} urls={composerData.urls}
             onPost={async (input) => { await postMessage(client, input); refresh.current() }} />}
       </>}
+    {selectedVersion && <VersionViewer piece={piece} role={role} versions={versions} versionId={selectedVersion.id}
+      approvedIds={approvedIds} imageUrls={imageUrls} onSelectVersion={setVersionId} onClose={() => setVersionId(null)}
+      onApprove={async (id) => { await approveVersion(client, pieceId, id); changed() }}
+      onSaveCaption={async (id, caption) => {
+        const created = await updateCaption(client, id, caption)
+        setVersions((current) => current.some((v) => v.id === created.id) ? current : [...current, created])
+        setVersionId(created.id)
+        changed()
+      }}
+      onDownload={async (version) => {
+        if (!version.image_path) return
+        const extension = version.image_path.split('.').at(-1)!
+        await openExternal(await downloadUrl(client, version.image_path, `${piece.title} v${version.number}.${extension}`))
+      }} />}
+    {uploadFinalOpen && onCloseUpload && versionsLoaded && pieceActions(role, piece, null).uploadFinal &&
+      <UploadFinalDialog piece={piece} initialCaption={versions.find((v) => v.id === piece.approved_version_id)?.caption ?? null}
+        onClose={onCloseUpload} onUpload={async (file, caption) => {
+          await uploadFinalVersion(client, { piece, file, caption })
+          changed()
+        }} />}
     </section>
   )
 }

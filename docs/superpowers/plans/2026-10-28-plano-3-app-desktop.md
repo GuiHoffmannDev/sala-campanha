@@ -617,17 +617,17 @@ it('renders the app title', () => {
       - `imagem_texto`: os dois, com a legenda da base aprovada já preenchida.
   - Os erros usam `friendlyError`.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `actions.test.ts`: `pieceActions follows the permission table`, uma tabela com os 4 papéis × os 5 status × as 2 fases, mais aprovada e não aprovada, e `texto` contra `imagem`.
   - `versions.test.ts` (local):
     - `designer uploads the final after the base is approved, and the gestor approves it`: `createAgentVersion`, aprovação do gestor, `uploadFinalVersion` da designer, aprovação do gestor; a peça termina `aprovada`.
     - `uploading a final before approval gives the friendly message`.
     - `designer cannot undo an approval`.
     - `caption edit creates an edicao version`.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/actions.test.ts tests/desktop/versions.test.ts`. Expected: FAIL.
-- [ ] **Step 3: Implementar.**
-- [ ] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git add -A && git commit -m "feat(desktop): version viewer, approval, step back, final upload and caption edit"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop/actions.test.ts tests/desktop/versions.test.ts`. Expected: FAIL.
+- [x] **Step 3: Implementar.**
+- [x] **Step 4: Run.** Run: `pnpm db:reset && pnpm test && pnpm typecheck`. Expected: PASS.
+- [x] **Step 5: Commit.** `git add -A && git commit -m "feat(desktop): version viewer, approval, step back, final upload and caption edit"`
 
 ---
 

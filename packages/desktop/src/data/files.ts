@@ -28,7 +28,10 @@ export async function uploadImage(client: SupabaseClient, path: string, file: Bl
 export async function downloadUrl(client: SupabaseClient, path: string, filename: string): Promise<string> {
   const { data, error } = await client.storage.from(BUCKET).createSignedUrl(path, 60, { download: filename })
   if (error) throw error
-  return data.signedUrl
+  // storage-js encodes the download query twice; keep the requested filename intact.
+  const url = new URL(data.signedUrl)
+  url.searchParams.set('download', filename)
+  return url.toString()
 }
 
 /** Signed URLs (valid for 1 h) for `team-files` paths, in one request. Paths that cannot be signed are left out. */

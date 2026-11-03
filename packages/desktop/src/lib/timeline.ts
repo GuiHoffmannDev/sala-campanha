@@ -6,7 +6,7 @@ import { DELIVERY_LABELS, EFFORT_LABELS, STATUS_LABELS } from './labels.ts'
 export type TimelineItem =
   | { type: 'message'; id: number; author: string; text: string; mine: boolean; deliveryLabel: string }
   | { type: 'agent'; id: number; text: string; prompt: string | null; version: Version | null; error: boolean }
-  | { type: 'system'; id: number; text: string }
+  | { type: 'system'; id: number; text: string; version?: Version }
 
 export type TimelineContext = {
   /** Display name by user id. */
@@ -87,7 +87,7 @@ function startedText(body: Extract<SessionEvent, { kind: 'agent_started' }>['bod
 export function timelineItems(events: SessionEvent[], ctx: TimelineContext): TimelineItem[] {
   const person = (id: string | null) => (id && ctx.members[id]) || 'Alguém'
   const items: TimelineItem[] = []
-  const system = (id: number, text: string) => items.push({ type: 'system', id, text })
+  const system = (id: number, text: string, version?: Version) => items.push({ type: 'system', id, text, ...(version && { version }) })
 
   for (const e of events) {
     switch (e.kind) {
@@ -117,20 +117,20 @@ export function timelineItems(events: SessionEvent[], ctx: TimelineContext): Tim
       // The next three name a version. One not loaded yet shows up when the version list reloads.
       case 'approval': {
         const v = ctx.versions[e.body.version_id]
-        if (v) system(e.id, `${person(e.author_id)} aprovou a versão ${v.number}.`)
+        if (v) system(e.id, `${person(e.author_id)} aprovou a versão ${v.number}.`, v)
         break
       }
       case 'version_added': {
         // The agent's versions are already shown by their agent_result.
         const v = ctx.versions[e.body.version_id]
         if (!e.author_id || !v) break
-        if (v.origin === 'upload') system(e.id, `${person(e.author_id)} enviou a versão final ${v.number}.`)
-        else if (v.origin === 'edicao') system(e.id, `${person(e.author_id)} editou a legenda (versão ${v.number}).`)
+        if (v.origin === 'upload') system(e.id, `${person(e.author_id)} enviou a versão final ${v.number}.`, v)
+        else if (v.origin === 'edicao') system(e.id, `${person(e.author_id)} editou a legenda (versão ${v.number}).`, v)
         break
       }
       case 'comment': {
         const v = ctx.versions[e.body.version_id]
-        if (v) system(e.id, `${person(e.author_id)} comentou na versão ${v.number}.`)
+        if (v) system(e.id, `${person(e.author_id)} comentou na versão ${v.number}.`, v)
         break
       }
     }

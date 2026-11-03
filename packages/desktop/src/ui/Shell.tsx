@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { PieceKind } from '@sala/shared'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   createCampaign, createPiece, loadCampaigns, loadPieces, loadThumbnails, renamePiece, subscribeLists,
   type Campaign, type Piece,
@@ -9,6 +9,7 @@ import { friendlyError, UserFacingError } from '../data/errors.ts'
 import { signedUrls } from '../data/files.ts'
 import { addReference, loadReferences, type Reference } from '../data/references.ts'
 import { loadMembers, type Member, type Membership } from '../data/team.ts'
+import { stepBack } from '../data/versions.ts'
 import type { Route } from '../lib/link.ts'
 import { CampaignSidebar } from './CampaignSidebar.tsx'
 import { Chat } from './Chat.tsx'
@@ -36,6 +37,7 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
   const { campaignId, pieceId } = route
   const referenceScope = `${teamId}:${campaignId}:${pieceId}`
   const [openReferences, setOpenReferences] = useState<string | null>(null)
+  const [uploadPieceId, setUploadPieceId] = useState<string | null>(null)
   const showingReferences = openReferences === referenceScope
 
   // Campaigns and people are tagged with their workspace, and pieces with their campaign, so a switch
@@ -50,7 +52,7 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
   // after a switch or a successful reload, and one load never hides another's failure.
   const [errors, setErrors] = useState<Record<LoadName, string | null>>({ members: null, campaigns: null, pieces: null })
   const report = (load: LoadName, message: string | null) => setErrors((e) => ({ ...e, [load]: message }))
-  const reload = () => setChanges((n) => n + 1)
+  const reload = useCallback(() => setChanges((n) => n + 1), [])
 
   useEffect(() => subscribeLists(client, teamId, campaignId, reload), [client, teamId, campaignId])
 
@@ -143,7 +145,9 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
         onCreateWorkspace={onCreateWorkspace} onCreateCampaign={addCampaign}
       />
       <div className="shell-main">
-        <PieceHeader campaign={campaign} piece={piece} canWrite={canWrite} onRename={rename} />
+        <PieceHeader key={pieceId} campaign={campaign} piece={piece} canWrite={canWrite} role={role ?? 'espectador'} onRename={rename}
+          onStepBack={async () => { if (pieceId) { await stepBack(client, pieceId); reload() } }}
+          onUploadFinal={() => { setOpenReferences(null); setUploadPieceId(pieceId) }} />
         {campaign && <div className="campaign-tools">
           <button type="button" aria-expanded={showingReferences}
             onClick={() => setOpenReferences(showingReferences ? null : referenceScope)}>
@@ -155,7 +159,8 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
           {showingReferences && campaign
             ? <CampaignReferences key={referenceScope} client={client} teamId={teamId} campaignId={campaign.id} canUpload={canWrite} />
             : piece
-            ? <Chat key={piece.id} client={client} piece={piece} role={role ?? 'espectador'} members={memberList} />
+            ? <Chat key={piece.id} client={client} piece={piece} role={role ?? 'espectador'} members={memberList}
+              onChange={reload} uploadFinalOpen={uploadPieceId === piece.id} onCloseUpload={() => setUploadPieceId(null)} />
             : <p className="shell-empty">Escolha uma peça</p>}
         </main>
       </div>
