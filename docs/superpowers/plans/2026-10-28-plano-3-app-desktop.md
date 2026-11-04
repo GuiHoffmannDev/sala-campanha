@@ -792,7 +792,7 @@ it('renders the app title', () => {
 ### Task 13: Interface integralmente em inglês
 
 **Files:**
-- Modify: `packages/desktop/index.html`, todo arquivo em `packages/desktop/src/` com texto para a pessoa, `supabase/templates/codigo.html`, `scripts/fake-agent.ts` e os testes afetados em `tests/desktop/`
+- Modify: `packages/desktop/index.html`, todo arquivo em `packages/desktop/src/` com texto para a pessoa, `supabase/templates/codigo.html`, `supabase/config.toml` (assuntos dos e-mails), `scripts/fake-agent.ts` e os testes afetados em `tests/desktop/`
 - Test: `tests/desktop/english-ui.test.ts`; testes existentes com copy exata
 
 **Interfaces:**
@@ -804,18 +804,28 @@ it('renders the app title', () => {
 - Contratos internos e compatibilidade permanecem: enums, chaves de evento, mensagens SQL usadas para mapear erros e links `sala://campanha/<id>/peca/<id>` não mudam.
 - Não criar camada de tradução, catálogo de mensagens ou dependência de i18n. Com um idioma, os textos continuam próximos dos componentes e helpers atuais.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - Atualizar as expectativas de copy em todos os testes desktop, sem relaxar asserts exatos.
   - `english-ui.test.ts`:
     - `uses English as the document language`.
     - `central labels and friendly errors are English`: cobre todos os valores de `STATUS_LABELS`, `KIND_LABELS`, `DELIVERY_LABELS`, `EFFORT_LABELS` e cada mapeamento público de `friendlyError`.
     - `main flows render only English product copy`: usa os testes de componente existentes para cobrir login, onboarding, shell, referências, conversa, versões, comentários e configurações, incluindo texto visível e nomes acessíveis. Dados de fixture podem continuar em português para provar que conteúdo da pessoa não é alterado.
-- [ ] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop`. Expected: FAIL nos textos ainda em pt-BR.
-- [ ] **Step 3: Implementar.** Traduzir o copy existente em um único passe, preservando lógica, permissões e payloads. Não renomear símbolos, enums, colunas, RPCs, rotas ou chaves de storage.
-- [ ] **Step 4: Audit the source.** Run: `rg -n "[À-ÿ]|\b(agente|arquivo|campanha|carregando|chave|código|comentário|convid|erro|esforço|legenda|membro|mensagem|peça|referência|salvar|tema|versão|você)\b" packages/desktop/src packages/desktop/index.html supabase/templates/codigo.html scripts/fake-agent.ts tests/desktop`. Expected: cada ocorrência restante é conteúdo de fixture, comentário técnico, identificador compatível ou mensagem interna do servidor; nenhum texto controlado pelo produto permanece em português.
-- [ ] **Step 5: Run.** Run: `pnpm test && pnpm typecheck`. Expected: PASS.
-- [ ] **Step 6: Conferir à mão.** Rodar `pnpm app` e percorrer login, onboarding, campanha, referências, conversa, versões, comentários e configurações em Light, Dark e System. Conferir texto visível, alertas, confirmações, notificações, estados vazios, foco por Tab e nomes anunciados pelo VoiceOver. O seletor de arquivos nativo segue o idioma do macOS; todo rótulo ao redor dele pertence ao app e fica em inglês.
-- [ ] **Step 7: Commit.** `git add -A && git commit -m "feat(desktop): switch the app interface to English"`
+- [x] **Step 2: Run to verify fail.** Run: `pnpm test tests/desktop`. Expected: FAIL nos textos ainda em pt-BR.
+- [x] **Step 3: Implementar.** Traduzir o copy existente em um único passe, preservando lógica, permissões e payloads. Não renomear símbolos, enums, colunas, RPCs, rotas ou chaves de storage.
+- [x] **Step 4: Audit the source.** Run: `rg -n "[À-ÿ]|\b(agente|arquivo|campanha|carregando|chave|código|comentário|convid|erro|esforço|legenda|membro|mensagem|peça|referência|salvar|tema|versão|você)\b" packages/desktop/src packages/desktop/index.html supabase/templates/codigo.html scripts/fake-agent.ts tests/desktop`. Expected: cada ocorrência restante é conteúdo de fixture, comentário técnico, identificador compatível ou mensagem interna do servidor; nenhum texto controlado pelo produto permanece em português.
+- [x] **Step 5: Run.** Run: `pnpm test && pnpm typecheck`. Expected: PASS.
+- [x] **Step 6: Conferir à mão.** Rodar `pnpm app` e percorrer login, onboarding, campanha, referências, conversa, versões, comentários e configurações em Light, Dark e System. Conferir texto visível, alertas, confirmações, notificações, estados vazios, foco por Tab e nomes anunciados pelo VoiceOver. O seletor de arquivos nativo segue o idioma do macOS; todo rótulo ao redor dele pertence ao app e fica em inglês.
+- [x] **Step 7: Commit.** `git add -A && git commit -m "feat(desktop): switch the app interface to English"`
+
+**Notas da execução (2026-11-04):**
+- Os testes desktop foram atualizados mantendo as expectativas exatas. A execução RED registrou falhas no copy em português. Os testes de idioma, todos os códigos de erro do agente e os assuntos dos e-mails também tiveram falhas confirmadas antes das respectivas correções.
+- Toda a apresentação do app foi convertida para inglês, incluindo os quatro papéis, carregamento, confirmações, acessibilidade, notificações, timeline, template de código e respostas do agente falso. A conferência do e-mail local revelou os assuntos de `magic_link` e `confirmation` em `supabase/config.toml`, também traduzidos e cobertos por regressão.
+- Os erros históricos do agente são apresentados em inglês a partir de `body.code`. A mensagem original continua no evento persistido; a interface usa uma orientação por código em vez do detalhe livre do servidor. Nenhum schema, enum, mensagem SQL de mapeamento, RPC, link, chave de storage ou payload foi alterado. Nomes, arquivos, mensagens, prompts e legendas da pessoa permanecem intactos. Nenhuma dependência ou camada de i18n foi adicionada.
+- Auditoria: o comando do Step 4 foi executado e cada ocorrência foi conferida. No código de produção restaram somente três ocorrências do protocolo compatível `sala://campanha/.../peca/...` e o símbolo de remoção `×`. Nos testes, as ocorrências são fixtures, nomes, conteúdo preservado, mensagens antigas de servidor e identificadores. Uma busca adicional conferiu os rótulos sem acentos, as datas e os assuntos dos e-mails.
+- Validação final: `pnpm test` passou com 549 testes aprovados e 7 testes opcionais de provedores reais ignorados; `pnpm typecheck` passou. O bundle de depuração para a conferência passou com `pnpm --filter @sala/desktop tauri build --debug --bundles app`. O aviso existente do Vite sobre bundle acima de 500 kB permanece.
+- Conferência interativa: `pnpm app` foi executado; como o controle nativo selecionava o bundle anterior, o bundle de depuração atualizado foi aberto explicitamente. Campanha, referências vazias, conversa, modelos, versões, formulários de comentário e configurações foram percorridos em Light, Dark e System. O foco por Tab foi observado visualmente e os nomes acessíveis foram conferidos na árvore do macOS. Login por código, os dois passos do onboarding, erro de chave inválida e confirmação de remoção (cancelada) foram conferidos em uma sessão nova do frontend local no navegador. O conteúdo do e-mail chegou em inglês; o novo assunto está validado na configuração e requer a recarga da configuração do Auth para aparecer na stack já iniciada.
+- Limites da conferência manual: o VoiceOver foi ativado, os controles foram percorridos e seus nomes acessíveis foram conferidos; depois, o VoiceOver foi restaurado para desligado. A ferramenta não capturou o áudio sintetizado. Uma menção entre contas locais de teste foi gerada, mas o banner nativo não pôde ser observado: o macOS está configurado para suprimir notificações durante o compartilhamento da tela. Essa preferência foi preservada; título, corpo, fallback e truncamento da notificação passaram nos testes automatizados.
+- Somente a Task 13 foi executada. A Task 14 permanece sem alterações. O trabalho fica na branch `codex/task-13-english-ui`, com o commit solicitado, sem merge ou push.
 
 ---
 

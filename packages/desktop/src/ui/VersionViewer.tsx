@@ -48,7 +48,7 @@ export function VersionViewer({ piece, role, versions, versionId, approvedIds, i
 
   if (!version) return null
   const actions = pieceActions(role, piece, { phase: version.phase, approved: approvedIds.has(version.id) })
-  const title = `${piece.title} — Versão ${version.number}`
+  const title = `${piece.title} — Version ${version.number}`
   const dirty = caption !== (version.caption ?? '')
 
   async function run(action: () => Promise<void>) {
@@ -61,23 +61,23 @@ export function VersionViewer({ piece, role, versions, versionId, approvedIds, i
     onCancel={(e) => { if (busy) e.preventDefault() }}>
     <div className="dialog-actions">
       <h2 id={titleId}>{title}</h2>
-      <button type="button" onClick={onClose} disabled={busy}>Fechar</button>
+      <button type="button" onClick={onClose} disabled={busy}>Close</button>
     </div>
-    <nav className="dialog-actions" aria-label="Versões da peça">
-      <button type="button" disabled={busy || index === 0} onClick={() => onSelectVersion(versions[index - 1]!.id)}>Versão anterior</button>
-      <button type="button" disabled={busy || index === versions.length - 1} onClick={() => onSelectVersion(versions[index + 1]!.id)}>Próxima versão</button>
+    <nav className="dialog-actions" aria-label="Piece versions">
+      <button type="button" disabled={busy || index === 0} onClick={() => onSelectVersion(versions[index - 1]!.id)}>Previous version</button>
+      <button type="button" disabled={busy || index === versions.length - 1} onClick={() => onSelectVersion(versions[index + 1]!.id)}>Next version</button>
     </nav>
     <CommentLayer key={version.id} version={version} title={title}
       imageUrl={version.image_path ? imageUrls[version.image_path] : undefined} comments={comments}
       canComment={actions.comment && !!onAddComment && !!onSetResolved} busy={busy} onAdd={onAddComment}
       onSetResolved={onSetResolved} onBusyChange={setBusy} />
     {actions.editCaption && <form onSubmit={(e) => { e.preventDefault(); void run(() => onSaveCaption(version.id, caption)) }}>
-        <label>Legenda<textarea value={caption} onChange={(e) => setCaption(e.target.value)} required disabled={busy} /></label>
-        <button type="submit" disabled={busy || !dirty || !caption.trim()}>Salvar legenda</button>
+        <label>Caption<textarea value={caption} onChange={(e) => setCaption(e.target.value)} required disabled={busy} /></label>
+        <button type="submit" disabled={busy || !dirty || !caption.trim()}>Save caption</button>
       </form>}
     <div className="dialog-actions">
-      {actions.approve && <button type="button" disabled={busy || dirty} onClick={() => void run(() => onApprove(version.id))}>Aprovar esta versão</button>}
-      {version.image_path && <button type="button" disabled={busy} onClick={() => void run(() => onDownload(version))}>Baixar</button>}
+      {actions.approve && <button type="button" disabled={busy || dirty} onClick={() => void run(() => onApprove(version.id))}>Approve this version</button>}
+      {version.image_path && <button type="button" disabled={busy} onClick={() => void run(() => onDownload(version))}>Download</button>}
     </div>
     {error && <p role="alert">{error}</p>}
     {children}

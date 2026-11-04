@@ -42,17 +42,17 @@ export function UploadFinalDialog({ piece, initialCaption, onUpload, onClose }: 
 
   return <dialog ref={dialog} className="upload-final-dialog" aria-labelledby={titleId} onClose={onClose}
     onCancel={(e) => { if (busy) e.preventDefault() }}>
-    <h2 id={titleId}>Enviar versão final</h2>
+    <h2 id={titleId}>Upload final version</h2>
     <form onSubmit={(e) => { e.preventDefault(); void submit() }}>
-      {needsImage && <label>Imagem final<input type="file" accept={IMAGE_TYPES.join(',')} required disabled={busy}
+      {needsImage && <label>Final image<input type="file" accept={IMAGE_TYPES.join(',')} required disabled={busy}
         onChange={(e) => { setFile(e.target.files?.[0] ?? null); setError(null) }} /></label>}
-      {needsCaption && <label>Legenda final<textarea value={caption} required disabled={busy}
+      {needsCaption && <label>Final caption<textarea value={caption} required disabled={busy}
         onChange={(e) => setCaption(e.target.value)} /></label>}
       {error && <p role="alert">{error}</p>}
       <div className="dialog-actions">
-        <button type="button" disabled={busy} onClick={onClose}>Cancelar</button>
+        <button type="button" disabled={busy} onClick={onClose}>Cancel</button>
         <button type="submit" disabled={busy || (needsImage && !file) || (needsCaption && !caption.trim())}>
-          {busy ? 'Enviando…' : 'Enviar versão final'}
+          {busy ? 'Uploading…' : 'Upload final version'}
         </button>
       </div>
     </form>

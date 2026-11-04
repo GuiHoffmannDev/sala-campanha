@@ -16,7 +16,7 @@ export function assertLocalUrl(url: string): void {
   } catch {
     // Invalid URLs use the same local-only error as remote hosts.
   }
-  throw new Error('fake-agent só roda contra o Supabase local')
+  throw new Error('fake-agent only runs against local Supabase')
 }
 
 export function fakeAgentProviders(): Providers {
@@ -25,8 +25,8 @@ export function fakeAgentProviders(): Providers {
       signal.throwIfAborted()
       const request = req.prompt.split('\nPedido atual:\n').at(-1)!
       return JSON.stringify({
-        image_prompt: `Teste local: ${Array.from(request).slice(0, 60).join('')}`,
-        caption: `Legenda de teste ${new Date().toLocaleTimeString('pt-BR')}`,
+        image_prompt: `Local test: ${Array.from(request).slice(0, 60).join('')}`,
+        caption: `Test caption ${new Date().toLocaleTimeString('en-US')}`,
       })
     },
   }

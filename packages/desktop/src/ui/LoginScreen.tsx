@@ -58,31 +58,31 @@ export function LoginScreen({ sendCode, verifyCode, startOAuth, error: callbackE
 
   return (
     <section className="login">
-      <button type="button" disabled={busy} onClick={() => oauth('google')}>Entrar com Google</button>
-      <button type="button" disabled={busy} onClick={() => oauth('apple')}>Entrar com Apple</button>
-      {inBrowser && !shownError && <p>Continue no navegador…</p>}
+      <button type="button" disabled={busy} onClick={() => oauth('google')}>Continue with Google</button>
+      <button type="button" disabled={busy} onClick={() => oauth('apple')}>Continue with Apple</button>
+      {inBrowser && !shownError && <p>Continue in your browser…</p>}
 
-      <p>ou entre com um código no e-mail</p>
+      <p>or sign in with an email code</p>
       {codeSent ? (
         <form onSubmit={submitCode}>
-          <p>{`Enviamos um código de 6 dígitos para ${email.trim()}.`}</p>
+          <p>{`We sent a 6-digit code to ${email.trim()}.`}</p>
           <label>
-            Código
+            Code
             <input
               value={code} onChange={(e) => setCode(e.target.value)}
               inputMode="numeric" autoComplete="one-time-code" required autoFocus
             />
           </label>
-          <button type="submit" disabled={busy}>Entrar</button>
-          <button type="button" disabled={busy} onClick={useOtherEmail}>Usar outro e-mail</button>
+          <button type="submit" disabled={busy}>Sign in</button>
+          <button type="button" disabled={busy} onClick={useOtherEmail}>Use another email</button>
         </form>
       ) : (
         <form onSubmit={submitEmail}>
           <label>
-            E-mail
+            Email
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
           </label>
-          <button type="submit" disabled={busy}>Enviar código</button>
+          <button type="submit" disabled={busy}>Send code</button>
         </form>
       )}
 

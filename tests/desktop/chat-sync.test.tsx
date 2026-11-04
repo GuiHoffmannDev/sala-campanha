@@ -59,17 +59,17 @@ it('refreshes the header after approvals and step backs missed while disconnecte
   }
   render(<Host />)
   await act(async () => live.handlers!.onSubscribed())
-  expect(screen.queryByRole('button', { name: 'Enviar versão final' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Upload final version' })).toBeNull()
 
   remotePiece = { ...piece, status: 'acabamento', approved_version_id: base.id }
   await act(async () => live.handlers!.onSubscribed())
-  expect(screen.getByRole('banner').textContent).toContain('Acabamento')
-  expect(screen.getByRole('button', { name: 'Enviar versão final' })).toBeTruthy()
+  expect(screen.getByRole('banner').textContent).toContain('Finishing')
+  expect(screen.getByRole('button', { name: 'Upload final version' })).toBeTruthy()
 
   remotePiece = piece
   await act(async () => live.handlers!.onSubscribed())
-  expect(screen.getByRole('banner').textContent).toContain('Base em revisão')
-  expect(screen.queryByRole('button', { name: 'Enviar versão final' })).toBeNull()
+  expect(screen.getByRole('banner').textContent).toContain('Base under review')
+  expect(screen.queryByRole('button', { name: 'Upload final version' })).toBeNull()
 })
 
 it('waits for the approved base before opening the final upload with its caption', async () => {
@@ -80,28 +80,28 @@ it('waits for the approved base before opening the final upload with its caption
   vi.mocked(loadVersions).mockImplementationOnce(() => new Promise((resolve) => { resolveVersions = resolve }))
   rerender(<Chat {...props} piece={{ ...piece, status: 'acabamento', approved_version_id: approved.id }} uploadFinalOpen />)
 
-  expect(screen.queryByRole('dialog', { name: 'Enviar versão final' })).toBeNull()
+  expect(screen.queryByRole('dialog', { name: 'Upload final version' })).toBeNull()
   await act(async () => resolveVersions([base, approved]))
-  expect(screen.getByLabelText('Legenda final')).toHaveProperty('value', 'Legenda aprovada')
+  expect(screen.getByLabelText('Final caption')).toHaveProperty('value', 'Legenda aprovada')
 })
 
 it('keeps the selected file and caption draft while versions reload', async () => {
   render(<Chat {...props} piece={{ ...piece, status: 'acabamento', approved_version_id: base.id }} uploadFinalOpen />)
-  const caption = await screen.findByLabelText('Legenda final')
-  const dialog = screen.getByRole('dialog', { name: 'Enviar versão final' })
+  const caption = await screen.findByLabelText('Final caption')
+  const dialog = screen.getByRole('dialog', { name: 'Upload final version' })
   const file = new File(['png'], 'Final.png', { type: 'image/png' })
-  fireEvent.change(screen.getByLabelText('Imagem final'), { target: { files: [file] } })
+  fireEvent.change(screen.getByLabelText('Final image'), { target: { files: [file] } })
   fireEvent.change(caption, { target: { value: 'Legenda final revisada' } })
 
   let resolveVersions!: (versions: Version[]) => void
   vi.mocked(loadVersions).mockImplementationOnce(() => new Promise((resolve) => { resolveVersions = resolve }))
   await act(async () => live.handlers!.onVersion())
-  expect(screen.getByRole('dialog', { name: 'Enviar versão final' })).toBe(dialog)
+  expect(screen.getByRole('dialog', { name: 'Upload final version' })).toBe(dialog)
   await act(async () => resolveVersions([base]))
-  expect(screen.getByRole('dialog', { name: 'Enviar versão final' })).toBe(dialog)
+  expect(screen.getByRole('dialog', { name: 'Upload final version' })).toBe(dialog)
   expect(caption).toHaveProperty('value', 'Legenda final revisada')
 
-  fireEvent.submit(screen.getByRole('button', { name: 'Enviar versão final' }).closest('form')!)
+  fireEvent.submit(screen.getByRole('button', { name: 'Upload final version' }).closest('form')!)
   await waitFor(() => expect(uploadFinalVersion).toHaveBeenCalledWith(props.client, {
     piece: { ...piece, status: 'acabamento', approved_version_id: base.id }, file, caption: 'Legenda final revisada',
   }))

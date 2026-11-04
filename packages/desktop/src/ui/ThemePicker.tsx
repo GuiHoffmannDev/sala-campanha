@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { loadTheme, saveTheme, type ThemeChoice } from '../lib/theme.ts'
 
 const OPTIONS: { value: ThemeChoice; label: string }[] = [
-  { value: 'light', label: 'Claro' },
-  { value: 'dark', label: 'Escuro' },
-  { value: 'system', label: 'Sistema' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System' },
 ]
 
 // Native radios give arrow-key navigation and screen reader support; CSS draws them as a segmented control.
@@ -18,7 +18,7 @@ export function ThemePicker() {
 
   return (
     <fieldset className="theme-picker">
-      <legend>Tema</legend>
+      <legend>Theme</legend>
       {OPTIONS.map((o) => (
         <label key={o.value}>
           <input

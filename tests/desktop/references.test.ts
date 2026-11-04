@@ -33,7 +33,7 @@ it('espectador cannot upload', async () => {
   const error = await addReference(f.t.members.espectador.client, {
     teamId: f.t.teamId, campaignId: f.campaignId, file: photo(),
   }).catch((e: unknown) => e)
-  expect(friendlyError(error)).toBe('Você não tem permissão para isso.')
+  expect(friendlyError(error)).toBe('You do not have permission to do this.')
   expect(await loadReferences(f.t.members.admin.client, f.campaignId)).toEqual([])
 })
 
@@ -52,6 +52,6 @@ it('rejects an invalid image before contacting storage or inserting a reference'
   const f = await createPieceFixture()
   const input = { teamId: f.t.teamId, campaignId: f.campaignId,
     file: new File(['pdf'], 'Manual.pdf', { type: 'application/pdf' }) }
-  await expect(addReference(f.t.members.designer.client, input)).rejects.toThrow('Use uma imagem PNG, JPG ou WebP.')
+  await expect(addReference(f.t.members.designer.client, input)).rejects.toThrow('Use a PNG, JPG or WebP image.')
   expect(await loadReferences(f.t.members.designer.client, f.campaignId)).toEqual([])
 })

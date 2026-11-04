@@ -62,17 +62,17 @@ it('shows messages with author and initials, and the agent card with image, capt
   const latest = (await screen.findByText('Agora mais claro')).closest('li')!
   expect(within(latest).getByText('Gil Prado')).toBeTruthy()
   expect(within(latest).getByText('GP')).toBeTruthy()
-  expect(within(latest).getByText('na fila')).toBeTruthy()
+  expect(within(latest).getByText('queued')).toBeTruthy()
   // The message the agent took stays claimed until the executor closes it.
   const answered = screen.getByText('Gerar versão').closest('li')!
   expect(within(answered).getByText('Gil Prado')).toBeTruthy()
-  expect(within(answered).getByText('o agente está trabalhando')).toBeTruthy()
+  expect(within(answered).getByText('the agent is working')).toBeTruthy()
 
-  const image = await screen.findByRole('img', { name: 'Versão 1' })
+  const image = await screen.findByRole('img', { name: 'Version 1' })
   const card = image.closest('li')!
   expect(image.getAttribute('src')).toMatch(/token=/)
   expect(within(card).getByText('Promoção de Natal')).toBeTruthy()
-  const toggle = within(card).getByRole('button', { name: 'Ver prompt' })
+  const toggle = within(card).getByRole('button', { name: 'View prompt' })
   expect(toggle.getAttribute('aria-expanded')).toBe('false')
   expect(within(card).queryByText('um pinheiro dourado')).toBeNull()
   await user.click(toggle)
@@ -93,12 +93,12 @@ it('shows an agent error in its own card', async () => {
 
   render(<Chat client={f.t.members.espectador.client}
     piece={(await loadPieces(f.t.members.espectador.client, f.campaignId))[0]!} role="espectador" members={[]} />)
-  const card = (await screen.findByText('O provedor demorou demais.')).closest('li')!
+  const card = (await screen.findByText('The provider did not respond in time. Try again.')).closest('li')!
   expect(card.className).toContain('agent-error')
   // No prompt was sent, so there is nothing to show.
-  expect(within(card).queryByRole('button', { name: 'Ver prompt' })).toBeNull()
-  // A person who is no longer in the list is "Alguém".
-  expect(screen.getByText('Alguém')).toBeTruthy()
+  expect(within(card).queryByRole('button', { name: 'View prompt' })).toBeNull()
+  // A person who is no longer in the list is "Someone".
+  expect(screen.getByText('Someone')).toBeTruthy()
 })
 
 it('a gap fill never overwrites a newer live update', async () => {
@@ -110,7 +110,7 @@ it('a gap fill never overwrites a newer live update', async () => {
 
   render(<Chat client={client} piece={(await loadPieces(client, f.campaignId))[0]!} role="designer" members={[]} />)
   const message = (await screen.findByText('Gerar')).closest('li')!
-  expect(within(message).getByText('o agente está trabalhando')).toBeTruthy()
+  expect(within(message).getByText('the agent is working')).toBeTruthy()
 
   // The rejoin fill reads the claimed row, but its answer arrives late.
   const stale = await vi.mocked(loadEvents).getMockImplementation()!(client, f.pieceId, 0)
@@ -120,10 +120,10 @@ it('a gap fill never overwrites a newer live update', async () => {
   // Meanwhile the channel delivers the newer copy: the agent finished.
   const claimed = stale.find((e) => e.id === msg.id)!
   act(() => live.handlers!.onEvent({ ...claimed, delivery: 'done' }))
-  expect(within(message).queryByText('o agente está trabalhando')).toBeNull()
+  expect(within(message).queryByText('the agent is working')).toBeNull()
 
   await act(async () => resolveFill(stale))
-  expect(within(message).queryByText('o agente está trabalhando')).toBeNull()
+  expect(within(message).queryByText('the agent is working')).toBeNull()
 })
 
 it.each(['events arrive first', 'versions arrive first'])('a rejoin reloads the versions it missed when %s', async (order) => {
@@ -159,21 +159,21 @@ it.each(['events arrive first', 'versions arrive first'])('a rejoin reloads the 
   act(() => live.handlers!.onSubscribed())
   if (order === 'events arrive first') {
     await act(async () => resolveEvents(missedEvents))
-    expect(screen.getByText('Versão 1')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Abrir versão 1' })).toBeNull()
+    expect(screen.getByText('Version 1')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Open version 1' })).toBeNull()
     await act(async () => resolveVersions(missedVersions))
   } else {
     await act(async () => resolveVersions(missedVersions))
-    expect(screen.queryByText('Versão 1')).toBeNull()
+    expect(screen.queryByText('Version 1')).toBeNull()
     await act(async () => resolveEvents(missedEvents))
   }
-  const image = await screen.findByRole('img', { name: 'Versão 1' })
+  const image = await screen.findByRole('img', { name: 'Version 1' })
   const card = image.closest('li')!
   expect(image.getAttribute('src')).toMatch(/token=/)
   expect(within(card).getByText('Promoção de Natal')).toBeTruthy()
-  await user.click(within(card).getByRole('button', { name: 'Abrir versão 1' }))
-  const dialog = screen.getByRole('dialog', { name: 'Peça de teste — Versão 1' })
-  expect(within(dialog).getByLabelText('Legenda da versão')).toHaveProperty('value', 'Promoção de Natal')
+  await user.click(within(card).getByRole('button', { name: 'Open version 1' }))
+  const dialog = screen.getByRole('dialog', { name: 'Peça de teste — Version 1' })
+  expect(within(dialog).getByLabelText('Version caption')).toHaveProperty('value', 'Promoção de Natal')
 })
 
 it('a failed gap fill is retried until it succeeds', async () => {
@@ -215,7 +215,7 @@ it('an image that loads keeps the chat at the bottom', async () => {
   expect(error).toBeNull()
   const { container } = render(<Chat client={f.t.members.designer.client}
     piece={(await loadPieces(f.t.members.designer.client, f.campaignId))[0]!} role="designer" members={[]} />)
-  const image = await screen.findByRole('img', { name: 'Versão 1' })
+  const image = await screen.findByRole('img', { name: 'Version 1' })
 
   // jsdom has no layout: give the list a size it can scroll in.
   const chat = container.querySelector<HTMLElement>('.chat')!
@@ -245,22 +245,22 @@ it('loads comments in the viewer, saves without Realtime and fills remote change
   const input = { teamId: f.t.teamId, pieceId: f.pieceId, versionId: version.id, target: null, parentId: null }
   const root = await addComment(client, { ...input, body: 'Conferir o logo' })
   render(<Chat client={client} piece={(await loadPieces(client, f.campaignId))[0]!} role="designer" members={[]} />)
-  await user.click(await screen.findByRole('button', { name: 'Abrir versão 1' }))
+  await user.click(await screen.findByRole('button', { name: 'Open version 1' }))
   const dialog = screen.getByRole('dialog')
   expect(await within(dialog).findByText('Conferir o logo')).toBeTruthy()
-  await user.click(within(dialog).getByRole('button', { name: 'Responder' }))
-  await user.type(within(dialog).getByLabelText('Comentário'), 'Já ajustei')
-  await user.click(within(dialog).getByRole('button', { name: 'Enviar comentário' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Reply' }))
+  await user.type(within(dialog).getByLabelText('Comment'), 'Já ajustei')
+  await user.click(within(dialog).getByRole('button', { name: 'Send comment' }))
   expect(await within(dialog).findByText('Já ajustei')).toBeTruthy()
   expect((await loadComments(client, f.pieceId)).map((c) => c.body)).toEqual(['Conferir o logo', 'Já ajustei'])
 
   await setResolved(f.t.members.gestor.client, root.id, true)
   await act(async () => live.handlers!.onComment())
-  expect(await within(dialog).findByRole('button', { name: 'Reabrir' })).toBeTruthy()
+  expect(await within(dialog).findByRole('button', { name: 'Reopen' })).toBeTruthy()
   await addComment(f.t.members.gestor.client, { ...input, body: 'Recebido durante a queda', parentId: root.id })
   await act(async () => live.handlers!.onSubscribed())
   expect(await within(dialog).findByText('Recebido durante a queda')).toBeTruthy()
-  await user.click(within(dialog).getByRole('button', { name: 'Reabrir' }))
-  expect(await within(dialog).findByRole('button', { name: 'Resolver' })).toBeTruthy()
+  await user.click(within(dialog).getByRole('button', { name: 'Reopen' }))
+  expect(await within(dialog).findByRole('button', { name: 'Resolve' })).toBeTruthy()
   expect((await loadComments(client, f.pieceId))[0]?.resolved).toBe(false)
 })

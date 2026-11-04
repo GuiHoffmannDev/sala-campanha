@@ -34,7 +34,7 @@ export async function uploadFinalVersion(
   const { piece, file, caption } = input
   let path: string | null = null
   if (piece.kind !== 'texto') {
-    if (!file) throw new UserFacingError('Escolha uma imagem PNG, JPG ou WebP.')
+    if (!file) throw new UserFacingError('Choose a PNG, JPG or WebP image.')
     const message = checkImageFile(file)
     if (message) throw new UserFacingError(message)
     path = newImagePath(piece.team_id, piece.id, file.type)

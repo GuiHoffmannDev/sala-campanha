@@ -39,7 +39,7 @@ export function NameForm({ label, submitLabel, onSubmit, onCancel, children }: P
       {children}
       <div className="name-form-actions">
         <button type="submit" disabled={!trimmed || busy}>{submitLabel}</button>
-        <button type="button" onClick={onCancel}>Cancelar</button>
+        <button type="button" onClick={onCancel}>Cancel</button>
       </div>
       {error && <p role="alert">{error}</p>}
     </form>

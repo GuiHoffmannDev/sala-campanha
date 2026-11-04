@@ -23,15 +23,15 @@ it('clears the typed key after saving and shows only the mask', async () => {
     }} />
   }
   render(<Host />)
-  const field = screen.getByLabelText('Chave Anthropic') as HTMLInputElement
+  const field = screen.getByLabelText('Key Anthropic') as HTMLInputElement
   expect(field.type).toBe('password')
   expect(field.autocomplete).toBe('off')
   await user.type(field, 'chave-falsa-local-1234')
-  await user.click(within(screen.getByRole('region', { name: 'Anthropic' })).getByRole('button', { name: 'Salvar' }))
+  await user.click(within(screen.getByRole('region', { name: 'Anthropic' })).getByRole('button', { name: 'Save' }))
   expect(field.value).toBe('')
   expect(await screen.findByText('...1234')).toBeTruthy()
   expect(screen.queryByText('chave-falsa-local-1234')).toBeNull()
-  expect(screen.getByText(/Atualizada em/)).toBeTruthy()
+  expect(screen.getByText(/Updated on/)).toBeTruthy()
 })
 
 it('asks before removing a member', async () => {
@@ -39,13 +39,13 @@ it('asks before removing a member', async () => {
   const removed: string[] = []
   const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
   render(<Settings {...defaults} onRemove={async (id) => { removed.push(id) }} />)
-  await user.click(screen.getByRole('tab', { name: 'Membros' }))
+  await user.click(screen.getByRole('tab', { name: 'Members' }))
   const member = screen.getByRole('group', { name: 'Bia' })
-  await user.click(within(member).getByRole('button', { name: 'Remover' }))
-  expect(confirm.mock.calls[0]?.[0]).toMatch(/perde o acesso na hora/)
+  await user.click(within(member).getByRole('button', { name: 'Remove' }))
+  expect(confirm.mock.calls[0]?.[0]).toMatch(/will lose access immediately/)
   expect(removed).toEqual([])
   confirm.mockReturnValue(true)
-  await user.click(within(member).getByRole('button', { name: 'Remover' }))
+  await user.click(within(member).getByRole('button', { name: 'Remove' }))
   expect(removed).toEqual(['other'])
 })
 
@@ -53,22 +53,22 @@ it('shows the text to send after inviting', async () => {
   const user = userEvent.setup()
   const invited: unknown[] = []
   render(<Settings {...defaults} onInvite={async (email, role) => { invited.push([email, role]) }} />)
-  await user.click(screen.getByRole('tab', { name: 'Membros' }))
-  await user.type(screen.getByLabelText('E-mail'), 'nova@example.com')
-  await user.selectOptions(screen.getByLabelText('Papel do convite'), 'gestor')
-  await user.click(screen.getByRole('button', { name: 'Convidar' }))
+  await user.click(screen.getByRole('tab', { name: 'Members' }))
+  await user.type(screen.getByLabelText('Email'), 'nova@example.com')
+  await user.selectOptions(screen.getByLabelText('Invite role'), 'gestor')
+  await user.click(screen.getByRole('button', { name: 'Invite' }))
   expect(invited).toEqual([['nova@example.com', 'gestor']])
-  expect(await screen.findByText('Convite criado. Avise a pessoa: baixe a Sala da Campanha e entre com nova@example.com.')).toBeTruthy()
-  expect(screen.getByRole('button', { name: 'Copiar' })).toBeTruthy()
+  expect(await screen.findByText('Invite created. Tell the person: download Sala da Campanha and sign in with nova@example.com.')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Copy' })).toBeTruthy()
 })
 
 it('keeps the key field empty and shows a friendly error when saving fails', async () => {
   const user = userEvent.setup()
   render(<Settings {...defaults} onSaveKey={async () => { throw new Error('only team admins can set provider keys') }} />)
-  const field = screen.getByLabelText('Chave Anthropic') as HTMLInputElement
+  const field = screen.getByLabelText('Key Anthropic') as HTMLInputElement
   await user.type(field, 'chave-falsa-local-1234')
-  await user.click(within(screen.getByRole('region', { name: 'Anthropic' })).getByRole('button', { name: 'Salvar' }))
-  expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Só o admin do workspace gerencia as chaves.')
+  await user.click(within(screen.getByRole('region', { name: 'Anthropic' })).getByRole('button', { name: 'Save' }))
+  expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Only a workspace admin can manage keys.')
   expect(field.value).toBe('')
 })
 
@@ -81,9 +81,9 @@ it('confirms key deletion, changes roles and cancels pending invites', async () 
     onDeleteKey={async (provider) => { changes.push(provider) }}
     onSetRole={async (id, role) => { changes.push([id, role]) }}
     onRevokeInvite={async (email) => { changes.push(email) }} />)
-  await user.click(within(screen.getByRole('region', { name: 'OpenAI' })).getByRole('button', { name: 'Remover' }))
-  await user.click(screen.getByRole('tab', { name: 'Membros' }))
-  await user.selectOptions(screen.getByLabelText('Papel de Bia'), 'gestor')
-  await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+  await user.click(within(screen.getByRole('region', { name: 'OpenAI' })).getByRole('button', { name: 'Remove' }))
+  await user.click(screen.getByRole('tab', { name: 'Members' }))
+  await user.selectOptions(screen.getByLabelText('Role for Bia'), 'gestor')
+  await user.click(screen.getByRole('button', { name: 'Cancel' }))
   expect(changes).toEqual(['openai', ['other', 'gestor'], 'nova@example.com'])
 })

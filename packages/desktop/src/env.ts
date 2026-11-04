@@ -4,7 +4,7 @@ export function readEnv(env: Record<string, string | undefined>): { supabaseUrl:
   const anonKey = env.VITE_SUPABASE_ANON_KEY
   if (!supabaseUrl || !anonKey) {
     throw new Error(
-      'Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY em packages/desktop/.env.local (veja supabase status).',
+      'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in packages/desktop/.env.local (see supabase status).',
     )
   }
   return { supabaseUrl, anonKey }

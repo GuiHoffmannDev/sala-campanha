@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Campaign, Piece } from '../data/campaigns.ts'
 import type { Member, Membership } from '../data/team.ts'
 import type { Route } from '../lib/link.ts'
+import { ROLE_LABELS } from '../lib/labels.ts'
 import { NameForm } from './NameForm.tsx'
 import { ThemePicker } from './ThemePicker.tsx'
 
@@ -28,7 +29,7 @@ export function CampaignSidebar(props: Props) {
   const workspace = memberships.find((m) => m.teamId === teamId)
 
   return (
-    <nav className="sidebar" aria-label="Campanhas">
+    <nav className="sidebar" aria-label="Campaigns">
       <div className="sidebar-workspace">
         {memberships.length > 1 ? (
           <label>
@@ -42,14 +43,14 @@ export function CampaignSidebar(props: Props) {
         )}
         {form === 'workspace' ? (
           <NameForm
-            label="Nome do workspace" submitLabel="Criar workspace" onCancel={() => setForm(null)}
+            label="Workspace name" submitLabel="Create workspace" onCancel={() => setForm(null)}
             onSubmit={async (name) => {
               await props.onCreateWorkspace(name)
               setForm(null)
             }}
           />
         ) : (
-          <button type="button" onClick={() => setForm('workspace')}>Novo workspace</button>
+          <button type="button" onClick={() => setForm('workspace')}>New workspace</button>
         )}
       </div>
 
@@ -84,17 +85,17 @@ export function CampaignSidebar(props: Props) {
       </ul>
       {canWrite && (form === 'campaign' ? (
         <NameForm
-          label="Nome da campanha" submitLabel="Criar campanha" onCancel={() => setForm(null)}
+          label="Campaign name" submitLabel="Create campaign" onCancel={() => setForm(null)}
           onSubmit={async (name) => {
             await props.onCreateCampaign(name)
             setForm(null)
           }}
         />
       ) : (
-        <button type="button" onClick={() => setForm('campaign')}>Nova campanha</button>
+        <button type="button" onClick={() => setForm('campaign')}>New campaign</button>
       ))}
 
-      <section className="sidebar-people" aria-label="Pessoas do workspace">
+      <section className="sidebar-people" aria-label="Workspace members">
         <ul>
           {members.map((m) => (
             <li key={m.userId}>
@@ -102,14 +103,14 @@ export function CampaignSidebar(props: Props) {
               <span className={`presence-dot${props.online?.has(m.userId) ? ' online' : ''}`}
                 role="img" aria-label={`${m.displayName}: ${props.online?.has(m.userId) ? 'online' : 'offline'}`} />
               <span className="person-name">{m.displayName}</span>
-              <span className="person-role">{m.role}</span>
+              <span className="person-role">{ROLE_LABELS[m.role]}</span>
             </li>
           ))}
         </ul>
       </section>
 
       <footer className="sidebar-footer">
-        {workspace?.role === 'admin' && <button type="button" onClick={props.onOpenSettings}>Configurações do workspace</button>}
+        {workspace?.role === 'admin' && <button type="button" onClick={props.onOpenSettings}>Workspace settings</button>}
         <ThemePicker />
       </footer>
     </nav>

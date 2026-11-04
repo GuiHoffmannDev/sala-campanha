@@ -58,16 +58,16 @@ it('shows online people and unique piece avatars, updates location and leaves on
     designer: [{ user_id: designer.userId, piece_id: f.pieceId }, { user_id: designer.userId, piece_id: f.pieceId }],
     gestor: [{ user_id: gestor.userId, piece_id: null }],
   }))
-  const people = await screen.findByRole('region', { name: 'Pessoas do workspace' })
+  const people = await screen.findByRole('region', { name: 'Workspace members' })
   expect(await within(people).findByLabelText('designer: online')).toBeTruthy()
   expect(within(people).getByLabelText('gestor: online')).toBeTruthy()
   expect(within(people).getByLabelText('admin: offline')).toBeTruthy()
-  const avatars = await screen.findByRole('group', { name: 'Nesta peça' })
+  const avatars = await screen.findByRole('group', { name: 'In this piece' })
   expect(within(avatars).getAllByRole('img')).toHaveLength(1)
   expect(within(avatars).getByRole('img', { name: 'designer' }).textContent).toBe('D')
   view.rerender(<Shell {...props} route={{ campaignId: f.campaignId, pieceId: null }} />)
   await waitFor(() => expect(live.location).toBeNull())
-  expect(screen.queryByRole('group', { name: 'Nesta peça' })).toBeNull()
+  expect(screen.queryByRole('group', { name: 'In this piece' })).toBeNull()
   view.unmount()
   await waitFor(() => expect(live.left).toBe(true))
   expect(live.stopped).toBe(true)
@@ -82,7 +82,7 @@ it('notifies mentions from another piece with its title and author, ignoring sel
     memberships={[{ teamId: f.t.teamId, teamName: 'Agência', role: 'designer', displayName: 'designer' }]}
     route={{ campaignId: f.campaignId, pieceId: f.pieceId }} onNavigate={() => {}}
     onSwitchWorkspace={() => {}} onCreateWorkspace={async () => {}} />)
-  await screen.findByRole('region', { name: 'Pessoas do workspace' })
+  await screen.findByRole('region', { name: 'Workspace members' })
   await screen.findAllByText('gestor')
   await waitFor(() => expect(live.event).not.toBeNull())
   const event: SessionEvent = { id: 42, team_id: f.t.teamId, piece_id: other.pieceId,
@@ -96,7 +96,7 @@ it('notifies mentions from another piece with its title and author, ignoring sel
     live.event!(event)
   })
   await waitFor(() => expect(live.notifications).toEqual([
-    { title: 'gestor mencionou você', body: 'Outro banner: @designer Veja' },
+    { title: 'gestor mentioned you', body: 'Outro banner: @designer Veja' },
   ]))
   view.unmount()
   await act(async () => live.event!(event))

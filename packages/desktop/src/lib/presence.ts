@@ -17,7 +17,7 @@ export function shouldNotify(event: SessionEvent, me: string): boolean {
 export function mentionNotice(event: SessionEvent, members: Record<string, string>, pieceTitle: string): { title: string; body: string } {
   const body = Array.from(`${pieceTitle}: ${event.kind === 'user_message' ? event.body.text : ''}`)
   return {
-    title: `${(event.author_id && members[event.author_id]) || 'Alguém'} mencionou você`,
+    title: `${(event.author_id && members[event.author_id]) || 'Someone'} mentioned you`,
     body: body.length > 120 ? `${body.slice(0, 119).join('')}…` : body.join(''),
   }
 }

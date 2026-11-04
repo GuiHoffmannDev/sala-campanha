@@ -57,30 +57,30 @@ it('mergeEvents dedupes, keeps order and applies updates', () => {
 it('timelineItems writes the exact text for each event kind', () => {
   // user_message: author, mine, delivery label only for messages to the agent.
   expect(timelineItems([message('Oi', { author_id: ANA, to_agent: true, delivery: 'queued' })], ctx)).toEqual([
-    { type: 'message', id: expect.any(Number), author: 'Ana Souza', text: 'Oi', mine: true, deliveryLabel: 'na fila' },
+    { type: 'message', id: expect.any(Number), author: 'Ana Souza', text: 'Oi', mine: true, deliveryLabel: 'queued' },
   ])
   const labelOf = (delivery: SessionEvent['delivery'], to_agent = true) =>
     (timelineItems([message('x', { author_id: BIA, to_agent, delivery })], ctx)[0] as { deliveryLabel: string; mine: boolean })
-  expect(labelOf('claimed').deliveryLabel).toBe('o agente está trabalhando')
-  expect(labelOf('failed').deliveryLabel).toBe('falhou')
+  expect(labelOf('claimed').deliveryLabel).toBe('the agent is working')
+  expect(labelOf('failed').deliveryLabel).toBe('failed')
   expect(labelOf('done').deliveryLabel).toBe('')
   expect(labelOf('not_applicable', false).deliveryLabel).toBe('')
   expect(labelOf('not_applicable', false).mine).toBe(false)
-  expect(timelineItems([message('x', { author_id: GONE })], ctx)[0]).toMatchObject({ author: 'Alguém', mine: false })
-  expect(timelineItems([message('x', { author_id: null })], ctx)[0]).toMatchObject({ author: 'Alguém' })
+  expect(timelineItems([message('x', { author_id: GONE })], ctx)[0]).toMatchObject({ author: 'Someone', mine: false })
+  expect(timelineItems([message('x', { author_id: null })], ctx)[0]).toMatchObject({ author: 'Someone' })
 
   // agent_started: catalog labels, effort, dropped references.
   const opus = { provider: 'anthropic', model: 'claude-opus-5-5' }
   const banana = { provider: 'gemini', model: 'gemini-nano-banana-2.1' }
-  expect(textOf(started({ text: opus, image: null }))).toEqual(['Gerando com Claude Opus 5.5.'])
+  expect(textOf(started({ text: opus, image: null }))).toEqual(['Generating with Claude Opus 5.5.'])
   expect(textOf(started({ text: { ...opus, effort: 'xhigh' }, image: banana })))
-    .toEqual(['Gerando com Claude Opus 5.5 (esforço muito alto) e Nano Banana 2.1.'])
+    .toEqual(['Generating with Claude Opus 5.5 (effort very high) and Nano Banana 2.1.'])
   expect(textOf(started({ text: opus, image: { ...banana, effort: 'minimal' } }, ['r1'])))
-    .toEqual(['Gerando com Claude Opus 5.5 e Nano Banana 2.1 (esforço mínimo). 1 referência ficou de fora pelo limite do modelo.'])
+    .toEqual(['Generating with Claude Opus 5.5 and Nano Banana 2.1 (effort minimal). 1 reference was left out due to the model limit.'])
   expect(textOf(started({ text: opus, image: banana }, ['r1', 'r2', 'r3'])))
-    .toEqual(['Gerando com Claude Opus 5.5 e Nano Banana 2.1. 3 referências ficaram de fora pelo limite do modelo.'])
-  for (const [effort, label] of [['low', 'baixo'], ['medium', 'médio'], ['high', 'alto'], ['max', 'máximo']]) {
-    expect(textOf(started({ text: { ...opus, effort }, image: null }))).toEqual([`Gerando com Claude Opus 5.5 (esforço ${label}).`])
+    .toEqual(['Generating with Claude Opus 5.5 and Nano Banana 2.1. 3 references were left out due to the model limit.'])
+  for (const [effort, label] of [['low', 'low'], ['medium', 'medium'], ['high', 'high'], ['max', 'maximum']]) {
+    expect(textOf(started({ text: { ...opus, effort }, image: null }))).toEqual([`Generating with Claude Opus 5.5 (effort ${label}).`])
   }
   expect(timelineItems([started({ text: opus, image: null })], ctx)[0]).toMatchObject({ type: 'system' })
 
@@ -89,40 +89,40 @@ it('timelineItems writes the exact text for each event kind', () => {
     kind: 'agent_result', body: { message_ids: [1], round: 1, version_id: 'v1', version_number: 1, image_prompt: 'um gato' },
   })
   expect(timelineItems([result], ctx)).toEqual([
-    { type: 'agent', id: result.id, text: 'Versão 1', prompt: 'um gato', version: versions.v1, error: false },
+    { type: 'agent', id: result.id, text: 'Version 1', prompt: 'um gato', version: versions.v1, error: false },
   ])
   const unknownVersion = ev({
     kind: 'agent_result', body: { message_ids: [1], round: 1, version_id: 'v9', version_number: 9, image_prompt: null },
   })
-  expect(timelineItems([unknownVersion], ctx)[0]).toMatchObject({ text: 'Versão 9', prompt: null, version: null })
+  expect(timelineItems([unknownVersion], ctx)[0]).toMatchObject({ text: 'Version 9', prompt: null, version: null })
   const failure = ev({
     kind: 'agent_error',
     body: { message_ids: [1], round: 1, code: 'provider_error', message: 'O provedor falhou.', image_prompt: 'um cão' },
   })
   expect(timelineItems([failure], ctx)).toEqual([
-    { type: 'agent', id: failure.id, text: 'O provedor falhou.', prompt: 'um cão', version: null, error: true },
+    { type: 'agent', id: failure.id, text: 'The provider rejected the request. Check your provider account and try again.', prompt: 'um cão', version: null, error: true },
   ])
 
   // status_changed, by a person and by the agent.
   expect(textOf(ev({ kind: 'status_changed', author_id: BIA, body: { from: 'base_em_revisao', to: 'acabamento' } })))
-    .toEqual(['Bia mudou a etapa de Base em revisão para Acabamento.'])
+    .toEqual(['Bia changed the stage from Base under review to Finishing.'])
   expect(textOf(ev({ kind: 'status_changed', author_id: null, body: { from: 'gerando', to: 'base_em_revisao' } })))
-    .toEqual(['O agente mudou a etapa de Gerando para Base em revisão.'])
+    .toEqual(['The agent changed the stage from Generating to Base under review.'])
   expect(textOf(ev({ kind: 'status_changed', author_id: GONE, body: { from: 'final_em_revisao', to: 'aprovada' } })))
-    .toEqual(['Alguém mudou a etapa de Final em revisão para Aprovada.'])
+    .toEqual(['Someone changed the stage from Final under review to Approved.'])
 
   // approval and comment name the version number from the map.
   expect(textOf(ev({ kind: 'approval', author_id: ANA, body: { version_id: 'v2', from: 'final_em_revisao', to: 'aprovada' } })))
-    .toEqual(['Ana Souza aprovou a versão 2.'])
+    .toEqual(['Ana Souza approved version 2.'])
   expect(textOf(ev({ kind: 'comment', author_id: BIA, body: { comment_id: 'c1', version_id: 'v1', parent_id: null } })))
-    .toEqual(['Bia comentou na versão 1.'])
+    .toEqual(['Bia commented on version 1.'])
 
   // version_added: none for the agent, upload and caption edit by a person.
   expect(textOf(ev({ kind: 'version_added', author_id: null, body: { version_id: 'v1', number: 1, phase: 'base' } }))).toEqual([])
   expect(textOf(ev({ kind: 'version_added', author_id: ANA, body: { version_id: 'v2', number: 2, phase: 'final' } })))
-    .toEqual(['Ana Souza enviou a versão final 2.'])
+    .toEqual(['Ana Souza uploaded final version 2.'])
   expect(textOf(ev({ kind: 'version_added', author_id: BIA, body: { version_id: 'v3', number: 3, phase: 'final' } })))
-    .toEqual(['Bia editou a legenda (versão 3).'])
+    .toEqual(['Bia edited the caption (version 3).'])
 })
 
 it('timelineItems waits for a version it does not know yet', () => {

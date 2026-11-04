@@ -202,7 +202,7 @@ export function Chat({ client, piece, role, members, onChange, uploadFinalOpen, 
   }
 
   return (
-    <section className="piece-chat" aria-label="Chat da peça">
+    <section className="piece-chat" aria-label="Piece chat">
     <div
       className="chat"
       ref={list}
@@ -215,12 +215,12 @@ export function Chat({ client, piece, role, members, onChange, uploadFinalOpen, 
       <Timeline items={items} imageUrls={imageUrls} onImageLoad={() => pinned.current && toBottom()} onOpenVersion={setVersionId} />
     </div>
     {!pieceActions(role, piece, null).chat
-      ? <p className="shell-empty">Você acompanha esta peça como espectador.</p>
+      ? <p className="shell-empty">You are viewing this piece as a viewer.</p>
       : <>
         {composerError && <div><p role="alert">{composerError}</p>
-          <button type="button" onClick={() => setComposerChanges((n) => n + 1)}>Tentar de novo</button></div>}
+          <button type="button" onClick={() => setComposerChanges((n) => n + 1)}>Try again</button></div>}
         {!composerData || !historyLoaded
-          ? <p className="shell-empty" role="status">Carregando modelos e referências…</p>
+          ? <p className="shell-empty" role="status">Loading models and references…</p>
           : <Composer piece={piece} members={members.map((m) => ({ userId: m.userId, name: m.displayName }))}
             keyed={composerData.keyed} choices={choices} references={composerData.references} urls={composerData.urls}
             onPost={async (input) => { await postMessage(client, input); refresh.current() }} />}
@@ -250,7 +250,7 @@ export function Chat({ client, piece, role, members, onChange, uploadFinalOpen, 
         await openExternal(await downloadUrl(client, version.image_path, `${piece.title} v${version.number}.${extension}`))
       }}>
       {commentsError && <div><p role="alert">{commentsError}</p>
-        <button type="button" onClick={() => setCommentChanges((n) => n + 1)}>Tentar de novo</button></div>}
+        <button type="button" onClick={() => setCommentChanges((n) => n + 1)}>Try again</button></div>}
     </VersionViewer>}
     {uploadFinalOpen && onCloseUpload && versionsLoaded && pieceActions(role, piece, null).uploadFinal &&
       (piece.kind !== 'imagem_texto' || approvedVersion) &&

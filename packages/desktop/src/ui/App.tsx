@@ -60,7 +60,7 @@ export function App({ client }: { client: SupabaseClient }) {
       if ('code' in callback) {
         finishOAuth(client, callback.code, callback.flowId).catch((e: unknown) => setLoginError(friendlyError(e)))
       } else {
-        setLoginError('Não foi possível entrar. Tente de novo.')
+        setLoginError('Could not sign in. Try again.')
       }
     }).then(
       (unlisten) => {
@@ -178,7 +178,7 @@ export function App({ client }: { client: SupabaseClient }) {
 
   async function addWorkspace(workspaceName: string) {
     openWorkspace(await createWorkspace(client, workspaceName, name ?? ''))
-    // Reload through the effect, so a failed reload offers "Tentar de novo" instead of a second workspace.
+    // Reload through the effect, so a failed reload offers "Try again" instead of a second workspace.
     setAttempt((n) => n + 1)
   }
 
@@ -186,7 +186,7 @@ export function App({ client }: { client: SupabaseClient }) {
 
   let content: ReactNode
   if (session === undefined) {
-    content = <p>Carregando…</p>
+    content = <p>Loading…</p>
   } else if (!session) {
     content = (
       <LoginScreen
@@ -205,12 +205,12 @@ export function App({ client }: { client: SupabaseClient }) {
   } else if (!name) {
     content = <Onboarding step="name" suggestedName="" onSaveName={saveName} onCreateWorkspace={addWorkspace} />
   } else if (!workspaces || workspaces.userId !== userId || workspaces.step === 'loading') {
-    content = <p>Carregando…</p>
+    content = <p>Loading…</p>
   } else if (workspaces.step === 'failed') {
     content = (
       <>
         <p role="alert">{workspaces.message}</p>
-        <button type="button" onClick={() => setAttempt((n) => n + 1)}>Tentar de novo</button>
+        <button type="button" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
       </>
     )
   } else if (workspaces.step === 'none') {
@@ -232,7 +232,7 @@ export function App({ client }: { client: SupabaseClient }) {
       </div>
     )
   } else {
-    content = <p>Carregando…</p>
+    content = <p>Loading…</p>
   }
 
   return (

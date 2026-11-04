@@ -30,11 +30,11 @@ it('notifies only mentions of me by someone else', () => {
 
 it('mentionNotice truncates long messages', () => {
   expect(mentionNotice(message, { ana: 'Ana Silva' }, 'Banner')).toEqual({
-    title: 'Ana Silva mencionou você', body: 'Banner: Veja esta versão',
+    title: 'Ana Silva mentioned you', body: 'Banner: Veja esta versão',
   })
   const long = { ...message, body: { ...message.body, text: '😀'.repeat(120) } }
   const notice = mentionNotice(long, { ana: 'Ana Silva' }, 'Banner')
   expect(notice.body).toBe(`Banner: ${'😀'.repeat(111)}…`)
   expect(Array.from(notice.body)).toHaveLength(120)
-  expect(mentionNotice(message, {}, 'Banner').title).toBe('Alguém mencionou você')
+  expect(mentionNotice(message, {}, 'Banner').title).toBe('Someone mentioned you')
 })

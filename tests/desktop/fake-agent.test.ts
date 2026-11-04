@@ -5,7 +5,7 @@ import { sniffType } from '../../packages/executor/src/providers/image.ts'
 
 it('refuses a non-local Supabase URL', () => {
   for (const url of ['https://example.supabase.co', 'http://127.0.0.1.evil.test', 'invalid', 'http://localhost@evil.test']) {
-    expect(() => assertLocalUrl(url)).toThrow('fake-agent só roda contra o Supabase local')
+    expect(() => assertLocalUrl(url)).toThrow('fake-agent only runs against local Supabase')
   }
   expect(() => assertLocalUrl('http://127.0.0.1:55321')).not.toThrow()
   expect(() => assertLocalUrl('http://localhost:55321')).not.toThrow()
@@ -19,8 +19,8 @@ it('fake providers answer with a plan parsePlan accepts and a real PNG', async (
   }, new AbortController().signal)
   for (const kind of ['texto', 'imagem', 'imagem_texto'] as const) {
     const plan = parsePlan(raw, kind, 'anthropic')
-    if (kind !== 'texto') expect(plan.imagePrompt).toBe(`Teste local: [#1] Ana: ${request}`)
-    if (kind !== 'imagem') expect(plan.caption).toMatch(/^Legenda de teste /)
+    if (kind !== 'texto') expect(plan.imagePrompt).toBe(`Local test: [#1] Ana: ${request}`)
+    if (kind !== 'imagem') expect(plan.caption).toMatch(/^Test caption /)
   }
   const started = Date.now()
   const image = await providers.image.gemini!.generateImage('ignored', { model: 'fake', prompt: '', images: [] }, new AbortController().signal)

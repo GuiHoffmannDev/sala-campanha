@@ -120,7 +120,7 @@ describe('live piece', () => {
     const v = await createAgentVersion(f)
     await waitFor(() => r.versions >= 1 && r.pieces >= 1)
     expect(r.versions).toBe(1)
-    // The first base version also moves the piece to "Base em revisão".
+    // The first base version also moves the piece to "Base under review".
     expect(r.pieces).toBe(1)
     r.pieces = 0
     const admin = serviceClient()

@@ -11,14 +11,14 @@ const normalizeEmail = (email: string) => email.trim().toLowerCase()
 export async function sendLoginCode(client: SupabaseClient, email: string): Promise<void> {
   const { error } = await client.auth.signInWithOtp({ email: normalizeEmail(email), options: { shouldCreateUser: true } })
   if (!error) return
-  if (error.status === 429) throw new UserFacingError('Espere um minuto antes de pedir outro código.')
+  if (error.status === 429) throw new UserFacingError('Wait a minute before requesting another code.')
   throw error
 }
 
 export async function verifyLoginCode(client: SupabaseClient, email: string, code: string): Promise<void> {
   const { error } = await client.auth.verifyOtp({ email: normalizeEmail(email), token: code.trim(), type: 'email' })
   // A network failure keeps its own message; any answer from the server means the code did not work.
-  if (error) throw isAuthRetryableFetchError(error) ? error : new UserFacingError('Código inválido ou vencido. Peça um novo.')
+  if (error) throw isAuthRetryableFetchError(error) ? error : new UserFacingError('Invalid or expired code. Request a new one.')
 }
 
 /** The Supabase URL that starts Google or Apple sign-in in the browser and comes back to `sala://auth/callback`. */
@@ -45,7 +45,7 @@ export async function oauthUrl(client: SupabaseClient, provider: OAuthProvider):
  */
 export async function finishOAuth(client: SupabaseClient, code: string, flowId?: string): Promise<void> {
   const { error } = await client.auth.exchangeCodeForSession(code, flowId ? { flowId } : undefined)
-  if (error) throw isAuthRetryableFetchError(error) ? error : new UserFacingError('Não foi possível entrar. Tente de novo.')
+  if (error) throw isAuthRetryableFetchError(error) ? error : new UserFacingError('Could not sign in. Try again.')
 }
 
 export async function signOut(client: SupabaseClient): Promise<void> {

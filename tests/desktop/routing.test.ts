@@ -19,13 +19,13 @@ const cases = [
 
 it('messageTarget mirrors the SQL routing rule', () => {
   for (const { text, mentions, toAgent } of cases) {
-    expect(messageTarget(text, mentions)).toEqual({ toAgent, label: toAgent ? 'Para o agente' : 'Para @Ana' })
+    expect(messageTarget(text, mentions)).toEqual({ toAgent, label: toAgent ? 'To the agent' : 'To @Ana' })
   }
 })
 
 it('lists several people in the label', () => {
-  expect(messageTarget('@Ana @Bia oi', [ana, bia]).label).toBe('Para @Ana e @Bia')
-  expect(messageTarget('@Ana @Bia @Caio oi', [ana, bia, caio]).label).toBe('Para @Ana, @Bia e @Caio')
+  expect(messageTarget('@Ana @Bia oi', [ana, bia]).label).toBe('To @Ana and @Bia')
+  expect(messageTarget('@Ana @Bia @Caio oi', [ana, bia, caio]).label).toBe('To @Ana, @Bia and @Caio')
 })
 
 it('matches longer names first, once per person, without matching name prefixes', () => {

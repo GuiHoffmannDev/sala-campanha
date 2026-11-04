@@ -93,11 +93,11 @@ export function Composer({ piece, members, keyed, choices, references, urls, onP
     }
   }
 
-  return <form className="composer" aria-label="Enviar mensagem" onSubmit={(e) => { e.preventDefault(); void post() }}>
+  return <form className="composer" aria-label="Send message" onSubmit={(e) => { e.preventDefault(); void post() }}>
     <p id={`${id}-target`} aria-live="polite">{target.label}</p>
     {error && <p role="alert">{error}</p>}
     <fieldset disabled={sending}>
-      <label>Mensagem
+      <label>Message
         <textarea ref={input} rows={3} value={text} aria-describedby={`${id}-target`}
           aria-autocomplete="list" aria-controls={suggestions.length ? `${id}-mentions` : undefined}
           aria-activedescendant={suggestions[active] ? `${id}-mention-${active}` : undefined}
@@ -108,7 +108,7 @@ export function Composer({ piece, members, keyed, choices, references, urls, onP
             setDismissed(false)
           }} onSelect={(e) => setCaret(e.currentTarget.selectionStart)} onKeyDown={keyDown} />
       </label>
-      {suggestions.length > 0 && <ul className="mention-list" id={`${id}-mentions`} role="listbox" aria-label="Membros">
+      {suggestions.length > 0 && <ul className="mention-list" id={`${id}-mentions`} role="listbox" aria-label="Members">
         {suggestions.map((m, index) => <li key={m.userId} id={`${id}-mention-${index}`} role="option" aria-selected={active === index}>
           <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insertMention(m)}>{m.name}</button>
         </li>)}
@@ -118,17 +118,17 @@ export function Composer({ piece, members, keyed, choices, references, urls, onP
           {pickedText && <ModelPicker capability="text" options={textOptions} value={pickedText} onChange={setTextPick} />}
           {piece.kind !== 'texto' && pickedImage && <ModelPicker capability="image" options={imageOptions} value={pickedImage} onChange={setImagePick} />}
         </div>
-        {!pickedText && <p role="status">Nenhuma chave de texto cadastrada. Peça ao admin do time.</p>}
+        {!pickedText && <p role="status">No text provider key added. Ask your workspace admin.</p>}
         <div className="composer-references">
-          {attachments.map((r) => <button key={r.id} type="button" aria-label={`Remover ${r.original_name}`}
+          {attachments.map((r) => <button key={r.id} type="button" aria-label={`Remove ${r.original_name}`}
             onClick={() => setSelected(selected.filter((id) => id !== r.id))}>{r.original_name} ×</button>)}
         </div>
-        <button type="button" aria-expanded={library} onClick={() => setLibrary(!library)}>Anexar referência</button>
+        <button type="button" aria-expanded={library} onClick={() => setLibrary(!library)}>Attach reference</button>
         {library && <ReferenceLibrary references={references} urls={urls} canUpload={false} selectable selected={selected}
           onUpload={async () => {}} onSelect={(ids) => { setSelected(ids); setLibrary(false) }} />}
       </>}
-      <button type="submit" disabled={blocked || sending}>Enviar</button>
-      {sending && <p role="status">Enviando mensagem…</p>}
+      <button type="submit" disabled={blocked || sending}>Send</button>
+      {sending && <p role="status">Sending message…</p>}
     </fieldset>
   </form>
 }

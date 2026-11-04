@@ -20,8 +20,8 @@ export function messageTarget(text: string, mentioned: Mention[]): { toAgent: bo
   // PostgreSQL also treats U+001C–U+001F and U+0085 as whitespace.
   const toAgent = !(text.replace(/^[\s\u001c-\u001f\u0085\u200b]+/u, '').startsWith('@') && mentioned.length > 0)
   const names = mentioned.map((m) => `@${m.name}`)
-  const people = names.length > 1 ? `${names.slice(0, -1).join(', ')} e ${names.at(-1)}` : names[0]
-  return { toAgent, label: toAgent ? 'Para o agente' : `Para ${people}` }
+  const people = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]
+  return { toAgent, label: toAgent ? 'To the agent' : `To ${people}` }
 }
 
 export function mentionQuery(text: string, caret: number): string | null {

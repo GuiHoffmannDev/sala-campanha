@@ -63,7 +63,7 @@ it('renders the app title', () => {
 
 it('shows the login screen without a session', async () => {
   render(<App client={appClient()} />)
-  expect(await screen.findByRole('button', { name: 'Entrar com Google' })).toBeTruthy()
+  expect(await screen.findByRole('button', { name: 'Continue with Google' })).toBeTruthy()
 })
 
 it('does not interpret a session lookup error as an empty membership list', async () => {
@@ -79,16 +79,16 @@ it('a new person names themselves, creates a workspace and sees it', async () =>
   const client = await signedIn(email)
   render(<App client={client} />)
 
-  await user.type(await screen.findByLabelText('Seu nome'), 'Bia Lima')
-  await user.click(screen.getByRole('button', { name: 'Continuar' }))
-  const field = (await screen.findByLabelText('Nome do workspace')) as HTMLInputElement
-  expect(field.value).toBe('Workspace de Bia')
-  await user.click(screen.getByRole('button', { name: 'Criar' }))
-  expect(await screen.findByText('Workspace de Bia')).toBeTruthy()
+  await user.type(await screen.findByLabelText('Your name'), 'Bia Lima')
+  await user.click(screen.getByRole('button', { name: 'Continue' }))
+  const field = (await screen.findByLabelText('Workspace name')) as HTMLInputElement
+  expect(field.value).toBe('Workspace for Bia')
+  await user.click(screen.getByRole('button', { name: 'Create' }))
+  expect(await screen.findByText('Workspace for Bia')).toBeTruthy()
 
   const { data: { user: me } } = await client.auth.getUser()
   const { data } = await serviceClient().from('team_members').select('role, display_name, teams(name)').eq('user_id', me!.id)
-  expect(data).toEqual([{ role: 'admin', display_name: 'Bia Lima', teams: { name: 'Workspace de Bia' } }])
+  expect(data).toEqual([{ role: 'admin', display_name: 'Bia Lima', teams: { name: 'Workspace for Bia' } }])
 })
 
 it('an invited person with a name opens the app straight into the inviter\'s workspace', async () => {
@@ -103,26 +103,26 @@ it('an invited person with a name opens the app straight into the inviter\'s wor
 
   render(<App client={client} />)
   expect(await screen.findByText(teamName)).toBeTruthy()
-  expect(screen.queryByText('Crie seu workspace')).toBeNull()
+  expect(screen.queryByText('Create your workspace')).toBeNull()
 })
 
 it('a sign-in error from the browser goes away when the person asks for a code', async () => {
   const user = userEvent.setup()
   render(<App client={appClient()} />)
-  await screen.findByRole('button', { name: 'Entrar com Google' })
+  await screen.findByRole('button', { name: 'Continue with Google' })
   act(() => deepLink.deliver('sala://auth/callback?error=access_denied'))
-  expect(screen.getByRole('alert').textContent).toBe('Não foi possível entrar. Tente de novo.')
+  expect(screen.getByRole('alert').textContent).toBe('Could not sign in. Try again.')
 
-  await user.type(screen.getByLabelText('E-mail'), `app-erro-${randomUUID()}@test.local`)
-  await user.click(screen.getByRole('button', { name: 'Enviar código' }))
-  expect(await screen.findByText(/^Enviamos um código de 6 dígitos/)).toBeTruthy()
+  await user.type(screen.getByLabelText('Email'), `app-erro-${randomUUID()}@test.local`)
+  await user.click(screen.getByRole('button', { name: 'Send code' }))
+  expect(await screen.findByText(/^We sent a 6-digit code/)).toBeTruthy()
   expect(screen.queryByRole('alert')).toBeNull()
 })
 
 it('a sign-in error does not come back after signing in and out', async () => {
   const client = appClient()
   render(<App client={client} />)
-  await screen.findByRole('button', { name: 'Entrar com Google' })
+  await screen.findByRole('button', { name: 'Continue with Google' })
   act(() => deepLink.deliver('sala://auth/callback?error=access_denied'))
   expect(screen.getByRole('alert')).toBeTruthy()
 
@@ -130,12 +130,12 @@ it('a sign-in error does not come back after signing in and out', async () => {
   const email = `app-volta-${randomUUID()}@test.local`
   await sendLoginCode(client, email)
   await verifyLoginCode(client, email, await loginCode(email))
-  expect(await screen.findByLabelText('Seu nome')).toBeTruthy()
+  expect(await screen.findByLabelText('Your name')).toBeTruthy()
 
   await act(async () => {
     await client.auth.signOut()
   })
-  expect(await screen.findByRole('button', { name: 'Entrar com Google' })).toBeTruthy()
+  expect(await screen.findByRole('button', { name: 'Continue with Google' })).toBeTruthy()
   expect(screen.queryByRole('alert')).toBeNull()
 })
 
@@ -143,7 +143,7 @@ it('a sign-in error does not come back after signing in and out', async () => {
 async function personWithWorkspace(name: string) {
   const client = await signedIn(`app-${randomUUID()}@test.local`)
   await saveDisplayName(client, name)
-  const teamId = await createWorkspace(client, `Workspace de ${name}`, name)
+  const teamId = await createWorkspace(client, `Workspace for ${name}`, name)
   const { data: { user } } = await client.auth.getUser()
   return { client, teamId, userId: user!.id }
 }
@@ -152,7 +152,7 @@ it('a share link that arrives before sign-in opens after sign-in, in the workspa
   const email = `app-link-${randomUUID()}@test.local`
   const client = await signedIn(email)
   await saveDisplayName(client, 'Duda')
-  await createWorkspace(client, 'Workspace de Duda', 'Duda')
+  await createWorkspace(client, 'Workspace for Duda', 'Duda')
   const { data: { user } } = await client.auth.getUser()
   const other = await createPieceFixture()
   const { error } = await serviceClient().from('team_members')
@@ -161,7 +161,7 @@ it('a share link that arrives before sign-in opens after sign-in, in the workspa
   await client.auth.signOut()
 
   render(<App client={client} />)
-  await screen.findByRole('button', { name: 'Entrar com Google' })
+  await screen.findByRole('button', { name: 'Continue with Google' })
   act(() => deepLink.deliver(`sala://campanha/${other.campaignId}/peca/${other.pieceId.toUpperCase()}`))
   // A second code request within a minute is refused, so the code comes straight from the admin API.
   await act(async () => {
@@ -179,19 +179,19 @@ it('a link to a piece the person cannot see shows a notice that goes away on cli
   const mine = await createCampaign(client, teamId, 'Campanha da Eva')
   const other = await createPieceFixture()
   render(<App client={client} />)
-  await screen.findByText('Workspace de Eva')
+  await screen.findByText('Workspace for Eva')
   act(() => deepLink.deliver(`sala://campanha/${mine.id}`))
   expect(await screen.findByRole('heading', { name: 'Campanha da Eva' })).toBeTruthy()
 
   act(() => deepLink.deliver(`sala://campanha/${other.campaignId}/peca/${other.pieceId}`))
-  const notice = await screen.findByText('Peça não encontrada ou sem acesso.')
+  const notice = await screen.findByText('Piece not found or access denied.')
   // Announced to screen readers, and the campaign the person had open stays open.
   expect(screen.getByRole('alert').contains(notice)).toBe(true)
   expect(screen.getByRole('heading', { name: 'Campanha da Eva' })).toBeTruthy()
 
   await user.click(notice)
-  expect(screen.queryByText('Peça não encontrada ou sem acesso.')).toBeNull()
-  expect(screen.getByText('Workspace de Eva')).toBeTruthy()
+  expect(screen.queryByText('Piece not found or access denied.')).toBeNull()
+  expect(screen.getByText('Workspace for Eva')).toBeTruthy()
 })
 
 it('opens the remembered workspace and creates a new one from the sidebar', async () => {
@@ -207,9 +207,9 @@ it('opens the remembered workspace and creates a new one from the sidebar', asyn
   const select = (await screen.findByLabelText('Workspace')) as HTMLSelectElement
   expect(select.value).toBe(other.teamId)
 
-  await user.click(screen.getByRole('button', { name: 'Novo workspace' }))
-  await user.type(screen.getByLabelText('Nome do workspace'), 'Estúdio Fábio')
-  await user.click(screen.getByRole('button', { name: 'Criar workspace' }))
+  await user.click(screen.getByRole('button', { name: 'New workspace' }))
+  await user.type(screen.getByLabelText('Workspace name'), 'Estúdio Fábio')
+  await user.click(screen.getByRole('button', { name: 'Create workspace' }))
   await screen.findByRole('option', { name: 'Estúdio Fábio' })
   const { data, error } = await client.from('teams').select('id').eq('name', 'Estúdio Fábio').single()
   expect(error).toBeNull()
@@ -224,11 +224,11 @@ it('refreshes workspace permissions after the admin changes their own role', asy
   await saveDisplayName(client, 'Ana')
   await client.rpc('set_member_role', { p_team: t.teamId, p_user: t.members.gestor.userId, p_role: 'admin' })
   render(<App client={client} />)
-  await user.click(await screen.findByRole('button', { name: 'Configurações do workspace' }))
-  await user.click(await screen.findByRole('tab', { name: 'Membros' }))
-  await user.selectOptions(screen.getByLabelText('Papel de admin'), 'espectador')
-  await waitFor(() => expect(screen.queryByRole('button', { name: 'Configurações do workspace' })).toBeNull())
-  expect(screen.queryByRole('button', { name: 'Nova campanha' })).toBeNull()
+  await user.click(await screen.findByRole('button', { name: 'Workspace settings' }))
+  await user.click(await screen.findByRole('tab', { name: 'Members' }))
+  await user.selectOptions(screen.getByLabelText('Role for admin'), 'espectador')
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Workspace settings' })).toBeNull())
+  expect(screen.queryByRole('button', { name: 'New campaign' })).toBeNull()
 })
 
 it.each(['demote', 'remove'] as const)('closes settings and discards cached invites after another admin acts (%s)', async (action) => {
@@ -241,10 +241,10 @@ it.each(['demote', 'remove'] as const)('closes settings and discards cached invi
   expect((await client.rpc('invite_member', { p_team: t.teamId, p_email: email, p_role: 'designer' })).error).toBeNull()
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
   render(<App client={client} />)
-  await user.click(await screen.findByRole('button', { name: 'Configurações do workspace' }))
-  await user.type(await screen.findByLabelText('Chave Anthropic'), 'unsaved-secret')
-  await user.click(screen.getByRole('tab', { name: 'Membros' }))
-  expect(screen.getByText(`${email} — designer`)).toBeTruthy()
+  await user.click(await screen.findByRole('button', { name: 'Workspace settings' }))
+  await user.type(await screen.findByLabelText('Key Anthropic'), 'unsaved-secret')
+  await user.click(screen.getByRole('tab', { name: 'Members' }))
+  expect(screen.getByText(`${email} — Designer`)).toBeTruthy()
 
   const result = action === 'demote'
     ? await t.members.gestor.client.rpc('set_member_role', { p_team: t.teamId, p_user: t.members.admin.userId, p_role: 'espectador' })
@@ -252,9 +252,9 @@ it.each(['demote', 'remove'] as const)('closes settings and discards cached invi
   expect(result.error).toBeNull()
   await act(async () => { await vi.advanceTimersByTimeAsync(3_000) })
 
-  await waitFor(() => expect(screen.queryByRole('button', { name: 'Configurações do workspace' })).toBeNull())
-  expect(screen.queryByLabelText('Chave Anthropic')).toBeNull()
-  expect(screen.queryByText(`${email} — designer`)).toBeNull()
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Workspace settings' })).toBeNull())
+  expect(screen.queryByLabelText('Key Anthropic')).toBeNull()
+  expect(screen.queryByText(`${email} — Designer`)).toBeNull()
 })
 
 it('preserves unsaved settings during an unchanged permission refresh and discovers an external promotion on focus', async () => {
@@ -265,14 +265,14 @@ it('preserves unsaved settings during an unchanged permission refresh and discov
   expect((await client.rpc('set_member_role', { p_team: t.teamId, p_user: t.members.gestor.userId, p_role: 'admin' })).error).toBeNull()
   const loads = vi.spyOn(teamData, 'loadMyMemberships')
   render(<App client={client} />)
-  await user.click(await screen.findByRole('button', { name: 'Configurações do workspace' }))
-  const key = await screen.findByLabelText('Chave Anthropic')
+  await user.click(await screen.findByRole('button', { name: 'Workspace settings' }))
+  const key = await screen.findByLabelText('Key Anthropic')
   await user.type(key, 'unsaved-secret')
   const previousLoads = loads.mock.calls.length
   await act(async () => { window.dispatchEvent(new Event('focus')) })
   await waitFor(() => expect(loads.mock.calls.length).toBeGreaterThan(previousLoads))
   await act(async () => { await loads.mock.results.at(-1)!.value })
-  expect(screen.getByLabelText('Chave Anthropic')).toBe(key)
+  expect(screen.getByLabelText('Key Anthropic')).toBe(key)
   expect(key).toHaveProperty('value', 'unsaved-secret')
 
   loads.mockRejectedValueOnce(new Error('fetch failed'))
@@ -280,16 +280,16 @@ it('preserves unsaved settings during an unchanged permission refresh and discov
     window.dispatchEvent(new Event('focus'))
     await loads.mock.results.at(-1)!.value.catch(() => {})
   })
-  expect(screen.getByLabelText('Chave Anthropic')).toBe(key)
+  expect(screen.getByLabelText('Key Anthropic')).toBe(key)
   expect(key).toHaveProperty('value', 'unsaved-secret')
 
   expect((await t.members.gestor.client.rpc('set_member_role', { p_team: t.teamId, p_user: t.members.admin.userId, p_role: 'espectador' })).error).toBeNull()
   await act(async () => { window.dispatchEvent(new Event('online')) })
-  await waitFor(() => expect(screen.queryByRole('button', { name: 'Configurações do workspace' })).toBeNull())
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Workspace settings' })).toBeNull())
   expect((await t.members.gestor.client.rpc('set_member_role', { p_team: t.teamId, p_user: t.members.admin.userId, p_role: 'admin' })).error).toBeNull()
   await act(async () => { window.dispatchEvent(new Event('focus')) })
-  await user.click(await screen.findByRole('button', { name: 'Configurações do workspace' }))
-  expect(await screen.findByLabelText('Chave Anthropic')).toHaveProperty('value', '')
+  await user.click(await screen.findByRole('button', { name: 'Workspace settings' }))
+  expect(await screen.findByLabelText('Key Anthropic')).toHaveProperty('value', '')
 })
 
 it('clears the removed workspace route before falling back to another workspace', async () => {
@@ -303,14 +303,14 @@ it('clears the removed workspace route before falling back to another workspace'
   render(<App client={client} />)
   await screen.findByLabelText('Workspace')
   act(() => deepLink.deliver(`sala://campanha/${f.campaignId}/peca/${f.pieceId}`))
-  expect(await screen.findByLabelText('Título da peça')).toHaveProperty('value', 'Peça de teste')
-  await user.click(screen.getByRole('button', { name: 'Configurações do workspace' }))
-  await screen.findByLabelText('Chave Anthropic')
+  expect(await screen.findByLabelText('Piece title')).toHaveProperty('value', 'Peça de teste')
+  await user.click(screen.getByRole('button', { name: 'Workspace settings' }))
+  await screen.findByLabelText('Key Anthropic')
 
   expect((await f.t.members.gestor.client.rpc('remove_member', { p_team: f.t.teamId, p_user: f.t.members.admin.userId })).error).toBeNull()
   await act(async () => { window.dispatchEvent(new Event('focus')) })
   expect(await screen.findByRole('heading', { name: 'Outro workspace' })).toBeTruthy()
-  expect(screen.queryByLabelText('Título da peça')).toBeNull()
-  expect(screen.queryByRole('region', { name: 'Chat da peça' })).toBeNull()
-  expect(screen.getByText('Escolha uma peça')).toBeTruthy()
+  expect(screen.queryByLabelText('Piece title')).toBeNull()
+  expect(screen.queryByRole('region', { name: 'Piece chat' })).toBeNull()
+  expect(screen.getByText('Choose a piece')).toBeTruthy()
 })

@@ -5,7 +5,7 @@ import { createTestTeam } from '../helpers/supabase.ts'
 it('only the admin invites, with the friendly message', async () => {
   const t = await createTestTeam()
   const error = await inviteMember(t.members.gestor.client, t.teamId, 'new@test.local', 'designer').catch((e: unknown) => e)
-  expect(friendlyError(error)).toBe('Só o admin do workspace convida pessoas.')
+  expect(friendlyError(error)).toBe('Only a workspace admin can invite people.')
   expect(await loadInvites(t.members.admin.client, t.teamId)).toEqual([])
 })
 

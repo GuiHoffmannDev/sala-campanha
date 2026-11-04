@@ -40,5 +40,5 @@ export async function setResolved(client: SupabaseClient, commentId: string, res
   const { data, error } = await client.from('comments').update({ resolved }).eq('id', commentId).select('id')
   if (error) throw error
   // RLS can hide a row from UPDATE without returning an error.
-  if (!data.length) throw new UserFacingError('Você não tem permissão para isso.')
+  if (!data.length) throw new UserFacingError('You do not have permission to do this.')
 }

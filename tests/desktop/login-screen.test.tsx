@@ -23,52 +23,52 @@ function renderLogin(overrides: Partial<Props> = {}) {
 it('asks for the code after sending it', async () => {
   const user = userEvent.setup()
   const calls = renderLogin()
-  expect(screen.getByText('ou entre com um código no e-mail')).toBeTruthy()
+  expect(screen.getByText('or sign in with an email code')).toBeTruthy()
 
-  await user.type(screen.getByLabelText('E-mail'), 'ana@test.local')
-  await user.click(screen.getByRole('button', { name: 'Enviar código' }))
+  await user.type(screen.getByLabelText('Email'), 'ana@test.local')
+  await user.click(screen.getByRole('button', { name: 'Send code' }))
   expect(calls.sent).toEqual(['ana@test.local'])
-  expect(await screen.findByText('Enviamos um código de 6 dígitos para ana@test.local.')).toBeTruthy()
+  expect(await screen.findByText('We sent a 6-digit code to ana@test.local.')).toBeTruthy()
 
-  await user.type(screen.getByLabelText('Código'), '123456')
-  await user.click(screen.getByRole('button', { name: 'Entrar' }))
+  await user.type(screen.getByLabelText('Code'), '123456')
+  await user.click(screen.getByRole('button', { name: 'Sign in' }))
   expect(calls.verified).toEqual([['ana@test.local', '123456']])
 
-  await user.click(screen.getByRole('button', { name: 'Usar outro e-mail' }))
-  expect(screen.getByRole('button', { name: 'Enviar código' })).toBeTruthy()
+  await user.click(screen.getByRole('button', { name: 'Use another email' }))
+  expect(screen.getByRole('button', { name: 'Send code' })).toBeTruthy()
 })
 
 it('shows the friendly error and keeps the email', async () => {
   const user = userEvent.setup()
   renderLogin({ sendCode: async () => { throw new TypeError('fetch failed') } })
 
-  await user.type(screen.getByLabelText('E-mail'), 'ana@test.local')
-  await user.click(screen.getByRole('button', { name: 'Enviar código' }))
-  expect((await screen.findByRole('alert')).textContent).toBe('Sem conexão com o servidor. Tente de novo.')
-  expect((screen.getByLabelText('E-mail') as HTMLInputElement).value).toBe('ana@test.local')
+  await user.type(screen.getByLabelText('Email'), 'ana@test.local')
+  await user.click(screen.getByRole('button', { name: 'Send code' }))
+  expect((await screen.findByRole('alert')).textContent).toBe('Cannot connect to the server. Try again.')
+  expect((screen.getByLabelText('Email') as HTMLInputElement).value).toBe('ana@test.local')
 })
 
 it('shows the friendly error of a refused code and stays on the code step', async () => {
   const user = userEvent.setup()
   renderLogin({ verifyCode: async () => { throw new Error('Token has expired or is invalid') } })
 
-  await user.type(screen.getByLabelText('E-mail'), 'ana@test.local')
-  await user.click(screen.getByRole('button', { name: 'Enviar código' }))
-  await user.type(await screen.findByLabelText('Código'), '000000')
-  await user.click(screen.getByRole('button', { name: 'Entrar' }))
-  expect((await screen.findByRole('alert')).textContent).toBe('Algo deu errado. Tente de novo.')
-  expect(screen.getByText('Enviamos um código de 6 dígitos para ana@test.local.')).toBeTruthy()
+  await user.type(screen.getByLabelText('Email'), 'ana@test.local')
+  await user.click(screen.getByRole('button', { name: 'Send code' }))
+  await user.type(await screen.findByLabelText('Code'), '000000')
+  await user.click(screen.getByRole('button', { name: 'Sign in' }))
+  expect((await screen.findByRole('alert')).textContent).toBe('Something went wrong. Try again.')
+  expect(screen.getByText('We sent a 6-digit code to ana@test.local.')).toBeTruthy()
 })
 
 it('starts Google and Apple sign-in', async () => {
   const user = userEvent.setup()
   const calls = renderLogin()
 
-  await user.click(screen.getByRole('button', { name: 'Entrar com Google' }))
+  await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
   expect(calls.oauth).toEqual(['google'])
-  expect(await screen.findByText('Continue no navegador…')).toBeTruthy()
+  expect(await screen.findByText('Continue in your browser…')).toBeTruthy()
 
-  await user.click(screen.getByRole('button', { name: 'Entrar com Apple' }))
+  await user.click(screen.getByRole('button', { name: 'Continue with Apple' }))
   expect(calls.oauth).toEqual(['google', 'apple'])
 })
 
@@ -76,12 +76,12 @@ it('shows the friendly error when a sign-in provider cannot start', async () => 
   const user = userEvent.setup()
   renderLogin({ startOAuth: async () => { throw new Error('Unsupported provider: provider is not enabled') } })
 
-  await user.click(screen.getByRole('button', { name: 'Entrar com Google' }))
-  expect((await screen.findByRole('alert')).textContent).toBe('Esse jeito de entrar ainda não está disponível.')
-  expect(screen.queryByText('Continue no navegador…')).toBeNull()
+  await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
+  expect((await screen.findByRole('alert')).textContent).toBe('This sign-in method is not available yet.')
+  expect(screen.queryByText('Continue in your browser…')).toBeNull()
 })
 
 it('shows a sign-in error that came back from the browser', () => {
-  renderLogin({ error: 'Não foi possível entrar. Tente de novo.' })
-  expect(screen.getByRole('alert').textContent).toBe('Não foi possível entrar. Tente de novo.')
+  renderLogin({ error: 'Could not sign in. Try again.' })
+  expect(screen.getByRole('alert').textContent).toBe('Could not sign in. Try again.')
 })

@@ -7,7 +7,7 @@ import { signedUrls } from '../../packages/desktop/src/data/files.ts'
 import { closeChannels, waitFor, warmUpRealtime } from '../helpers/realtime'
 import { createAgentVersion, createPieceFixture, createTestTeam, serviceClient, uploadTeamFile } from '../helpers/supabase'
 
-const NOT_FOUND = 'Peça não encontrada ou sem acesso.'
+const NOT_FOUND = 'Piece not found or access denied.'
 const NO_ROUTE = { campaignId: null, pieceId: null }
 
 afterEach(closeChannels)
@@ -34,7 +34,7 @@ it('designer creates a campaign and a piece and renames it', async () => {
 it('espectador gets the friendly permission error', async () => {
   const f = await createPieceFixture()
   const viewer = f.t.members.espectador.client
-  const permission = 'Você não tem permissão para isso.'
+  const permission = 'You do not have permission to do this.'
 
   const campaign = await createCampaign(viewer, f.t.teamId, 'Não pode').catch((e: unknown) => e)
   expect(friendlyError(campaign)).toBe(permission)
@@ -43,7 +43,7 @@ it('espectador gets the friendly permission error', async () => {
   expect(friendlyError(piece)).toBe(permission)
   // RLS hides the row from an update instead of failing it; the app must still say no.
   const rename = await renamePiece(viewer, f.pieceId, 'Não pode').catch((e: unknown) => e)
-  expect(friendlyError(rename)).toBe('Você não pode alterar esta peça.')
+  expect(friendlyError(rename)).toBe('You cannot edit this piece.')
 
   const { data } = await serviceClient().from('pieces').select('title').eq('id', f.pieceId).single()
   expect(data?.title).toBe('Peça de teste')
@@ -144,7 +144,7 @@ describe('live lists', () => {
     await createCampaign(designer, f.t.teamId, 'Nova')
     await waitFor(() => changes >= 1)
     expect(changes).toBe(1)
-    await createPiece(designer, { campaignId: f.campaignId, teamId: f.t.teamId, title: 'Nova peça', kind: 'texto' })
+    await createPiece(designer, { campaignId: f.campaignId, teamId: f.t.teamId, title: 'New piece', kind: 'texto' })
     await waitFor(() => changes >= 2)
     await renamePiece(designer, f.pieceId, 'Renomeada')
     await waitFor(() => changes >= 3)

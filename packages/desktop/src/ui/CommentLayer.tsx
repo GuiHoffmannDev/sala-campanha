@@ -63,7 +63,7 @@ export function CommentLayer({ version, title, imageUrl, comments, canComment, b
   return <>
     {version.image_path && (imageUrl
       ? <div className="comment-image">
-        <button type="button" className="comment-image-target" aria-label="Escolher ponto na imagem"
+        <button type="button" className="comment-image-target" aria-label="Choose a point on the image"
           disabled={!canComment || !pinning || busy} onKeyDown={(e) => {
             const move = { ArrowLeft: [-0.05, 0], ArrowRight: [0.05, 0], ArrowUp: [0, -0.05], ArrowDown: [0, 0.05] }[e.key]
             if (!move) return
@@ -78,26 +78,26 @@ export function CommentLayer({ version, title, imageUrl, comments, canComment, b
         {pinning && canComment && <span className="comment-pin" aria-hidden="true"
           style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%` }}>+</span>}
         {roots.map((c, index) => c.x !== null && c.y !== null && <button key={c.id} type="button"
-          className={`comment-pin${c.resolved ? ' resolved' : ''}`} aria-label={`Comentário ${index + 1}`}
+          className={`comment-pin${c.resolved ? ' resolved' : ''}`} aria-label={`Comment ${index + 1}`}
           aria-controls={`${prefix}-${c.id}`} style={{ left: `${c.x * 100}%`, top: `${c.y * 100}%` }}
           onClick={() => focusThread(c.id)}>{index + 1}</button>)}
         {canComment && draft?.target && 'x' in draft.target && <button type="button" className="comment-pin"
-          aria-label="Novo comentário" style={{ left: `${draft.target.x * 100}%`, top: `${draft.target.y * 100}%` }}
+          aria-label="New comment" style={{ left: `${draft.target.x * 100}%`, top: `${draft.target.y * 100}%` }}
           onClick={() => field.current?.focus()}>+</button>}
       </div>
-      : <p role="status">Imagem indisponível.</p>)}
-    {version.caption !== null && <textarea ref={caption} className="version-caption" aria-label="Legenda da versão"
+      : <p role="status">Image unavailable.</p>)}
+    {version.caption !== null && <textarea ref={caption} className="version-caption" aria-label="Version caption"
       readOnly value={version.caption.replace(/\r\n?/g, '\n')} onSelect={selectExcerpt} />}
-    <section aria-label="Comentários da versão" className="comment-layer">
+    <section aria-label="Version comments" className="comment-layer">
       {canComment && <div className="dialog-actions">
-        <button type="button" disabled={busy} onClick={() => start(null)}>Comentar na versão</button>
+        <button type="button" disabled={busy} onClick={() => start(null)}>Comment on version</button>
         {imageUrl && <button type="button" disabled={busy} aria-pressed={pinning}
-          onClick={() => { setPinning(true); setPoint({ x: 0.5, y: 0.5 }); setDraft(null); setError(null) }}>Comentar na imagem</button>}
-        {excerpt && <button type="button" disabled={busy} onClick={() => start(excerpt)}>Comentar trecho</button>}
+          onClick={() => { setPinning(true); setPoint({ x: 0.5, y: 0.5 }); setDraft(null); setError(null) }}>Comment on image</button>}
+        {excerpt && <button type="button" disabled={busy} onClick={() => start(excerpt)}>Comment on excerpt</button>}
       </div>}
-      {pinning && canComment && <p role="status">Clique na imagem. Pelo teclado, use as setas e Enter.
-        {' '}Ponto: {Math.round(point.x * 100)}%, {Math.round(point.y * 100)}%.
-        {' '}<button type="button" onClick={() => setPinning(false)}>Cancelar</button></p>}
+      {pinning && canComment && <p role="status">Click the image. With a keyboard, use the arrow keys and Enter.
+        {' '}Point: {Math.round(point.x * 100)}%, {Math.round(point.y * 100)}%.
+        {' '}<button type="button" onClick={() => setPinning(false)}>Cancel</button></p>}
       {draft && canComment && <form onSubmit={(e) => {
         e.preventDefault()
         if (busy || !body.trim() || !onAdd) return
@@ -108,24 +108,24 @@ export function CommentLayer({ version, title, imageUrl, comments, canComment, b
         })
       }}>
         {draft.target && 'quote' in draft.target && <blockquote>{draft.target.quote}</blockquote>}
-        <label>Comentário<textarea ref={field} value={body} onChange={(e) => setBody(e.target.value)} required disabled={busy} /></label>
+        <label>Comment<textarea ref={field} value={body} onChange={(e) => setBody(e.target.value)} required disabled={busy} /></label>
         <div className="dialog-actions">
-          <button type="submit" disabled={busy || !body.trim()}>Enviar comentário</button>
-          <button type="button" disabled={busy} onClick={() => { setDraft(null); setError(null) }}>Cancelar</button>
+          <button type="submit" disabled={busy || !body.trim()}>Send comment</button>
+          <button type="button" disabled={busy} onClick={() => { setDraft(null); setError(null) }}>Cancel</button>
         </div>
       </form>}
       {error && <p role="alert">{error}</p>}
       {roots.map((root, index) => <article key={root.id} id={`${prefix}-${root.id}`} tabIndex={-1}
-        aria-label={`Comentário ${index + 1}`} className="comment-thread">
-        <strong>Comentário {index + 1}</strong>
+        aria-label={`Comment ${index + 1}`} className="comment-thread">
+        <strong>Comment {index + 1}</strong>
         {root.quote && <blockquote>{root.quote}</blockquote>}
         <p>{root.body}</p>
-        {root.resolved && <span className="comment-resolved">Resolvido</span>}
+        {root.resolved && <span className="comment-resolved">Resolved</span>}
         {current.filter((c) => c.parent_id === root.id).map((reply) => <p key={reply.id} className="comment-reply">{reply.body}</p>)}
         {canComment && <div className="dialog-actions">
-          <button type="button" disabled={busy} onClick={() => start(null, root.id)}>Responder</button>
+          <button type="button" disabled={busy} onClick={() => start(null, root.id)}>Reply</button>
           <button type="button" disabled={busy} onClick={() => void run(() => onSetResolved!(root.id, !root.resolved))}>
-            {root.resolved ? 'Reabrir' : 'Resolver'}
+            {root.resolved ? 'Reopen' : 'Resolve'}
           </button>
         </div>}
       </article>)}

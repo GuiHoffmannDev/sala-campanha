@@ -255,12 +255,12 @@ otp_expiry = 3600
 
 # The app signs in with a 6-digit code (`{{ .Token }}`), never with the link.
 [auth.email.template.magic_link]
-subject = "Seu código da Sala da Campanha"
+subject = "Your Sala da Campanha sign-in code"
 content_path = "./supabase/templates/codigo.html"
 
 # With confirmations on, a new user's first code arrives in the confirmation email.
 [auth.email.template.confirmation]
-subject = "Seu código da Sala da Campanha"
+subject = "Your Sala da Campanha sign-in code"
 content_path = "./supabase/templates/codigo.html"
 
 # Uncomment to customize notification email template

@@ -21,6 +21,6 @@ it('gestor gets the friendly admin-only message', async () => {
     () => saveKey(t.members.gestor.client, t.teamId, 'openai', 'local-fake-provider-key-0001'),
     () => deleteKey(t.members.gestor.client, t.teamId, 'openai'),
   ]) {
-    expect(friendlyError(await action().catch((e: unknown) => e))).toBe('Só o admin do workspace gerencia as chaves.')
+    expect(friendlyError(await action().catch((e: unknown) => e))).toBe('Only a workspace admin can manage keys.')
   }
 })

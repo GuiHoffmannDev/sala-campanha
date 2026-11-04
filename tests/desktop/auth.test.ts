@@ -27,9 +27,9 @@ it('a new person signs up with an email code and creates a workspace', async () 
   expect(displayNameOf(user!)).toBe('Nova Pessoa')
 
   expect(await acceptInvites(client, 'Nova Pessoa')).toBe(0)
-  const teamId = await createWorkspace(client, 'Workspace de Nova', 'Nova Pessoa')
+  const teamId = await createWorkspace(client, 'Workspace for Nova', 'Nova Pessoa')
   expect(await loadMyMemberships(client)).toEqual([
-    { teamId, teamName: 'Workspace de Nova', role: 'admin', displayName: 'Nova Pessoa' },
+    { teamId, teamName: 'Workspace for Nova', role: 'admin', displayName: 'Nova Pessoa' },
   ])
 })
 
@@ -79,8 +79,8 @@ it('a wrong code is refused with a readable message', async () => {
 
   const error = await verifyLoginCode(client, email, wrong).catch((e: unknown) => e)
   expect(error).toBeInstanceOf(Error)
-  expect((error as Error).message).toBe('Código inválido ou vencido. Peça um novo.')
-  expect(friendlyError(error)).toBe('Código inválido ou vencido. Peça um novo.')
+  expect((error as Error).message).toBe('Invalid or expired code. Request a new one.')
+  expect(friendlyError(error)).toBe('Invalid or expired code. Request a new one.')
   expect((await client.auth.getSession()).data.session).toBeNull()
 })
 
@@ -89,7 +89,7 @@ it('asking for another code too soon says to wait', async () => {
   const client = appClient()
   await sendLoginCode(client, email)
   // supabase/config.toml allows one email per address per second; the hosted default is a minute.
-  await expect(sendLoginCode(client, email)).rejects.toThrow('Espere um minuto antes de pedir outro código.')
+  await expect(sendLoginCode(client, email)).rejects.toThrow('Wait a minute before requesting another code.')
 })
 
 it('oauthUrl points to the provider through Supabase', async () => {
@@ -105,20 +105,20 @@ it('oauthUrl points to the provider through Supabase', async () => {
     expect(result).toMatchObject({ url: expect.stringContaining('redirect_to=sala%3A%2F%2Fauth%2Fcallback%3Fsb_flow_id%3D') })
     expect(result).toMatchObject({ url: expect.stringContaining('code_challenge=') })
   } else {
-    expect(result).toEqual({ error: 'Esse jeito de entrar ainda não está disponível.' })
+    expect(result).toEqual({ error: 'This sign-in method is not available yet.' })
   }
 })
 
 it('a sign-in provider that is off in Supabase gives the friendly text', async () => {
   // GitHub stays off in supabase/config.toml, so it answers the way Google or Apple do when they are off.
   const error = await oauthUrl(appClient(), 'github' as OAuthProvider).catch((e: unknown) => e)
-  expect(friendlyError(error)).toBe('Esse jeito de entrar ainda não está disponível.')
+  expect(friendlyError(error)).toBe('This sign-in method is not available yet.')
 })
 
 it('a code that did not come from the provider is refused with a readable message', async () => {
   const client = appClient()
   await oauthUrl(client, 'apple').catch(() => undefined) // stores the PKCE verifier, as a real sign-in does
-  await expect(finishOAuth(client, randomUUID())).rejects.toThrow('Não foi possível entrar. Tente de novo.')
+  await expect(finishOAuth(client, randomUUID())).rejects.toThrow('Could not sign in. Try again.')
 })
 
 it("finishing Google or Apple uses that sign-in's own PKCE verifier", async () => {
@@ -139,7 +139,7 @@ it("finishing Google or Apple uses that sign-in's own PKCE verifier", async () =
   const fetchSpy = vi.spyOn(globalThis, 'fetch')
   try {
     // The code is made up, so Supabase refuses it; what matters is the verifier sent with it.
-    await expect(finishOAuth(client, code, flowId)).rejects.toThrow('Não foi possível entrar. Tente de novo.')
+    await expect(finishOAuth(client, code, flowId)).rejects.toThrow('Could not sign in. Try again.')
     const exchange = fetchSpy.mock.calls.find(([url]) => String(url).includes('grant_type=pkce'))
     const { code_verifier } = JSON.parse(String(exchange?.[1]?.body)) as { code_verifier: string }
     expect(createHash('sha256').update(code_verifier).digest('base64url')).toBe(started.searchParams.get('code_challenge'))
@@ -168,7 +168,7 @@ it('the redirect allow list accepts the callback with its flow id', async () => 
 it('sign-in calls without a connection say so', async () => {
   // Nothing listens on port 9, so every request fails before reaching a server.
   const offline = createAppClient('http://127.0.0.1:9', 'anon')
-  const offlineText = 'Sem conexão com o servidor. Tente de novo.'
+  const offlineText = 'Cannot connect to the server. Try again.'
   const errorOf = (p: Promise<unknown>) => p.then(() => null, (e: unknown) => friendlyError(e))
 
   expect(await errorOf(sendLoginCode(offline, 'ana@test.local'))).toBe(offlineText)

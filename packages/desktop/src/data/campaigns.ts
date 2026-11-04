@@ -11,7 +11,7 @@ export type Piece = {
 
 const CAMPAIGN_COLUMNS = 'id, team_id, name, created_at'
 const PIECE_COLUMNS = 'id, campaign_id, team_id, title, kind, status, approved_version_id, created_at'
-const NOT_FOUND = 'Peça não encontrada ou sem acesso.'
+const NOT_FOUND = 'Piece not found or access denied.'
 
 /** The workspace's campaigns, oldest first. */
 export async function loadCampaigns(client: SupabaseClient, teamId: string): Promise<Campaign[]> {
@@ -50,7 +50,7 @@ export async function renamePiece(client: SupabaseClient, pieceId: string, title
   const { data, error } = await client.from('pieces').update({ title: title.trim() }).eq('id', pieceId).select('id')
   if (error) throw error
   // RLS hides a piece the person cannot write instead of failing the update.
-  if (!data.length) throw new UserFacingError('Você não pode alterar esta peça.')
+  if (!data.length) throw new UserFacingError('You cannot edit this piece.')
 }
 
 /** For each piece of the campaign with an image, the `image_path` of its newest version with one. */

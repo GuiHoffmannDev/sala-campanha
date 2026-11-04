@@ -3,21 +3,21 @@ import { friendlyError } from '../data/errors.ts'
 
 type Props = {
   step: 'name' | 'workspace'
-  /** The person's name: the field itself on the name step, the first name in "Workspace de <nome>" on the workspace step. */
+  /** The person's name: the field itself on the name step, the first name in "Workspace for <nome>" on the workspace step. */
   suggestedName: string
   onSaveName(name: string): Promise<void>
   onCreateWorkspace(name: string): Promise<void>
 }
 
 const TEXT = {
-  name: { title: 'Como você quer aparecer para o time?', field: 'Seu nome', submit: 'Continuar' },
-  workspace: { title: 'Crie seu workspace', field: 'Nome do workspace', submit: 'Criar' },
+  name: { title: 'How should your name appear to the team?', field: 'Your name', submit: 'Continue' },
+  workspace: { title: 'Create your workspace', field: 'Workspace name', submit: 'Create' },
 }
 
 function initialValue(step: Props['step'], suggestedName: string): string {
   if (step === 'name') return suggestedName
   const firstName = suggestedName.trim().split(/\s+/)[0]
-  return firstName ? `Workspace de ${firstName}` : ''
+  return firstName ? `Workspace for ${firstName}` : ''
 }
 
 export function Onboarding({ step, suggestedName, onSaveName, onCreateWorkspace }: Props) {

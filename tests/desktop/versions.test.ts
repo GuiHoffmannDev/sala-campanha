@@ -29,7 +29,7 @@ it('uploading a final before approval gives the friendly message', async () => {
   const client = f.t.members.designer.client
   const [piece] = await loadPieces(client, f.campaignId)
   const error = await uploadFinalVersion(client, { piece: piece!, file: photo(), caption: 'Final' }).catch((e: unknown) => e)
-  expect(friendlyError(error)).toBe('A versão final só pode ser enviada depois da aprovação da base.')
+  expect(friendlyError(error)).toBe('The final version can only be uploaded after the base is approved.')
   expect(await loadVersions(client, f.pieceId)).toHaveLength(1)
 })
 
@@ -38,7 +38,7 @@ it('designer cannot undo an approval', async () => {
   const base = await createAgentVersion(f, { image: false })
   await approveVersion(f.t.members.gestor.client, f.pieceId, base.id)
   const error = await stepBack(f.t.members.designer.client, f.pieceId).catch((e: unknown) => e)
-  expect(friendlyError(error)).toBe('Só o admin ou o gestor podem desfazer uma aprovação.')
+  expect(friendlyError(error)).toBe('Only an admin or manager can undo an approval.')
   expect((await loadPieces(f.t.members.designer.client, f.campaignId))[0]?.status).toBe('aprovada')
   await stepBack(f.t.members.gestor.client, f.pieceId)
   expect((await loadPieces(f.t.members.designer.client, f.campaignId))[0]?.status).toBe('base_em_revisao')
@@ -56,9 +56,9 @@ it('rejects missing, unsupported and oversized final images before contacting st
   const client = { storage: { from: vi.fn() }, rpc: vi.fn() } as unknown as SupabaseClient
   const piece = { kind: 'imagem', team_id: 't', id: 'p' } as Piece
   for (const [file, message] of [
-    [null, 'Escolha uma imagem PNG, JPG ou WebP.'],
-    [new File(['pdf'], 'Manual.pdf', { type: 'application/pdf' }), 'Use uma imagem PNG, JPG ou WebP.'],
-    [{ type: 'image/png', size: 26_214_401 } as File, 'A imagem tem mais de 25 MB.'],
+    [null, 'Choose a PNG, JPG or WebP image.'],
+    [new File(['pdf'], 'Manual.pdf', { type: 'application/pdf' }), 'Use a PNG, JPG or WebP image.'],
+    [{ type: 'image/png', size: 26_214_401 } as File, 'The image is larger than 25 MB.'],
   ] as const) {
     await expect(uploadFinalVersion(client, { piece, file, caption: null })).rejects.toThrow(message)
   }

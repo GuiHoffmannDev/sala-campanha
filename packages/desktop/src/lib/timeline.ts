@@ -70,22 +70,35 @@ export function initials(name: string): string {
 
 function modelLabel(ref: ModelRef, capability: ModelCapability): string {
   const label = findModel(ref, capability)?.label ?? ref.model
-  return ref.effort ? `${label} (esforço ${EFFORT_LABELS[ref.effort] ?? ref.effort})` : label
+  return ref.effort ? `${label} (effort ${EFFORT_LABELS[ref.effort] ?? ref.effort})` : label
 }
 
 function startedText(body: Extract<SessionEvent, { kind: 'agent_started' }>['body']): string {
   const { text, image } = body.models
   const models = [text && modelLabel(text, 'text'), image && modelLabel(image, 'image')].filter(Boolean)
-  let out = `Gerando com ${models.join(' e ')}.`
+  let out = `Generating with ${models.join(' and ')}.`
   const dropped = body.dropped_reference_ids.length
-  if (dropped === 1) out += ' 1 referência ficou de fora pelo limite do modelo.'
-  else if (dropped > 1) out += ` ${dropped} referências ficaram de fora pelo limite do modelo.`
+  if (dropped === 1) out += ' 1 reference was left out due to the model limit.'
+  else if (dropped > 1) out += ` ${dropped} references were left out due to the model limit.`
   return out
+}
+
+/** Uses the stable error code so historical server copy follows the app's language too. */
+function agentErrorText(code: Extract<SessionEvent, { kind: 'agent_error' }>['body']['code']): string {
+  switch (code) {
+    case 'missing_key': return 'A provider key is missing. Ask your workspace admin to add it.'
+    case 'invalid_model': return 'The selected model or effort is not available. Choose another option.'
+    case 'wrong_status': return 'This piece cannot generate base versions at its current stage. Go back one stage to generate again.'
+    case 'provider_error': return 'The provider rejected the request. Check your provider account and try again.'
+    case 'timeout': return 'The provider did not respond in time. Try again.'
+    case 'invalid_output': return 'The provider returned a response the agent could not understand. Try again.'
+    case 'internal': return 'Internal agent error. Try again.'
+  }
 }
 
 /** What the chat shows for each event, in the order given. */
 export function timelineItems(events: SessionEvent[], ctx: TimelineContext): TimelineItem[] {
-  const person = (id: string | null) => (id && ctx.members[id]) || 'Alguém'
+  const person = (id: string | null) => (id && ctx.members[id]) || 'Someone'
   const items: TimelineItem[] = []
   const system = (id: number, text: string, version?: Version) => items.push({ type: 'system', id, text, ...(version && { version }) })
 
@@ -102,35 +115,35 @@ export function timelineItems(events: SessionEvent[], ctx: TimelineContext): Tim
         break
       case 'agent_result':
         items.push({
-          type: 'agent', id: e.id, text: `Versão ${e.body.version_number}`, prompt: e.body.image_prompt,
+          type: 'agent', id: e.id, text: `Version ${e.body.version_number}`, prompt: e.body.image_prompt,
           version: ctx.versions[e.body.version_id] ?? null, error: false,
         })
         break
       case 'agent_error':
-        items.push({ type: 'agent', id: e.id, text: e.body.message, prompt: e.body.image_prompt, version: null, error: true })
+        items.push({ type: 'agent', id: e.id, text: agentErrorText(e.body.code), prompt: e.body.image_prompt, version: null, error: true })
         break
       case 'status_changed': {
-        const who = e.author_id ? person(e.author_id) : 'O agente'
-        system(e.id, `${who} mudou a etapa de ${STATUS_LABELS[e.body.from]} para ${STATUS_LABELS[e.body.to]}.`)
+        const who = e.author_id ? person(e.author_id) : 'The agent'
+        system(e.id, `${who} changed the stage from ${STATUS_LABELS[e.body.from]} to ${STATUS_LABELS[e.body.to]}.`)
         break
       }
       // The next three name a version. One not loaded yet shows up when the version list reloads.
       case 'approval': {
         const v = ctx.versions[e.body.version_id]
-        if (v) system(e.id, `${person(e.author_id)} aprovou a versão ${v.number}.`, v)
+        if (v) system(e.id, `${person(e.author_id)} approved version ${v.number}.`, v)
         break
       }
       case 'version_added': {
         // The agent's versions are already shown by their agent_result.
         const v = ctx.versions[e.body.version_id]
         if (!e.author_id || !v) break
-        if (v.origin === 'upload') system(e.id, `${person(e.author_id)} enviou a versão final ${v.number}.`, v)
-        else if (v.origin === 'edicao') system(e.id, `${person(e.author_id)} editou a legenda (versão ${v.number}).`, v)
+        if (v.origin === 'upload') system(e.id, `${person(e.author_id)} uploaded final version ${v.number}.`, v)
+        else if (v.origin === 'edicao') system(e.id, `${person(e.author_id)} edited the caption (version ${v.number}).`, v)
         break
       }
       case 'comment': {
         const v = ctx.versions[e.body.version_id]
-        if (v) system(e.id, `${person(e.author_id)} comentou na versão ${v.number}.`, v)
+        if (v) system(e.id, `${person(e.author_id)} commented on version ${v.number}.`, v)
         break
       }
     }

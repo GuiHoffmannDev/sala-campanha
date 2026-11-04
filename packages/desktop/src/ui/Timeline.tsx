@@ -14,7 +14,7 @@ type Props = {
 /** The piece conversation, oldest first. */
 export function Timeline({ items, imageUrls, onImageLoad, onOpenVersion }: Props) {
   return (
-    <ol className="timeline" aria-label="Conversa">
+    <ol className="timeline" aria-label="Conversation">
       {items.map((item) => {
         if (item.type === 'message') {
           const delivery = item.deliveryLabel === DELIVERY_LABELS.failed ? 'delivery-failed' : 'delivery-pending'
@@ -31,7 +31,7 @@ export function Timeline({ items, imageUrls, onImageLoad, onOpenVersion }: Props
         }
         if (item.type === 'agent') return <AgentCard key={item.id} item={item} imageUrls={imageUrls} onImageLoad={onImageLoad} onOpenVersion={onOpenVersion} />
         return <li key={item.id} className="chat-system">{item.version && onOpenVersion
-          ? <button type="button" className="version-link" aria-label={`Abrir versão ${item.version.number}`}
+          ? <button type="button" className="version-link" aria-label={`Open version ${item.version.number}`}
             onClick={() => onOpenVersion(item.version!.id)}>{item.text}</button>
           : item.text}</li>
       })}
@@ -47,9 +47,9 @@ function AgentCard({ item, imageUrls, onImageLoad, onOpenVersion }: {
   const url = item.version?.image_path ? imageUrls[item.version.image_path] : undefined
   return (
     <li className={item.error ? 'agent-card agent-error' : 'agent-card'}>
-      <strong className="chat-author">Agente</strong>
+      <strong className="chat-author">Agent</strong>
       {item.version && onOpenVersion
-        ? <button type="button" className="version-link agent-version" aria-label={`Abrir versão ${item.version.number}`}
+        ? <button type="button" className="version-link agent-version" aria-label={`Open version ${item.version.number}`}
           onClick={() => onOpenVersion(item.version!.id)}>
           <span className="agent-title">{item.text}</span>
           {url && <img src={url} alt={item.text} onLoad={onImageLoad} />}
@@ -59,7 +59,7 @@ function AgentCard({ item, imageUrls, onImageLoad, onOpenVersion }: {
       {item.version?.caption && <p className="agent-caption">{item.version.caption}</p>}
       {item.prompt && (
         <>
-          <button type="button" aria-expanded={showPrompt} onClick={() => setShowPrompt((s) => !s)}>Ver prompt</button>
+          <button type="button" aria-expanded={showPrompt} onClick={() => setShowPrompt((s) => !s)}>View prompt</button>
           {showPrompt && <pre className="agent-prompt">{item.prompt}</pre>}
         </>
       )}

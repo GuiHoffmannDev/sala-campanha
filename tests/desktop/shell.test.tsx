@@ -70,13 +70,13 @@ it('posts the inherited model and campaign references through the piece composer
     file: new NodeFile(['png'], 'Produto.png', { type: 'image/png' }) as File })
   render(<Host client={client} memberships={[membership(f.t.teamId, 'designer')]} teamId={f.t.teamId}
     route={{ campaignId: f.campaignId, pieceId: f.pieceId }} />)
-  const input = await screen.findByRole('textbox', { name: 'Mensagem' })
-  await waitFor(() => expect(screen.getByLabelText('Esforço de texto')).toHaveProperty('value', 'high'))
+  const input = await screen.findByRole('textbox', { name: 'Message' })
+  await waitFor(() => expect(screen.getByLabelText('Text effort')).toHaveProperty('value', 'high'))
   await user.type(input, 'Gere outra versão')
-  await user.click(screen.getByRole('button', { name: 'Anexar referência' }))
+  await user.click(screen.getByRole('button', { name: 'Attach reference' }))
   await user.click(await screen.findByRole('checkbox', { name: 'Produto.png' }))
-  await user.click(screen.getByRole('button', { name: 'Usar selecionadas' }))
-  await user.click(screen.getByRole('button', { name: 'Enviar' }))
+  await user.click(screen.getByRole('button', { name: 'Use selected' }))
+  await user.click(screen.getByRole('button', { name: 'Send' }))
   await waitFor(async () => {
     const { data, error } = await client.from('session_events').select('body, to_agent, delivery')
       .eq('piece_id', f.pieceId).order('id', { ascending: false }).limit(1).single()
@@ -91,8 +91,8 @@ it('shows an espectador notice instead of the composer', async () => {
   const f = await createPieceFixture()
   render(<Host client={f.t.members.espectador.client} memberships={[membership(f.t.teamId, 'espectador')]}
     teamId={f.t.teamId} route={{ campaignId: f.campaignId, pieceId: f.pieceId }} />)
-  expect(await screen.findByText('Você acompanha esta peça como espectador.')).toBeTruthy()
-  expect(screen.queryByRole('textbox', { name: 'Mensagem' })).toBeNull()
+  expect(await screen.findByText('You are viewing this piece as a viewer.')).toBeTruthy()
+  expect(screen.queryByRole('textbox', { name: 'Message' })).toBeNull()
 })
 
 it('opens campaign references for an espectador and returns to the piece', async () => {
@@ -104,12 +104,12 @@ it('opens campaign references for an espectador and returns to the piece', async
   })
   render(<Host client={f.t.members.espectador.client} memberships={[membership(f.t.teamId, 'espectador')]}
     teamId={f.t.teamId} route={{ campaignId: f.campaignId, pieceId: f.pieceId }} />)
-  await user.click(await screen.findByRole('button', { name: 'Referências' }))
+  await user.click(await screen.findByRole('button', { name: 'References' }))
   const image = await screen.findByRole('img', { name: 'Produto.png' })
   expect(image.getAttribute('src')).toContain('/storage/v1/object/sign/team-files/')
-  expect(screen.queryByLabelText('Enviar fotos')).toBeNull()
-  await user.click(screen.getByRole('button', { name: 'Voltar à peça' }))
-  expect(await screen.findByRole('list', { name: 'Conversa' })).toBeTruthy()
+  expect(screen.queryByLabelText('Upload photos')).toBeNull()
+  await user.click(screen.getByRole('button', { name: 'Back to piece' }))
+  expect(await screen.findByRole('list', { name: 'Conversation' })).toBeTruthy()
 })
 
 it('a designer uploads multiple campaign photos and a campaign switch hides them', async () => {
@@ -120,9 +120,9 @@ it('a designer uploads multiple campaign photos and a campaign switch hides them
   const props = { client: f.t.members.designer.client, memberships, teamId: f.t.teamId,
     onNavigate: () => {}, onSwitchWorkspace: () => {}, onCreateWorkspace: async () => {} }
   const { rerender } = render(<Shell {...props} route={{ campaignId: f.campaignId, pieceId: null }} />)
-  await user.click(await screen.findByRole('button', { name: 'Referências' }))
+  await user.click(await screen.findByRole('button', { name: 'References' }))
   // Use Node Files at the fetch boundary: jsdom's File is not a native Node Blob.
-  fireEvent.change(screen.getByLabelText('Enviar fotos'), { target: { files: [
+  fireEvent.change(screen.getByLabelText('Upload photos'), { target: { files: [
     new NodeFile(['png'], 'Produto.png', { type: 'image/png' }),
     new NodeFile(['jpg'], 'Detalhe.jpg', { type: 'image/jpeg' }),
   ] } })
@@ -132,8 +132,8 @@ it('a designer uploads multiple campaign photos and a campaign switch hides them
 
   rerender(<Shell {...props} route={{ campaignId: other.campaignId, pieceId: null }} />)
   expect(screen.queryByRole('img', { name: 'Produto.png' })).toBeNull()
-  await user.click(screen.getByRole('button', { name: 'Referências' }))
-  expect(await screen.findByText('Nenhuma referência nesta campanha.')).toBeTruthy()
+  await user.click(screen.getByRole('button', { name: 'References' }))
+  expect(await screen.findByText('No references in this campaign.')).toBeTruthy()
   expect(screen.queryByRole('img', { name: 'Detalhe.jpg' })).toBeNull()
 })
 
@@ -142,12 +142,12 @@ it('opening a piece from the list closes the reference library', async () => {
   const f = await createPieceFixture()
   render(<Host client={f.t.members.designer.client} memberships={[membership(f.t.teamId, 'designer')]}
     teamId={f.t.teamId} route={{ campaignId: f.campaignId, pieceId: null }} />)
-  await user.click(await screen.findByRole('button', { name: 'Referências' }))
-  const pieces = screen.getByRole('region', { name: 'Peças da campanha' })
+  await user.click(await screen.findByRole('button', { name: 'References' }))
+  const pieces = screen.getByRole('region', { name: 'Campaign pieces' })
   await user.click(await within(pieces).findByRole('button', { name: /Peça de teste/ }))
-  expect(await screen.findByLabelText('Título da peça')).toHaveProperty('value', 'Peça de teste')
-  expect(screen.queryByRole('region', { name: 'Biblioteca de referências' })).toBeNull()
-  expect(screen.getByRole('list', { name: 'Conversa' })).toBeTruthy()
+  expect(await screen.findByLabelText('Piece title')).toHaveProperty('value', 'Peça de teste')
+  expect(screen.queryByRole('region', { name: 'Reference library' })).toBeNull()
+  expect(screen.getByRole('list', { name: 'Conversation' })).toBeTruthy()
 })
 
 it('a designer creates a campaign and a piece, opens it and copies its link', async () => {
@@ -155,29 +155,29 @@ it('a designer creates a campaign and a piece, opens it and copies its link', as
   const t = await createTestTeam()
   render(<Host client={t.members.designer.client} memberships={[membership(t.teamId, 'designer')]} teamId={t.teamId} />)
 
-  await user.click(await screen.findByRole('button', { name: 'Nova campanha' }))
-  await user.type(screen.getByLabelText('Nome da campanha'), 'Black Friday')
-  await user.click(screen.getByRole('button', { name: 'Criar campanha' }))
+  await user.click(await screen.findByRole('button', { name: 'New campaign' }))
+  await user.type(screen.getByLabelText('Campaign name'), 'Black Friday')
+  await user.click(screen.getByRole('button', { name: 'Create campaign' }))
   // The new campaign opens: its name is in the header.
   expect(await screen.findByRole('heading', { name: 'Black Friday' })).toBeTruthy()
-  expect(screen.getByText('Escolha uma peça')).toBeTruthy()
+  expect(screen.getByText('Choose a piece')).toBeTruthy()
 
-  await user.click(screen.getByRole('button', { name: 'Nova peça' }))
-  await user.type(screen.getByLabelText('Título da peça'), 'Banner Instagram')
-  await user.selectOptions(screen.getByLabelText('Tipo'), 'Imagem e texto')
-  await user.click(screen.getByRole('button', { name: 'Criar peça' }))
+  await user.click(screen.getByRole('button', { name: 'New piece' }))
+  await user.type(screen.getByLabelText('Piece title'), 'Banner Instagram')
+  await user.selectOptions(screen.getByLabelText('Type'), 'Image and text')
+  await user.click(screen.getByRole('button', { name: 'Create piece' }))
 
-  const list = screen.getByRole('region', { name: 'Peças da campanha' })
+  const list = screen.getByRole('region', { name: 'Campaign pieces' })
   expect(await within(list).findByText('Banner Instagram')).toBeTruthy()
-  expect(within(list).getByText('Imagem e texto')).toBeTruthy()
-  expect(within(list).getByText('Gerando')).toBeTruthy()
+  expect(within(list).getByText('Image and text')).toBeTruthy()
+  expect(within(list).getByText('Generating')).toBeTruthy()
   // The new piece opens too: its title is editable in the header.
-  const title = (await screen.findByLabelText('Título da peça')) as HTMLInputElement
+  const title = (await screen.findByLabelText('Piece title')) as HTMLInputElement
   expect(title.value).toBe('Banner Instagram')
 
   const { data: piece } = await serviceClient().from('pieces').select('id, campaign_id').eq('team_id', t.teamId).single()
-  await user.click(screen.getByRole('button', { name: 'Compartilhar' }))
-  expect(await screen.findByText('Link copiado')).toBeTruthy()
+  await user.click(screen.getByRole('button', { name: 'Share' }))
+  expect(await screen.findByText('Link copied')).toBeTruthy()
   expect(copied.texts).toEqual([`sala://campanha/${piece!.campaign_id}/peca/${piece!.id}`])
 })
 
@@ -191,7 +191,7 @@ it('renames the open piece in the header', async () => {
     />,
   )
 
-  const title = (await screen.findByLabelText('Título da peça')) as HTMLInputElement
+  const title = (await screen.findByLabelText('Piece title')) as HTMLInputElement
   await waitFor(() => expect(title.value).toBe('Peça de teste'))
   await user.clear(title)
   await user.type(title, 'Post do Natal{Enter}')
@@ -213,8 +213,8 @@ it('an espectador sees the work and the people but cannot create or rename', asy
 
   expect(await screen.findByRole('heading', { name: 'Peça de teste' })).toBeTruthy()
   expect(screen.getByText('Agência Sol')).toBeTruthy()
-  const list = screen.getByRole('region', { name: 'Peças da campanha' })
-  expect(within(list).getByText('Base em revisão')).toBeTruthy()
+  const list = screen.getByRole('region', { name: 'Campaign pieces' })
+  expect(within(list).getByText('Base under review')).toBeTruthy()
   // The thumbnail is the newest image, through a signed URL. It is decorative (alt=""): the title is beside it.
   const thumbnail = await waitFor(() => {
     const img = list.querySelector('img')
@@ -223,15 +223,16 @@ it('an espectador sees the work and the people but cannot create or rename', asy
   })
   expect(thumbnail.src).toContain('/storage/v1/object/sign/team-files/')
 
-  const people = screen.getByRole('region', { name: 'Pessoas do workspace' })
+  const people = screen.getByRole('region', { name: 'Workspace members' })
   expect(await within(people).findAllByRole('listitem')).toHaveLength(4)
-  // The test helper names each person after their role: name and role both show.
-  expect(within(people).getAllByText('gestor')).toHaveLength(2)
+  // The fixture name stays in Portuguese; the role label is product copy in English.
+  expect(within(people).getByText('gestor')).toBeTruthy()
+  expect(within(people).getByText('Manager')).toBeTruthy()
 
-  expect(screen.queryByRole('button', { name: 'Nova campanha' })).toBeNull()
-  expect(screen.queryByRole('button', { name: 'Nova peça' })).toBeNull()
-  expect(screen.queryByLabelText('Título da peça')).toBeNull()
-  expect(screen.getByRole('button', { name: 'Compartilhar' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'New campaign' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'New piece' })).toBeNull()
+  expect(screen.queryByLabelText('Piece title')).toBeNull()
+  expect(screen.getByRole('button', { name: 'Share' })).toBeTruthy()
 })
 
 it("a workspace switch never shows the previous workspace's campaigns", async () => {
@@ -264,9 +265,9 @@ it('switches between workspaces and creates a new one', async () => {
   await user.selectOptions(await screen.findByLabelText('Workspace'), 'Agência B')
   expect(switched).toEqual([b.teamId])
 
-  await user.click(screen.getByRole('button', { name: 'Novo workspace' }))
-  await user.type(screen.getByLabelText('Nome do workspace'), 'Agência C')
-  await user.click(screen.getByRole('button', { name: 'Criar workspace' }))
+  await user.click(screen.getByRole('button', { name: 'New workspace' }))
+  await user.type(screen.getByLabelText('Workspace name'), 'Agência C')
+  await user.click(screen.getByRole('button', { name: 'Create workspace' }))
   await waitFor(() => expect(created).toEqual(['Agência C']))
 })
 
@@ -274,21 +275,21 @@ it('an admin opens workspace settings and saving a key refreshes its mask', asyn
   const user = userEvent.setup()
   const t = await createTestTeam()
   render(<Host client={t.members.admin.client} teamId={t.teamId} memberships={[membership(t.teamId, 'admin')]} />)
-  await user.click(screen.getByRole('button', { name: 'Configurações do workspace' }))
-  const field = await screen.findByLabelText('Chave Anthropic')
+  await user.click(screen.getByRole('button', { name: 'Workspace settings' }))
+  const field = await screen.findByLabelText('Key Anthropic')
   await user.type(field, 'chave-falsa-local-0001')
-  await user.click(within(screen.getByRole('region', { name: 'Anthropic' })).getByRole('button', { name: 'Salvar' }))
+  await user.click(within(screen.getByRole('region', { name: 'Anthropic' })).getByRole('button', { name: 'Save' }))
   expect(await screen.findByText('...0001')).toBeTruthy()
   expect(field).toHaveProperty('value', '')
-  await user.click(screen.getByRole('button', { name: 'Voltar às campanhas' }))
-  expect(screen.queryByLabelText('Chave Anthropic')).toBeNull()
+  await user.click(screen.getByRole('button', { name: 'Back to campaigns' }))
+  expect(screen.queryByLabelText('Key Anthropic')).toBeNull()
 })
 
 it.each(['gestor', 'designer', 'espectador'] as const)('%s cannot open workspace settings', async (role) => {
   const t = await createTestTeam()
   render(<Host client={t.members[role].client} teamId={t.teamId} memberships={[membership(t.teamId, role)]} />)
   expect(await screen.findByRole('heading', { name: 'Agência' })).toBeTruthy()
-  expect(screen.queryByRole('button', { name: 'Configurações do workspace' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Workspace settings' })).toBeNull()
 })
 
 it('switching workspaces closes settings and clears the typed key', async () => {
@@ -298,8 +299,8 @@ it('switching workspaces closes settings and clears the typed key', async () => 
   const props = { client: a.members.admin.client, memberships: [membership(a.teamId, 'admin'), membership(b.teamId, 'admin')],
     route: { campaignId: null, pieceId: null }, onNavigate: () => {}, onSwitchWorkspace: () => {}, onCreateWorkspace: async () => {} }
   const { rerender } = render(<Shell {...props} teamId={a.teamId} />)
-  await user.click(screen.getByRole('button', { name: 'Configurações do workspace' }))
-  await user.type(await screen.findByLabelText('Chave Anthropic'), 'pending-secret')
+  await user.click(screen.getByRole('button', { name: 'Workspace settings' }))
+  await user.type(await screen.findByLabelText('Key Anthropic'), 'pending-secret')
   rerender(<Shell {...props} teamId={b.teamId} />)
-  expect(screen.queryByLabelText('Chave Anthropic')).toBeNull()
+  expect(screen.queryByLabelText('Key Anthropic')).toBeNull()
 })

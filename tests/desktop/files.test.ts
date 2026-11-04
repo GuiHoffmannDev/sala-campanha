@@ -2,9 +2,9 @@ import { checkImageFile, newImagePath } from '../../packages/desktop/src/data/fi
 
 it('rejects files the bucket refuses', () => {
   for (const type of ['application/pdf', 'image/heic']) {
-    expect(checkImageFile({ type, size: 10 })).toBe('Use uma imagem PNG, JPG ou WebP.')
+    expect(checkImageFile({ type, size: 10 })).toBe('Use a PNG, JPG or WebP image.')
   }
-  expect(checkImageFile({ type: 'image/png', size: 26_214_401 })).toBe('A imagem tem mais de 25 MB.')
+  expect(checkImageFile({ type: 'image/png', size: 26_214_401 })).toBe('The image is larger than 25 MB.')
 })
 
 it('accepts a PNG at the limit', () => {

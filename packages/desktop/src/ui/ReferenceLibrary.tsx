@@ -41,14 +41,14 @@ export function ReferenceLibrary({ references, urls, canUpload, selectable, sele
   }
 
   return (
-    <section className="reference-library" aria-label="Biblioteca de referências">
-      <h2>Referências</h2>
-      {canUpload && <label>Enviar fotos
+    <section className="reference-library" aria-label="Reference library">
+      <h2>References</h2>
+      {canUpload && <label>Upload photos
         <input type="file" accept={IMAGE_TYPES.join(',')} multiple disabled={uploading} onChange={(e) => void upload(e)} />
       </label>}
-      {uploading && <p role="status">Enviando fotos…</p>}
+      {uploading && <p role="status">Uploading photos…</p>}
       {errors.map((message, index) => <p role="alert" key={index}>{message}</p>)}
-      {!references.length && <p className="shell-empty">Nenhuma referência nesta campanha.</p>}
+      {!references.length && <p className="shell-empty">No references in this campaign.</p>}
       <ul className="reference-grid">
         {references.map((reference) => (
           <li key={reference.id}>
@@ -66,7 +66,7 @@ export function ReferenceLibrary({ references, urls, canUpload, selectable, sele
           </li>
         ))}
       </ul>
-      {selectable && <button type="button" onClick={() => onSelect(selection)}>Usar selecionadas</button>}
+      {selectable && <button type="button" onClick={() => onSelect(selection)}>Use selected</button>}
     </section>
   )
 }

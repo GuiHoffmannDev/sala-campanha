@@ -46,7 +46,7 @@ export function PieceHeader({ campaign, piece, canWrite, role, membersInPiece = 
     if (!piece) return
     const previous = piece.kind === 'texto' && piece.status === 'aprovada'
       ? 'base_em_revisao' : PIECE_STATUSES[PIECE_STATUSES.indexOf(piece.status) - 1]
-    if (!previous || !window.confirm(`Voltar a peça de ${STATUS_LABELS[piece.status]} para ${STATUS_LABELS[previous]}?`)) return
+    if (!previous || !window.confirm(`Move the piece from ${STATUS_LABELS[piece.status]} to ${STATUS_LABELS[previous]}?`)) return
     setBusy(true)
     setError(null)
     try { await onStepBack() } catch (e) { setError(friendlyError(e)) } finally { setBusy(false) }
@@ -93,7 +93,7 @@ export function PieceHeader({ campaign, piece, canWrite, role, membersInPiece = 
         <h1>{campaign.name}</h1>
         {piece && (canWrite ? (
           <input
-            className="piece-title-input" aria-label="Título da peça" value={draft} maxLength={80}
+            className="piece-title-input" aria-label="Piece title" value={draft} maxLength={80}
             onChange={(e) => setDraft(e.target.value)} onBlur={() => void saveTitle()} onKeyDown={onKeyDown}
           />
         ) : (
@@ -102,7 +102,7 @@ export function PieceHeader({ campaign, piece, canWrite, role, membersInPiece = 
       </div>
       {piece && <span className={`status status-${piece.status}`}>{STATUS_LABELS[piece.status]}</span>}
       {/* Avatars of who is on the piece now (Task 11). */}
-      <div className="piece-avatars" role={piece ? 'group' : undefined} aria-label={piece ? 'Nesta peça' : undefined}>
+      <div className="piece-avatars" role={piece ? 'group' : undefined} aria-label={piece ? 'In this piece' : undefined}>
         {piece && membersInPiece.map((m) => (
           <span key={m.userId} className="piece-avatar" role="img" aria-label={m.displayName} title={m.displayName}>
             {m.displayName.trim().split(/\s+/u).slice(0, 2).map((name) => Array.from(name)[0] ?? '').join('').toLocaleUpperCase('pt-BR')}
@@ -110,10 +110,10 @@ export function PieceHeader({ campaign, piece, canWrite, role, membersInPiece = 
         ))}
       </div>
       <div className="piece-share">
-        {actions?.stepBack && <button type="button" disabled={busy} onClick={() => void back()}>Voltar uma etapa</button>}
-        {actions?.uploadFinal && <button type="button" disabled={busy} onClick={onUploadFinal}>Enviar versão final</button>}
-        {copied && <span role="status">Link copiado</span>}
-        <button type="button" onClick={() => void share()}>Compartilhar</button>
+        {actions?.stepBack && <button type="button" disabled={busy} onClick={() => void back()}>Go back one stage</button>}
+        {actions?.uploadFinal && <button type="button" disabled={busy} onClick={onUploadFinal}>Upload final version</button>}
+        {copied && <span role="status">Link copied</span>}
+        <button type="button" onClick={() => void share()}>Share</button>
       </div>
       {error && <p role="alert">{error}</p>}
     </header>

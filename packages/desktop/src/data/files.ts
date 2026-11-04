@@ -9,14 +9,14 @@ export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 const EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }
 
 export function checkImageFile(file: { type: string; size: number }): string | null {
-  if (!IMAGE_TYPES.includes(file.type)) return 'Use uma imagem PNG, JPG ou WebP.'
-  if (file.size > MAX_FILE_BYTES) return 'A imagem tem mais de 25 MB.'
+  if (!IMAGE_TYPES.includes(file.type)) return 'Use a PNG, JPG or WebP image.'
+  if (file.size > MAX_FILE_BYTES) return 'The image is larger than 25 MB.'
   return null
 }
 
 export function newImagePath(teamId: string, folder: string, type: string): string {
   const extension = EXTENSIONS[type]
-  if (!extension) throw new UserFacingError('Use uma imagem PNG, JPG ou WebP.')
+  if (!extension) throw new UserFacingError('Use a PNG, JPG or WebP image.')
   return `${teamId}/${folder}/${crypto.randomUUID()}.${extension}`.toLowerCase()
 }
 

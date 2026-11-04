@@ -6,5 +6,5 @@ it('reads the Supabase URL and anon key', () => {
 })
 
 it('names both variables when one is missing', () => {
-  expect(() => readEnv({ VITE_SUPABASE_URL: 'x' })).toThrow(/VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY/)
+  expect(() => readEnv({ VITE_SUPABASE_URL: 'x' })).toThrow(/Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY/)
 })

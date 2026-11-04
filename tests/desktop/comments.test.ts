@@ -63,10 +63,10 @@ it('espectador gets the friendly error', async () => {
   const v = await createAgentVersion(f)
   const input = { teamId: f.t.teamId, pieceId: f.pieceId, versionId: v.id, body: 'Sem permissão', target: null, parentId: null }
   const error = await addComment(f.t.members.espectador.client, input).catch((e: unknown) => e)
-  expect(friendlyError(error)).toBe('Você não tem permissão para isso.')
+  expect(friendlyError(error)).toBe('You do not have permission to do this.')
   const root = await addComment(f.t.members.designer.client, input)
   const resolveError = await setResolved(f.t.members.espectador.client, root.id, true).catch((e: unknown) => e)
-  expect(friendlyError(resolveError)).toBe('Você não tem permissão para isso.')
+  expect(friendlyError(resolveError)).toBe('You do not have permission to do this.')
   expect((await loadComments(f.t.members.designer.client, f.pieceId))[0]?.resolved).toBe(false)
 })
 

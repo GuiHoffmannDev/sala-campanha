@@ -226,11 +226,11 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
           membersInPiece={memberList.filter((m) => inPiece.has(m.userId))}
           onStepBack={async () => { if (pieceId) { await stepBack(client, pieceId); reload() } }}
           onUploadFinal={() => { setOpenReferences(null); setUploadPieceId(pieceId) }} />}
-        {showingSettings && <button type="button" onClick={() => setSettingsTeam(null)}>Voltar às campanhas</button>}
+        {showingSettings && <button type="button" onClick={() => setSettingsTeam(null)}>Back to campaigns</button>}
         {!showingSettings && campaign && <div className="campaign-tools">
           <button type="button" aria-expanded={showingReferences}
             onClick={() => setOpenReferences(showingReferences ? null : referenceScope)}>
-            {showingReferences ? (piece ? 'Voltar à peça' : 'Voltar à campanha') : 'Referências'}
+            {showingReferences ? (piece ? 'Back to piece' : 'Back to campaign') : 'References'}
           </button>
         </div>}
         {error && <p role="alert">{error}</p>}
@@ -242,7 +242,7 @@ export function Shell({ client, memberships, teamId, route, onNavigate, onSwitch
             : piece
             ? <Chat key={piece.id} client={client} piece={piece} role={role ?? 'espectador'} members={memberList}
               onChange={reload} uploadFinalOpen={uploadPieceId === piece.id} onCloseUpload={() => setUploadPieceId(null)} />
-            : <p className="shell-empty">Escolha uma peça</p>}
+            : <p className="shell-empty">Choose a piece</p>}
         </main>
       </div>
       {!showingSettings && campaignId && (
@@ -287,8 +287,8 @@ function WorkspaceSettings({ client, teamId, onChange, onMembershipChange }: {
   }
 
   if (!data) return error
-    ? <div><p role="alert">{error}</p><button type="button" onClick={() => setAttempt((n) => n + 1)}>Tentar de novo</button></div>
-    : <p role="status">Carregando configurações…</p>
+    ? <div><p role="alert">{error}</p><button type="button" onClick={() => setAttempt((n) => n + 1)}>Try again</button></div>
+    : <p role="status">Loading settings…</p>
 
   return <Settings teamId={teamId} {...data}
     onSaveKey={(provider, key) => change(() => saveKey(client, teamId, provider, key))}
@@ -338,7 +338,7 @@ function CampaignReferences({ client, teamId, campaignId, canUpload }: {
   }
 
   return <div className="campaign-references">
-    {loading && <p role="status">Carregando referências…</p>}
+    {loading && <p role="status">Loading references…</p>}
     {error && <p role="alert">{error}</p>}
     <ReferenceLibrary references={references} urls={urls} canUpload={canUpload} selectable={false}
       selected={[]} onUpload={upload} onSelect={() => {}} />

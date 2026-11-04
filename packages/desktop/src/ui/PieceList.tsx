@@ -19,7 +19,7 @@ export function PieceList({ pieces, thumbnails, selectedId, canWrite, onSelect, 
   const [kind, setKind] = useState<PieceKind>('imagem')
 
   return (
-    <section className="piece-list" aria-label="Peças da campanha">
+    <section className="piece-list" aria-label="Campaign pieces">
       <ul>
         {pieces.map((p) => (
           <li key={p.id}>
@@ -37,21 +37,21 @@ export function PieceList({ pieces, thumbnails, selectedId, canWrite, onSelect, 
       </ul>
       {canWrite && (creating ? (
         <NameForm
-          label="Título da peça" submitLabel="Criar peça" onCancel={() => setCreating(false)}
+          label="Piece title" submitLabel="Create piece" onCancel={() => setCreating(false)}
           onSubmit={async (title) => {
             await onCreatePiece(title, kind)
             setCreating(false)
           }}
         >
           <label>
-            Tipo
+            Type
             <select value={kind} onChange={(e) => setKind(e.target.value as PieceKind)}>
               {PIECE_KINDS.map((k) => <option key={k} value={k}>{KIND_LABELS[k]}</option>)}
             </select>
           </label>
         </NameForm>
       ) : (
-        <button type="button" onClick={() => setCreating(true)}>Nova peça</button>
+        <button type="button" onClick={() => setCreating(true)}>New piece</button>
       ))}
     </section>
   )
